@@ -2,9 +2,9 @@
 
 Browser-based tool for building, editing, assigning, archiving, and printing `Erwartungshorizonte` and correction sheets for NRW school contexts.
 
-## Screenshot
+70% Vibe-Coded to be honest. Still might be a good tool for a lot of educators.
 
-Add a current screenshot here once one is available.
+## Screenshot
 
 ```md
 ![App screenshot](./docs/screenshot-current-state.png)
