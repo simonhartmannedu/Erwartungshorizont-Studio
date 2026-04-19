@@ -1,0 +1,10 @@
+dist
+.regression-dist
+node_modules
+.codex
+public/.codex
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+tailwind.config.js
+tailwind.config.d.ts
