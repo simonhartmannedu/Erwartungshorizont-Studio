@@ -2,8 +2,8 @@ import { Fragment, useMemo, useState } from "react";
 import { DraftWorkspace, ExpectationArchiveEntry, StudentDatabase } from "../types";
 import { formatDateTime, formatNumber } from "../utils/format";
 import { getStudentAssessment } from "../utils/students";
-import { DuplicateIcon, OpenIcon, TrashIcon } from "./icons";
-import { Card, Field } from "./ui";
+import { CheckIcon, ChevronDownIcon, CloseIcon, DuplicateIcon, GroupIcon, OpenIcon, TrashIcon } from "./icons";
+import { Card, Field, IconButton } from "./ui";
 
 interface Props {
   entries: ExpectationArchiveEntry[];
@@ -11,6 +11,7 @@ interface Props {
   workspaces: DraftWorkspace[];
   onOpen: (entry: ExpectationArchiveEntry) => void;
   onDuplicateToBuilder: (entry: ExpectationArchiveEntry) => void;
+  onAssignCopyToGroup: (entry: ExpectationArchiveEntry, groupId: string) => void;
   onDelete: (entry: ExpectationArchiveEntry) => void;
 }
 
@@ -20,11 +21,16 @@ export const ExpectationArchiveDashboard = ({
   workspaces,
   onOpen,
   onDuplicateToBuilder,
+  onAssignCopyToGroup,
   onDelete,
 }: Props) => {
   const [search, setSearch] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"savedAt" | "grade" | "title" | "points">("savedAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [assigningEntryId, setAssigningEntryId] = useState<string | null>(null);
+  const [selectedGroupByEntryId, setSelectedGroupByEntryId] = useState<Record<string, string>>({});
 
   const years = useMemo(
     () => [...new Set(entries.map((entry) => entry.schoolYear).filter(Boolean))].sort().reverse(),
@@ -38,7 +44,7 @@ export const ExpectationArchiveDashboard = ({
 
   const filteredEntries = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return entries.filter((entry) => {
+    const visibleEntries = entries.filter((entry) => {
       const matchesSearch =
         !term ||
         [
@@ -57,7 +63,56 @@ export const ExpectationArchiveDashboard = ({
         (!gradeFilter || entry.gradeLevel === gradeFilter)
       );
     });
-  }, [entries, gradeFilter, search, yearFilter]);
+
+    const directionFactor = sortDirection === "asc" ? 1 : -1;
+
+    return [...visibleEntries].sort((left, right) => {
+      switch (sortBy) {
+        case "grade":
+          return directionFactor * `${left.gradeLevel} ${left.course} ${left.schoolYear}`.localeCompare(
+            `${right.gradeLevel} ${right.course} ${right.schoolYear}`,
+            "de-DE",
+            { numeric: true, sensitivity: "base" },
+          );
+        case "title":
+          return directionFactor * left.examTitle.localeCompare(right.examTitle, "de-DE", {
+            numeric: true,
+            sensitivity: "base",
+          });
+        case "points":
+          return directionFactor * (left.totalMaxPoints - right.totalMaxPoints);
+        case "savedAt":
+        default:
+          return directionFactor * (new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+      }
+    });
+  }, [entries, gradeFilter, search, sortBy, sortDirection, yearFilter]);
+
+  const handleSort = (nextSortBy: typeof sortBy) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortBy(nextSortBy);
+    setSortDirection(nextSortBy === "title" || nextSortBy === "grade" ? "asc" : "desc");
+  };
+
+  const renderSortLabel = (label: string, columnSortBy: typeof sortBy) => (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 font-semibold"
+      onClick={() => handleSort(columnSortBy)}
+      title={`Nach ${label} sortieren`}
+    >
+      <span>{label}</span>
+      <ChevronDownIcon
+        className={`h-3.5 w-3.5 transition-transform ${
+          sortBy === columnSortBy && sortDirection === "asc" ? "rotate-180" : ""
+        }`}
+      />
+    </button>
+  );
 
   const progressByEntryId = useMemo(
     () =>
@@ -65,7 +120,7 @@ export const ExpectationArchiveDashboard = ({
         entries.map((entry) => {
           const linkedWorkspaces = workspaces.filter(
             (workspace, index, allWorkspaces) =>
-              (workspace.activeArchiveEntryId === entry.id || workspace.exam.id === entry.examId) &&
+              workspace.activeArchiveEntryId === entry.id &&
               allWorkspaces.findIndex((candidate) => candidate.id === workspace.id) === index,
           );
 
@@ -114,12 +169,14 @@ export const ExpectationArchiveDashboard = ({
     [entries, studentDatabase, workspaces],
   );
 
+  const getSelectedGroupId = (entryId: string) => selectedGroupByEntryId[entryId] ?? "";
+
   return (
     <Card
       title="Erwartungshorizont-Archiv"
       subtitle="Gespeicherte Bewertungsbögen zum Wiederverwenden, Öffnen oder Duplizieren."
     >
-      <div className="mb-5 grid gap-3 md:grid-cols-3">
+      <div className="mb-5 grid gap-3 md:grid-cols-4">
         <Field label="Suche">
           <input className="field" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Titel, Lehrkraft, Kurs ..." />
         </Field>
@@ -141,6 +198,26 @@ export const ExpectationArchiveDashboard = ({
                 {grade}
               </option>
             ))}
+          </select>
+        </Field>
+        <Field label="Sortierung">
+          <select
+            className="field"
+            value={`${sortBy}:${sortDirection}`}
+            onChange={(event) => {
+              const [nextSortBy, nextSortDirection] = event.target.value.split(":") as [typeof sortBy, typeof sortDirection];
+              setSortBy(nextSortBy);
+              setSortDirection(nextSortDirection);
+            }}
+          >
+            <option value="savedAt:desc">Zuletzt gespeichert</option>
+            <option value="savedAt:asc">Zuerst gespeichert</option>
+            <option value="title:asc">Titel A-Z</option>
+            <option value="title:desc">Titel Z-A</option>
+            <option value="grade:asc">Klasse A-Z</option>
+            <option value="grade:desc">Klasse Z-A</option>
+            <option value="points:desc">Meiste Punkte</option>
+            <option value="points:asc">Wenigste Punkte</option>
           </select>
         </Field>
       </div>
@@ -178,10 +255,10 @@ export const ExpectationArchiveDashboard = ({
             }}
           >
             <tr>
-              <th className="px-4 py-3">Klasse / Jahr / Datum</th>
-              <th className="px-4 py-3">Vorlage</th>
+              <th className="px-4 py-3">{renderSortLabel("Klasse / Jahr / Datum", "grade")}</th>
+              <th className="px-4 py-3">{renderSortLabel("Vorlage", "title")}</th>
               <th className="px-4 py-3">Struktur</th>
-              <th className="px-4 py-3">Punkte / Horizonte</th>
+              <th className="px-4 py-3">{renderSortLabel("Punkte / Horizonte", "points")}</th>
               <th className="px-4 py-3 text-right">Aktionen</th>
             </tr>
           </thead>
@@ -237,19 +314,92 @@ export const ExpectationArchiveDashboard = ({
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <button type="button" className="button-primary gap-2" onClick={() => onOpen(entry)}>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <IconButton
+                          onClick={() => onOpen(entry)}
+                          title="Im Builder öffnen"
+                          className="px-3 py-2"
+                        >
                           <OpenIcon />
-                          Im Builder öffnen
-                        </button>
-                        <button type="button" className="button-secondary gap-2" onClick={() => onDuplicateToBuilder(entry)}>
+                        </IconButton>
+                        {assigningEntryId === entry.id ? (
+                          <>
+                            <label className="min-w-[240px]">
+                              <span className="sr-only">Lerngruppe auswählen</span>
+                              <select
+                                className="field"
+                                value={getSelectedGroupId(entry.id)}
+                                onChange={(event) =>
+                                  setSelectedGroupByEntryId((current) => ({
+                                    ...current,
+                                    [entry.id]: event.target.value,
+                                  }))
+                                }
+                                disabled={studentDatabase.groups.length === 0}
+                              >
+                                <option value="">Lerngruppe wählen</option>
+                                {studentDatabase.groups.map((group) => (
+                                  <option key={group.id} value={group.id}>
+                                    {group.subject} · {group.className}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <IconButton
+                              onClick={() => {
+                                onAssignCopyToGroup(entry, getSelectedGroupId(entry.id));
+                                setAssigningEntryId(null);
+                              }}
+                              title="Ausgewählter Lerngruppe zuordnen"
+                              className="px-3 py-2"
+                            >
+                              <CheckIcon />
+                            </IconButton>
+                            <IconButton
+                              onClick={() => {
+                                setAssigningEntryId(null);
+                                setSelectedGroupByEntryId((current) => ({
+                                  ...current,
+                                  [entry.id]: "",
+                                }));
+                              }}
+                              title="Zuordnung abbrechen"
+                              variant="soft"
+                              className="px-3 py-2"
+                            >
+                              <CloseIcon />
+                            </IconButton>
+                          </>
+                        ) : (
+                          <IconButton
+                            onClick={() => {
+                              setAssigningEntryId(entry.id);
+                              setSelectedGroupByEntryId((current) => ({
+                                ...current,
+                                [entry.id]: current[entry.id] ?? "",
+                              }));
+                            }}
+                            title="Lerngruppe zuordnen"
+                            className="px-3 py-2"
+                          >
+                            <GroupIcon />
+                          </IconButton>
+                        )}
+                        <IconButton
+                          onClick={() => onDuplicateToBuilder(entry)}
+                          title="Als Kopie öffnen"
+                          className="px-3 py-2"
+                        >
                           <DuplicateIcon />
-                          Als Kopie öffnen
-                        </button>
-                        <button type="button" className="button-soft gap-2" onClick={() => onDelete(entry)}>
+                        </IconButton>
+                        <IconButton
+                          onClick={() => onDelete(entry)}
+                          title="Archiv-Eintrag löschen"
+                          variant="soft"
+                          className="px-3 py-2"
+                        >
                           <TrashIcon />
-                          Löschen
-                        </button>
+                        </IconButton>
                       </div>
                     </td>
                   </tr>

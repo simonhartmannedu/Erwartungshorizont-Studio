@@ -9,6 +9,7 @@ export const ReportSummarySection = ({
   exam,
   summary,
   teacherComment,
+  commentPreview,
   signatureDataUrl,
   onTeacherCommentChange,
   onSignatureChange,
@@ -16,11 +17,13 @@ export const ReportSummarySection = ({
   exam: Exam;
   summary: ExamSummary;
   teacherComment?: string;
+  commentPreview?: string;
   signatureDataUrl?: string | null;
   onTeacherCommentChange?: (value: string) => void;
   onSignatureChange?: (value: string | null) => void;
 }) => {
   const normalizedTeacherComment = teacherComment?.trim() ?? "";
+  const normalizedCommentPreview = commentPreview?.trim() ?? "";
   const germanPrintDate = new Date().toLocaleDateString("de-DE");
   const hasEditableFooter = Boolean(onTeacherCommentChange || onSignatureChange);
   const hasPrintedComment = Boolean(normalizedTeacherComment);
@@ -110,15 +113,25 @@ export const ReportSummarySection = ({
                     <textarea
                       className="field mt-3 min-h-32 no-print"
                       value={teacherComment ?? ""}
-                      placeholder="Optionaler Kommentar für den Ausdruck"
+                      placeholder="Kommentar für den Ausdruck. Platzhalter: $Name$, $Vorname$, $Nachname$, $Kürzel$, $Klasse$, $Fach$, $Punkte$, $MaxPunkte$, $Prozent$, $Note$."
                       onChange={(event) => onTeacherCommentChange(event.target.value)}
                     />
+                    <p className="themed-muted mt-2 text-xs leading-5 no-print">
+                      Platzhalter werden erst im Ausdruck bzw. Export aufgelöst, z. B. mit dem Namen des jeweiligen
+                      Kindes.
+                    </p>
+                    {normalizedTeacherComment && normalizedCommentPreview && normalizedCommentPreview !== normalizedTeacherComment ? (
+                      <div className="surface-muted mt-3 rounded-2xl p-3 no-print">
+                        <p className="label">Vorschau mit Platzhaltern</p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{normalizedCommentPreview}</p>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
-                  <p className="mt-3 whitespace-pre-wrap">{normalizedTeacherComment}</p>
+                  <p className="mt-3 whitespace-pre-wrap">{normalizedCommentPreview || normalizedTeacherComment}</p>
                 )}
                 {onTeacherCommentChange && hasPrintedComment ? (
-                  <p className="print-only mt-3 whitespace-pre-wrap">{normalizedTeacherComment}</p>
+                  <p className="print-only mt-3 whitespace-pre-wrap">{normalizedCommentPreview || normalizedTeacherComment}</p>
                 ) : null}
               </div>
             ) : null}
@@ -130,7 +143,12 @@ export const ReportSummarySection = ({
                 </p>
                 {onSignatureChange ? (
                   <div className="mt-3 no-print">
-                    <SignaturePad value={signatureDataUrl} onSave={onSignatureChange} onClear={() => onSignatureChange(null)} />
+                    <SignaturePad
+                      value={signatureDataUrl}
+                      onSave={onSignatureChange}
+                      onClear={() => onSignatureChange(null)}
+                      importSvgPath="/signature.svg"
+                    />
                   </div>
                 ) : signatureDataUrl ? (
                   <img

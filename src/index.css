@@ -618,6 +618,55 @@
     box-shadow: none;
   }
 
+  .tooltip-anchor {
+    position: relative;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-tooltip {
+    pointer-events: none;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.55rem);
+    z-index: 60;
+    width: max-content;
+    max-width: min(18rem, 70vw);
+    transform: translateX(-50%) translateY(0.2rem);
+    border-radius: 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--app-text-strong) 10%, var(--app-secondary-border));
+    background: color-mix(in srgb, var(--app-panel-bg) 92%, var(--app-bg));
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+    color: var(--app-text-strong);
+    opacity: 0;
+    padding: 0.45rem 0.65rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    transition: opacity 140ms ease, transform 140ms ease;
+    white-space: normal;
+  }
+
+  .app-tooltip::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 0.7rem;
+    height: 0.7rem;
+    transform: translateX(-50%) rotate(45deg);
+    border-right: 1px solid color-mix(in srgb, var(--app-text-strong) 10%, var(--app-secondary-border));
+    border-bottom: 1px solid color-mix(in srgb, var(--app-text-strong) 10%, var(--app-secondary-border));
+    background: color-mix(in srgb, var(--app-panel-bg) 92%, var(--app-bg));
+  }
+
+  .tooltip-anchor:hover .app-tooltip,
+  .tooltip-anchor:focus-within .app-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
   .print-report-meta-row {
     @apply rounded-3xl border px-5 py-4 text-sm leading-7 backdrop-blur-xl;
     border-color: var(--app-border);
@@ -794,6 +843,88 @@
 
   .status-note {
     color: var(--app-label);
+  }
+
+  .empty-workspace-state {
+    @apply rounded-[1.75rem] border p-4 sm:p-5;
+    border-color: color-mix(in srgb, var(--app-secondary-border) 90%, transparent);
+    background: color-mix(in srgb, var(--app-secondary-bg) 94%, transparent);
+  }
+
+  .empty-workspace-scene {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 5.75rem;
+    margin-bottom: 0.8rem;
+    image-rendering: pixelated;
+    text-align: center;
+  }
+
+  .empty-workspace-title {
+    font-family: "Manrope", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--app-text-strong);
+  }
+
+  .empty-workspace-loader {
+    display: inline-flex;
+    gap: 0.32rem;
+    padding: 0.38rem;
+    border: 1px solid color-mix(in srgb, var(--app-text-strong) 22%, transparent);
+    color: var(--app-text-strong);
+    background: transparent;
+    image-rendering: pixelated;
+  }
+
+  .empty-workspace-loader span {
+    width: 0.95rem;
+    height: 0.7rem;
+    background: color-mix(in srgb, var(--app-text-strong) 14%, transparent);
+    animation: empty-loader-step 1.1s steps(2, end) infinite;
+  }
+
+  .empty-workspace-loader span:nth-child(2) {
+    animation-delay: 0.12s;
+  }
+
+  .empty-workspace-loader span:nth-child(3) {
+    animation-delay: 0.24s;
+  }
+
+  .empty-workspace-loader span:nth-child(4) {
+    animation-delay: 0.36s;
+  }
+
+  .empty-workspace-loader span:nth-child(5) {
+    animation-delay: 0.48s;
+  }
+
+  .empty-workspace-loader span:nth-child(6) {
+    animation-delay: 0.6s;
+  }
+
+  @keyframes empty-loader-step {
+    0%,
+    100% {
+      background: color-mix(in srgb, var(--app-text-strong) 14%, transparent);
+    }
+
+    50% {
+      background: var(--app-text-strong);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .empty-workspace-loader span {
+      animation: none !important;
+      background: color-mix(in srgb, var(--app-text-strong) 24%, transparent);
+    }
   }
 
   .warning-note {
@@ -2091,31 +2222,53 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   margin-top: 0.85rem;
   min-height: 2.05rem;
   padding: 0.45rem 0.85rem;
   border-radius: 9999px;
-  border: 1px solid color-mix(in srgb, #72a4f2 70%, white 10%);
-  background: linear-gradient(180deg, color-mix(in srgb, #72a4f2 84%, white 8%), #72a4f2);
-  color: white;
+  border: 1px solid color-mix(in srgb, var(--app-field-focus) 34%, var(--app-secondary-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--app-primary-bg) 84%, var(--app-field-focus)) 0%,
+      color-mix(in srgb, var(--app-field-focus) 72%, var(--app-soft-bg) 28%) 100%
+    );
+  color: var(--app-primary-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   text-decoration: none;
-  box-shadow: 0 10px 24px color-mix(in srgb, #72a4f2 28%, transparent);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--app-primary-bg) 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+  transition:
+    transform 150ms ease-out,
+    box-shadow 150ms ease-out,
+    border-color 150ms ease-out,
+    filter 150ms ease-out;
 }
 
 .app-footer-support-button:hover {
-  filter: brightness(1.03);
+  border-color: color-mix(in srgb, var(--app-field-focus) 56%, var(--app-secondary-border-hover));
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--app-primary-bg) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
+  filter: saturate(1.04) brightness(1.02);
+  transform: translateY(-1px);
 }
 
 .app-footer-support-button:focus {
-  outline: 2px solid color-mix(in srgb, #72a4f2 60%, white 30%);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--app-primary-ring) 92%, transparent),
+    0 14px 28px color-mix(in srgb, var(--app-primary-bg) 26%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
 }
 
 .app-footer-support-button:active {
-  transform: translateY(1px);
+  transform: translateY(0);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--app-primary-bg) 18%, transparent);
 }
 
 .app-footer .label,

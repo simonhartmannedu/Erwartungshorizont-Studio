@@ -2,9 +2,8 @@
 
 set -eu
 
+PROJECT_DIR="/home/simon/Dokumente/Codex-Stuff/EWH"
 NPM_BIN="/usr/bin/npm"
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PROJECT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 cd "$PROJECT_DIR"
 
