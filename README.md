@@ -107,3 +107,7 @@ License summary:
 - personal, educational, and other noncommercial use is allowed
 - commercial use or redistribution requires a separate written license
 - full terms are in [LICENSE](LICENSE)
+
+## Support me
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/M4M41Y3MP2)
