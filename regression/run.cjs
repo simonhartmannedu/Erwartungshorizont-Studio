@@ -24,13 +24,13 @@ const { createPasswordVerifier, decryptText, encryptText, verifyPassword } = req
   "../.regression-dist/src/utils/crypto.js",
 );
 const { cloneExam, withExamMeta } = require("../.regression-dist/src/utils/exam.js");
+const { generateAutomatedExamFeedback } = require("../.regression-dist/src/utils/reportFeedback.js");
 const {
   createEncryptedStudentDatabaseBackup,
   describeBackupStatus,
   parseStudentDatabaseBackup,
 } = require("../.regression-dist/src/utils/backup.js");
 const { renderPrintDocument } = require("../.regression-dist/src/utils/export.js");
-const { generateAutomatedExamFeedback } = require("../.regression-dist/src/utils/reportFeedback.js");
 const { parseDraftBundle, parseStudentDatabaseState } = require("../.regression-dist/src/utils/storage.js");
 const {
   getEffectiveSignatureDataUrl,
@@ -214,10 +214,9 @@ const testPrintEscaping = async () => {
 
 const testClassDefaultSignatureFallback = async () => {
   const { database } = await createStudentDatabase();
-  const fallbackSignature = "data:image/png;base64,AA==";
   const group = {
     ...database.groups[0],
-    defaultSignatureDataUrl: fallbackSignature,
+    defaultSignatureDataUrl: "/signature.svg",
   };
   const assessment = {
     ...database.assessments["student-1"],
@@ -226,7 +225,7 @@ const testClassDefaultSignatureFallback = async () => {
   const summary = calculateExamSummary(sampleExam);
   const effectiveSignature = getEffectiveSignatureDataUrl(group, assessment);
 
-  assert.equal(effectiveSignature, fallbackSignature);
+  assert.equal(effectiveSignature, "/signature.svg");
 
   const html = renderPrintDocument([
     {
@@ -243,7 +242,7 @@ const testClassDefaultSignatureFallback = async () => {
     },
   ]);
 
-  assert.match(html, /src="data:image\/png;base64,AA=="/);
+  assert.match(html, /src="\/signature\.svg"/);
 };
 
 const testTaskScoreScaling = async () => {

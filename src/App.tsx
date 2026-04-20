@@ -85,14 +85,24 @@ import {
   updateStudentSignature,
   updateTeacherComment,
 } from "./utils/students";
-import { downloadDataFile, openBatchPrintWindow, openClassOverviewPrintWindow, openGradeScalePrintWindow, openPrintWindow } from "./utils/export";
+import {
+  downloadCsvFile,
+  downloadDataFile,
+  exportClassOverviewCsv,
+  exportGradeScaleCsv,
+  exportStudentExamCsv,
+  openBatchPrintWindow,
+  openClassOverviewPrintWindow,
+  openGradeScalePrintWindow,
+  openPrintWindow,
+  resolveCommentTemplate,
+} from "./utils/export";
 import { ImportSortOptions, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
 import { ExamHeaderForm } from "./components/ExamHeaderForm";
 import { SectionEditor } from "./components/SectionEditor";
 import { GradeScaleEditor } from "./components/GradeScaleEditor";
 import { SummaryPanel } from "./components/SummaryPanel";
 import { ClassOverviewPanel } from "./components/ClassOverviewPanel";
-import { PrintableReport } from "./components/PrintableReport";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { ExpectationArchiveDashboard } from "./components/ExpectationArchiveDashboard";
@@ -132,6 +142,7 @@ type PendingTemplateLoad = {
   target: GuidedBuilderTarget;
   gradeScale: Exam["gradeScale"];
   meta: Exam["meta"];
+  targetGroupId: string | null;
 };
 type PendingSectionTotalChange = {
   sectionId: string;
@@ -338,7 +349,48 @@ const moveBlock = <T,>(
 const normalizeArchiveTitle = (value: string) => value.trim().toLocaleLowerCase("de-DE");
 
 const workspaceMatchesGroup = (workspace: DraftWorkspace, groupId: string) =>
-  !groupId || workspace.assignedGroupId === groupId || workspace.assignedGroupId === null;
+  !groupId || workspace.assignedGroupId === groupId;
+
+const getWorkspaceCorrectionSnapshot = (
+  workspace: DraftWorkspace,
+  group: ReturnType<typeof getStudentGroup>,
+  database: StudentDatabase,
+) => {
+  const relevantStudents = (group?.students ?? []).filter((student) => !student.isAbsent);
+  const correctedCount = relevantStudents.reduce((count, student) => {
+    const correctionStatus = getStudentCorrectionStatus(
+      workspace.exam,
+      getStudentAssessment(database, student.id, workspace.id),
+    );
+    return correctionStatus === "corrected" ? count + 1 : count;
+  }, 0);
+
+  return {
+    correctedCount,
+    relevantStudentCount: relevantStudents.length,
+    allCorrected: relevantStudents.length > 0 && correctedCount === relevantStudents.length,
+  };
+};
+
+const pickPreferredWorkspaceForGroup = (
+  workspaces: DraftWorkspace[],
+  group: ReturnType<typeof getStudentGroup>,
+  database: StudentDatabase,
+) =>
+  [...workspaces].sort((left, right) => {
+    const leftSnapshot = getWorkspaceCorrectionSnapshot(left, group, database);
+    const rightSnapshot = getWorkspaceCorrectionSnapshot(right, group, database);
+
+    if (leftSnapshot.allCorrected !== rightSnapshot.allCorrected) {
+      return leftSnapshot.allCorrected ? -1 : 1;
+    }
+
+    if (leftSnapshot.correctedCount !== rightSnapshot.correctedCount) {
+      return rightSnapshot.correctedCount - leftSnapshot.correctedCount;
+    }
+
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  })[0] ?? null;
 
 const toFiniteNumber = (value: unknown, fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -497,11 +549,11 @@ function App() {
   const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode>(null);
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
-  const [printPreviewCollapsed, setPrintPreviewCollapsed] = useState(true);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
   const [confettiBurstKey, setConfettiBurstKey] = useState(0);
   const completedCorrectionCelebrationKeysRef = useRef<Record<string, boolean>>({});
   const lastVersionedExamByWorkspaceRef = useRef<Record<string, string>>({});
+  const previousActiveGroupIdRef = useRef<string>("");
 
   const pushNotice = (tone: AppNoticeTone, title: string, detail?: string) => {
     setAppNotice({
@@ -651,13 +703,20 @@ function App() {
     () => draftBundle.workspaces.filter((workspace) => workspaceMatchesGroup(workspace, activeGroupId)),
     [draftBundle.workspaces, activeGroupId],
   );
-  const activeWorkspace =
-    draftBundle.workspaces.find((workspace) => workspace.id === draftBundle.activeWorkspaceId) ??
-    draftBundle.workspaces[0] ??
-    null;
-  const exam = activeWorkspace?.exam ?? normalizeExamStructure(createEmptyExam());
-  const activeArchiveEntryId = activeWorkspace?.activeArchiveEntryId ?? null;
+  const emptyGroupExam = useMemo(() => normalizeExamStructure(createEmptyExam()), []);
+  const hasNoAssignedWorkspaceForActiveGroup = Boolean(activeGroupId) && visibleWorkspaces.length === 0;
   const activeGroup = getStudentGroup(studentDatabase, activeGroupId);
+  const preferredWorkspaceForActiveGroup = useMemo(
+    () => pickPreferredWorkspaceForGroup(visibleWorkspaces, activeGroup, studentDatabase),
+    [activeGroup, studentDatabase, visibleWorkspaces],
+  );
+  const activeWorkspace =
+    visibleWorkspaces.find((workspace) => workspace.id === draftBundle.activeWorkspaceId) ??
+    preferredWorkspaceForActiveGroup ??
+    visibleWorkspaces[0] ??
+    null;
+  const exam = activeWorkspace?.exam ?? emptyGroupExam;
+  const activeArchiveEntryId = activeWorkspace?.activeArchiveEntryId ?? null;
   const activeStudentRecord = getStudentRecord(studentDatabase, activeStudentId);
   const activeAssessment = activeStudentId
     ? getStudentAssessment(studentDatabase, activeStudentId, activeWorkspace?.id ?? null)
@@ -791,10 +850,25 @@ function App() {
 
     setDraftBundle((current) => ({
       ...current,
-      activeWorkspaceId: visibleWorkspaces[0]!.id,
+      activeWorkspaceId: (pickPreferredWorkspaceForGroup(visibleWorkspaces, activeGroup, studentDatabase) ?? visibleWorkspaces[0])!.id,
     }));
     setCollapsedSectionIds([]);
-  }, [activeGroupId, activeWorkspace, visibleWorkspaces]);
+  }, [activeGroup, activeGroupId, activeWorkspace, studentDatabase, visibleWorkspaces]);
+
+  useEffect(() => {
+    const previousGroupId = previousActiveGroupIdRef.current;
+    previousActiveGroupIdRef.current = activeGroupId;
+
+    if (!activeGroupId || previousGroupId === activeGroupId) return;
+    if (!preferredWorkspaceForActiveGroup) return;
+    if (draftBundle.activeWorkspaceId === preferredWorkspaceForActiveGroup.id) return;
+
+    setDraftBundle((current) => ({
+      ...current,
+      activeWorkspaceId: preferredWorkspaceForActiveGroup.id,
+    }));
+    setCollapsedSectionIds([]);
+  }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup]);
 
   const displayExam = useMemo(
     () => (storageReady ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
@@ -1050,10 +1124,13 @@ function App() {
   };
 
   const setActiveWorkspaceArchiveEntryId = (nextActiveArchiveEntryId: string | null) => {
+    const activeWorkspaceId = activeWorkspace?.id;
+    if (!activeWorkspaceId) return;
+
     setDraftBundle((current) => ({
       ...current,
       workspaces: current.workspaces.map((workspace) =>
-        workspace.id === current.activeWorkspaceId
+        workspace.id === activeWorkspaceId
           ? { ...workspace, activeArchiveEntryId: nextActiveArchiveEntryId }
           : workspace,
       ),
@@ -1061,10 +1138,13 @@ function App() {
   };
 
   const setActiveWorkspaceGroupId = (nextGroupId: string | null) => {
+    const activeWorkspaceId = activeWorkspace?.id;
+    if (!activeWorkspaceId) return;
+
     setDraftBundle((current) => ({
       ...current,
       workspaces: current.workspaces.map((workspace) =>
-        workspace.id === current.activeWorkspaceId
+        workspace.id === activeWorkspaceId
           ? { ...workspace, assignedGroupId: nextGroupId }
           : workspace,
       ),
@@ -1072,10 +1152,13 @@ function App() {
   };
 
   const setActiveWorkspaceExam = (updater: Exam | ((current: Exam) => Exam)) => {
+    const activeWorkspaceId = activeWorkspace?.id;
+    if (!activeWorkspaceId) return;
+
     setDraftBundle((current) => ({
       ...current,
       workspaces: current.workspaces.map((workspace) => {
-        if (workspace.id !== current.activeWorkspaceId) return workspace;
+        if (workspace.id !== activeWorkspaceId) return workspace;
         const nextExam = typeof updater === "function" ? (updater as (current: Exam) => Exam)(workspace.exam) : updater;
         return { ...workspace, exam: nextExam, updatedAt: new Date().toISOString() };
       }),
@@ -1471,11 +1554,23 @@ function App() {
     setSectionDropIndicator(null);
   };
 
+  const syncBuilderToGroup = (groupId: string | null) => {
+    if (!groupId) return null;
+
+    const targetGroup = getStudentGroup(studentDatabaseRef.current, groupId);
+    if (!targetGroup) return null;
+
+    setActiveGroupId(targetGroup.id);
+    setActiveStudentId(targetGroup.students[0]?.id ?? "");
+    return targetGroup;
+  };
+
   const applyTemplate = (
     template: ExamTemplateDefinition,
     target: GuidedBuilderTarget,
     gradeScale: Exam["gradeScale"],
     meta: Exam["meta"],
+    targetGroupId: string | null,
   ) => {
     const nextExam = normalizeExamStructure(
       withExamMeta(
@@ -1491,17 +1586,23 @@ function App() {
       setActiveWorkspaceArchiveEntryId(null);
       setActiveWorkspaceGroupId(activeGroupId || null);
     } else {
-      addWorkspace(nextExam, { assignedGroupId: activeGroupId || null });
+      const assignedGroupId = targetGroupId || activeGroupId || null;
+      addWorkspace(nextExam, { assignedGroupId });
+      syncBuilderToGroup(assignedGroupId);
     }
     setCollapsedSectionIds([]);
     setActiveTab("builder");
     setTemplateToLoad(null);
+    const assignedGroup =
+      target === "new" ? getStudentGroup(studentDatabaseRef.current, targetGroupId || activeGroupId || "") : null;
     pushNotice(
       "success",
       target === "current" ? "Vorlage übernommen" : "Klassenarbeit erstellt",
       target === "current"
         ? "Die aktuelle Klassenarbeit wurde mit der gewählten Vorlage vollständig aufgebaut."
-        : "Die gewählte Vorlage wurde als neue Klassenarbeit angelegt.",
+        : assignedGroup
+          ? `Die gewählte Vorlage wurde als neue Klassenarbeit für ${assignedGroup.subject} · ${assignedGroup.className} angelegt.`
+          : "Die gewählte Vorlage wurde als neue Klassenarbeit angelegt.",
     );
   };
 
@@ -1511,6 +1612,7 @@ function App() {
     sections: GuidedSectionDraft[];
     target: GuidedBuilderTarget;
     meta: Exam["meta"];
+    targetGroupId: string | null;
   }) => {
     const nextExam = {
       ...exam,
@@ -1543,16 +1645,24 @@ function App() {
       setActiveWorkspaceArchiveEntryId(null);
       setActiveWorkspaceGroupId(activeGroupId || null);
     } else {
-      addWorkspace(nextExam, { assignedGroupId: activeGroupId || null });
+      const assignedGroupId = config.targetGroupId || activeGroupId || null;
+      addWorkspace(nextExam, { assignedGroupId });
+      syncBuilderToGroup(assignedGroupId);
     }
     setCollapsedSectionIds([]);
     setActiveTab("builder");
+    const assignedGroup =
+      config.target === "new"
+        ? getStudentGroup(studentDatabaseRef.current, config.targetGroupId || activeGroupId || "")
+        : null;
     pushNotice(
       "success",
       config.target === "current" ? "Klassenarbeit aufgebaut" : "Neue Klassenarbeit erstellt",
       config.target === "current"
         ? "Die aktuelle Klassenarbeit wurde mit dem geführten Aufbau ersetzt."
-        : "Der geführte Aufbau wurde als neue Klassenarbeit angelegt.",
+        : assignedGroup
+          ? `Der geführte Aufbau wurde als neue Klassenarbeit für ${assignedGroup.subject} · ${assignedGroup.className} angelegt.`
+          : "Der geführte Aufbau wurde als neue Klassenarbeit angelegt.",
     );
   };
 
@@ -1571,6 +1681,25 @@ function App() {
     });
     setCollapsedSectionIds([]);
     setActiveTab("builder");
+  };
+
+  const assignArchiveEntryCopyToGroup = (entry: ExpectationArchiveEntry, groupId: string) => {
+    const targetGroup = getStudentGroup(studentDatabase, groupId);
+    if (!targetGroup) return;
+
+    addWorkspace(createEditableExamFromArchive(entry, { duplicate: true }), {
+      activeArchiveEntryId: entry.id,
+      assignedGroupId: targetGroup.id,
+    });
+    setActiveGroupId(targetGroup.id);
+    setActiveStudentId(targetGroup.students[0]?.id ?? "");
+    setCollapsedSectionIds([]);
+    setActiveTab("builder");
+    pushNotice(
+      "success",
+      "Lerngruppe zugeordnet",
+      `Die Vorlage wurde als neue Klassenarbeit für ${targetGroup.subject} · ${targetGroup.className} angelegt.`,
+    );
   };
 
   const persistArchiveEntry = (incomingEntry: ExpectationArchiveEntry, overwriteId?: string) => {
@@ -1755,6 +1884,13 @@ function App() {
   const handleSignatureChange = (value: string | null) => {
     if (!activeGroup || !activeStudentId) return;
     setStudentDatabase((current) => {
+      if (value === "/signature.svg") {
+        let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, null);
+        next = updateGroupDefaultSignature(next, activeGroup.id, value);
+        studentDatabaseRef.current = next;
+        return next;
+      }
+
       let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, value);
       if (value === null && activeAssessment?.signatureDataUrl == null && activeGroup.defaultSignatureDataUrl) {
         next = updateGroupDefaultSignature(next, activeGroup.id, null);
@@ -2259,20 +2395,151 @@ function App() {
     }
   };
 
+  const handleExportStudentCsv = () => {
+    exportStudentExamCsv(
+      displayExam,
+      summary,
+      activeStudentRecord && activeGroup
+        ? {
+            alias: activeStudentRecord.alias,
+            fullName: activeStudentLiveLabelTitle === "Aktiver Schülername" ? activeStudentLiveLabel : null,
+            subject: activeGroup.subject,
+            className: activeGroup.className,
+            teacherComment: activeAssessment?.teacherComment ?? "",
+          }
+        : undefined,
+    );
+  };
+
+  const handleExportClassCsv = async () => {
+    if (!activeGroup) {
+      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
+      return;
+    }
+
+    if (activeGroup.students.length === 0) {
+      pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
+      return;
+    }
+
+    const namesByStudentId: Record<string, string> = {};
+    if (activeGroup.passwordVerifier) {
+      const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
+      if (unlockedPassword) {
+        const resolvedNames = await Promise.all(
+          activeGroup.students.map(async (student) => {
+            try {
+              const fullName = await decryptText(student.encryptedName, unlockedPassword);
+              return [student.id, fullName] as const;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        resolvedNames.forEach((entry) => {
+          if (!entry) return;
+          namesByStudentId[entry[0]] = entry[1];
+        });
+      }
+    }
+
+    const rows = activeGroup.students.map((student) => {
+      const studentExam = buildExamForStudent(exam, studentDatabaseRef.current, {
+        groupId: activeGroup.id,
+        studentId: student.id,
+      }, activeWorkspace?.id ?? null);
+      const studentSummary = calculateExamSummary(studentExam);
+      const assessment = getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null);
+
+      return {
+        Schuelercode: student.alias,
+        Schuelername: namesByStudentId[student.id] ?? "",
+        Anwesend: student.isAbsent ? "nein" : "ja",
+        Fach: activeGroup.subject,
+        Klasse: activeGroup.className,
+        Titel: exam.meta.title,
+        Datum: exam.meta.examDate,
+        Punkte: studentSummary.totalAchievedPoints,
+        MaxPunkte: studentSummary.totalMaxPoints,
+        Prozent: Number(studentSummary.finalPercentage.toFixed(1)),
+        Note: studentSummary.grade.label,
+        Notenstufe: studentSummary.grade.verbalLabel,
+        Kommentar: resolveCommentTemplate(assessment.teacherComment ?? "", {
+          alias: student.alias,
+          fullName: namesByStudentId[student.id] ?? null,
+          subject: activeGroup.subject,
+          className: activeGroup.className,
+          examTitle: exam.meta.title,
+          examDate: exam.meta.examDate,
+          totalAchievedPoints: studentSummary.totalAchievedPoints,
+          totalMaxPoints: studentSummary.totalMaxPoints,
+          percentage: studentSummary.finalPercentage,
+          gradeLabel: studentSummary.grade.label,
+          gradeVerbalLabel: studentSummary.grade.verbalLabel,
+        }),
+        ZuletztAktualisiert: assessment.updatedAt,
+        GedrucktAm: assessment.printedAt ?? "",
+      };
+    });
+
+    downloadCsvFile(`${activeGroup.className || "Klasse"}_Klassendaten.csv`, rows);
+  };
+
+  const handleExportClassOverviewCsv = () => {
+    if (!activeGroup) {
+      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
+      return;
+    }
+
+    if (!classOverview) {
+      pushNotice("warning", "Keine auswertbaren Daten", "Für die aktive Klasse liegen noch keine auswertbaren Daten vor.");
+      return;
+    }
+
+    exportClassOverviewCsv(displayExam, classOverview, {
+      subject: activeGroup.subject,
+      className: activeGroup.className,
+    });
+  };
+
+  const handleExportGradeScaleCsv = () => {
+    exportGradeScaleCsv(displayExam, summary, activeStudentRecord?.alias ?? displayExam.meta.title);
+  };
+
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
   const printWithoutDetailsLabel = activeStudentRecord
-    ? `Vordruck (${activeStudentRecord.alias})`
-    : "Vordruck";
+    ? `Leerer EWH (${activeStudentRecord.alias})`
+    : "Leerer EWH";
   const printGradeScaleLabel = "Notenbereiche als PDF";
   const classPrintLabel = activeGroup ? `Klasse drucken (${activeGroup.className})` : "Klasse als PDF";
   const classOverviewPrintLabel = activeGroup
     ? `Klassenübersicht drucken (${activeGroup.className})`
     : "Klassenübersicht als PDF";
+  const exportCsvStudentLabel = activeStudentRecord ? `SuS als CSV (${activeStudentRecord.alias})` : "SuS als CSV";
+  const exportCsvClassLabel = activeGroup ? `Klasse als CSV (${activeGroup.className})` : "Klasse als CSV";
+  const exportCsvClassOverviewLabel = activeGroup
+    ? `Klassenübersicht als CSV (${activeGroup.className})`
+    : "Klassenübersicht als CSV";
+  const exportCsvGradeScaleLabel = "Notenbereiche als CSV";
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
       ? "Beim Drucken wird das Klassenpasswort abgefragt und der Klarname nur lokal im Druckfenster entschlüsselt."
-      : "Für diese Klasse ist noch kein Passwort gesetzt. Der Ausdruck nutzt deshalb nur den Schülercode."
-    : "JSON für Rasterdaten, Browser-Print für PDF und Ausdruck.";
+      : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und CSV-Exporte nutzen deshalb nur den Schülercode."
+    : "PDF für Ausdrucke, CSV für Tabellenkalkulationen und JSON für Sicherungen.";
+
+  const resolvedTeacherCommentPreview = resolveCommentTemplate(activeAssessment?.teacherComment ?? "", {
+    alias: activeStudentRecord?.alias ?? "",
+    fullName: activeStudentLiveLabelTitle === "Aktiver Schülername" ? activeStudentLiveLabel : null,
+    subject: activeGroup?.subject,
+    className: activeGroup?.className,
+    examTitle: displayExam.meta.title,
+    examDate: displayExam.meta.examDate,
+    totalAchievedPoints: summary.totalAchievedPoints,
+    totalMaxPoints: summary.totalMaxPoints,
+    percentage: summary.finalPercentage,
+    gradeLabel: summary.grade.label,
+    gradeVerbalLabel: summary.grade.verbalLabel,
+  });
 
   if (storageError) {
     return (
@@ -2433,7 +2700,7 @@ function App() {
             <button
               type="button"
               onClick={saveExpectationsToArchive}
-              className="button-secondary shrink-0 gap-2 whitespace-nowrap"
+              className="button-secondary ml-auto shrink-0 gap-2 whitespace-nowrap border-l pl-4"
             >
               <SaveIcon />
               Im Archiv speichern
@@ -2487,23 +2754,9 @@ function App() {
                     </button>
                   ))}
                   </div>
-                  {activeGroupId && visibleWorkspaces.length === 0 && (
-                    <p className="status-note px-1 pt-3 text-sm leading-6">
-                      Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet. Oeffne eine Archiv-Vorlage oder ordne die aktuelle Arbeit dieser Lerngruppe zu.
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 md:justify-end">
-              {activeGroupId && activeWorkspace?.assignedGroupId !== activeGroupId && (
-                <button
-                  type="button"
-                  className="button-secondary flex-1 gap-2 sm:flex-none"
-                  onClick={() => setActiveWorkspaceGroupId(activeGroupId)}
-                >
-                  Dieser Lerngruppe zuordnen
-                </button>
-              )}
               <button
                 type="button"
                 className="button-secondary flex-1 gap-2 sm:flex-none"
@@ -2523,7 +2776,24 @@ function App() {
               </button>
               </div>
             </div>
-            {activeWorkspace && (
+            {hasNoAssignedWorkspaceForActiveGroup ? (
+              <div className="empty-workspace-state mt-4">
+                <div className="empty-workspace-scene" aria-hidden="true">
+                  <p className="empty-workspace-title">Missing input</p>
+                  <div className="empty-workspace-loader">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+                <p className="status-note text-sm leading-6">
+                  Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet.
+                </p>
+              </div>
+            ) : activeWorkspace && (
               <div className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <div className="surface-muted rounded-2xl p-4">
                   <p className="label">Aktuelle Klassenarbeit</p>
@@ -2654,15 +2924,31 @@ function App() {
               <Card title="Metadaten" subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft.">
                 <ExamHeaderForm
                   meta={exam.meta}
+                  disabled={!activeWorkspace}
                   onChange={(key, value) =>
                     setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
                   }
                 />
+                {!activeWorkspace ? (
+                  <div className="surface-muted mt-4 rounded-2xl p-4">
+                    <p className="label">Noch kein EWH zugeordnet</p>
+                    <p className="themed-muted mt-2 text-sm leading-6">
+                      Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
+                      bis du einen EWH per Wizard anlegst oder eine Vorlage zuweist.
+                    </p>
+                  </div>
+                ) : null}
               </Card>
             )}
 
             {activeTab === "guidedBuilder" && (
               <GuidedExamBuilder
+                groups={studentDatabase.groups.map((group) => ({
+                  id: group.id,
+                  subject: group.subject,
+                  className: group.className,
+                }))}
+                activeGroupId={activeGroupId}
                 templates={examTemplates}
                 initialTotalPoints={summary.totalMaxPoints}
                 initialGradeScale={exam.gradeScale}
@@ -2674,12 +2960,13 @@ function App() {
                   weight: section.weight,
                   description: section.description,
                 }))}
-                onSelectTemplate={(template, target, gradeScale, meta) => {
+                onSelectTemplate={(template, target, gradeScale, meta, targetGroupId) => {
                   setTemplateToLoad({
                     template,
                     target,
                     gradeScale,
                     meta: { ...meta },
+                    targetGroupId,
                   });
                 }}
                 onApplyManualStructure={applyGuidedBuilderStructure}
@@ -2688,112 +2975,146 @@ function App() {
 
             {activeTab === "builder" && (
               <>
-                <Card
-                  title="Punkte und Note"
-                  subtitle="Skaliere bei Bedarf die Gesamtpunktzahl und passe darunter den Notenschlüssel an. Die Gesamtnote wird weiterhin direkt über die erreichten Gesamtpunkte berechnet."
-                  actions={
-                    <div className="control-shell inline-flex items-center gap-1 rounded-full border p-1">
-                      <IconButton
-                        onClick={() => setPointsAndGradeSectionCollapsed((current) => !current)}
-                        title={pointsAndGradeSectionCollapsed ? "Aufklappen" : "Zuklappen"}
-                        className="px-2.5 py-2 text-xs"
-                      >
-                        {pointsAndGradeSectionCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-                      </IconButton>
-                    </div>
-                  }
-                >
-                  {!pointsAndGradeSectionCollapsed && (
-                    <>
-                      <section aria-labelledby="point-scaling-heading">
-                        <div className="mb-4">
-                          <h3 id="point-scaling-heading" className="subsection-title text-lg font-semibold">
-                            Gesamtpunktzahl skalieren
-                          </h3>
-                          <p className="subsection-copy mt-1 text-sm leading-6">
-                            Alle Maximalpunkte werden proportional umgerechnet und als echte Daten gespeichert.
-                          </p>
+                {activeWorkspace ? (
+                  <>
+                    <Card
+                      title="Punkte und Note"
+                      subtitle="Skaliere bei Bedarf die Gesamtpunktzahl und passe darunter den Notenschlüssel an. Die Gesamtnote wird weiterhin direkt über die erreichten Gesamtpunkte berechnet."
+                      actions={
+                        <div className="control-shell inline-flex items-center gap-1 rounded-full border p-1">
+                          <IconButton
+                            onClick={() => setPointsAndGradeSectionCollapsed((current) => !current)}
+                            title={pointsAndGradeSectionCollapsed ? "Aufklappen" : "Zuklappen"}
+                            className="px-2.5 py-2 text-xs"
+                          >
+                            {pointsAndGradeSectionCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+                          </IconButton>
                         </div>
-                        <PointScaleControl
-                          embedded
-                          currentTotal={summary.totalMaxPoints}
-                          onApply={(targetTotal, scaleAchieved) =>
-                            setActiveWorkspaceExam((current) => scaleExamPoints(current, targetTotal, scaleAchieved))
-                          }
-                        />
-                      </section>
+                      }
+                    >
+                      {!pointsAndGradeSectionCollapsed && (
+                        <>
+                          <section aria-labelledby="point-scaling-heading">
+                            <div className="mb-4">
+                              <h3 id="point-scaling-heading" className="subsection-title text-lg font-semibold">
+                                Gesamtpunktzahl skalieren
+                              </h3>
+                              <p className="subsection-copy mt-1 text-sm leading-6">
+                                Alle Maximalpunkte werden proportional umgerechnet und als echte Daten gespeichert.
+                              </p>
+                            </div>
+                            <PointScaleControl
+                              embedded
+                              currentTotal={summary.totalMaxPoints}
+                              onApply={(targetTotal, scaleAchieved) =>
+                                setActiveWorkspaceExam((current) => scaleExamPoints(current, targetTotal, scaleAchieved))
+                              }
+                            />
+                          </section>
 
-                      <div className="my-8 flex justify-center">
-                        <hr className="section-divider w-[90%]" />
-                      </div>
-
-                      <section aria-labelledby="grade-scale-heading">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <h3 id="grade-scale-heading" className="subsection-title text-lg font-semibold">
-                              Notenschlüssel bearbeiten
-                            </h3>
-                            <p className="subsection-copy mt-1 text-sm leading-6">
-                              Aktiv ist die direkte Berechnung: Alle erreichten Punkte werden ohne Abschnittsgewichtung zusammengezählt.
-                            </p>
+                          <div className="my-8 flex justify-center">
+                            <hr className="section-divider w-[90%]" />
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className={showGradeScaleEditor ? "button-primary" : "button-secondary"}
-                              onClick={() => setShowGradeScaleEditor((current) => !current)}
-                            >
-                              Notenschlüssel bearbeiten
-                            </button>
-                          </div>
-                        </div>
-                        {hasPointWeightMismatch && (
-                          <div className="mt-3">
-                            <DismissibleCallout
-                              tone="warning"
-                              resetKey={displayExam.sections
-                                .map((section) => `${section.id}:${section.weight}:${section.maxPointsOverride ?? "auto"}:${section.tasks.map((task) => task.maxPoints).join(",")}`)
-                                .join("|")}
-                            >
-                              Die aktuellen Maximalpunkte passen noch nicht zu den eingetragenen Abschnitts-Gewichtungen. Die Prozentwerte bleiben als Orientierung sichtbar, die Gesamtnote wird aber weiterhin nur über Punkte berechnet.
-                            </DismissibleCallout>
-                          </div>
-                        )}
-                      </section>
 
-                      <div className="my-8 flex justify-center">
-                        <hr className="section-divider w-[90%]" />
-                      </div>
+                          <section aria-labelledby="grade-scale-heading">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <h3 id="grade-scale-heading" className="subsection-title text-lg font-semibold">
+                                  Notenschlüssel bearbeiten
+                                </h3>
+                                <p className="subsection-copy mt-1 text-sm leading-6">
+                                  Aktiv ist die direkte Berechnung: Alle erreichten Punkte werden ohne Abschnittsgewichtung zusammengezählt.
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className={showGradeScaleEditor ? "button-primary" : "button-secondary"}
+                                  onClick={() => setShowGradeScaleEditor((current) => !current)}
+                                >
+                                  Notenschlüssel bearbeiten
+                                </button>
+                              </div>
+                            </div>
+                            {hasPointWeightMismatch && (
+                              <div className="mt-3">
+                                <DismissibleCallout
+                                  tone="warning"
+                                  resetKey={displayExam.sections
+                                    .map((section) => `${section.id}:${section.weight}:${section.maxPointsOverride ?? "auto"}:${section.tasks.map((task) => task.maxPoints).join(",")}`)
+                                    .join("|")}
+                                >
+                                  Die aktuellen Maximalpunkte passen noch nicht zu den eingetragenen Abschnitts-Gewichtungen. Die Prozentwerte bleiben als Orientierung sichtbar, die Gesamtnote wird aber weiterhin nur über Punkte berechnet.
+                                </DismissibleCallout>
+                              </div>
+                            )}
+                          </section>
 
-                      <GradeScaleRangeSection
-                        exam={displayExam}
+                          <div className="my-8 flex justify-center">
+                            <hr className="section-divider w-[90%]" />
+                          </div>
+
+                          <GradeScaleRangeSection
+                            exam={displayExam}
+                            totalMaxPoints={summary.totalMaxPoints}
+                            title="Notenbereiche"
+                            subtitle="Ausgeschriebene Punktespannen je Note auf Basis der aktuellen Gesamtpunktzahl."
+                          />
+                        </>
+                      )}
+                    </Card>
+
+                    {showGradeScaleEditor && !pointsAndGradeSectionCollapsed && (
+                      <GradeScaleEditor
+                        scale={exam.gradeScale}
                         totalMaxPoints={summary.totalMaxPoints}
-                        title="Notenbereiche"
-                        subtitle="Ausgeschriebene Punktespannen je Note auf Basis der aktuellen Gesamtpunktzahl."
+                        onChange={(nextScale) => updateExam({ gradeScale: nextScale })}
+                        onBandChange={(bandId, lowerBound, verbalLabel) =>
+                          updateExam({
+                            gradeScale: {
+                              ...exam.gradeScale,
+                              bands: exam.gradeScale.bands.map((band) =>
+                                band.id === bandId ? { ...band, lowerBound, verbalLabel } : band,
+                              ),
+                            },
+                          })
+                        }
                       />
-                    </>
-                  )}
-                </Card>
-
-                {showGradeScaleEditor && !pointsAndGradeSectionCollapsed && (
-                  <GradeScaleEditor
-                    scale={exam.gradeScale}
-                    totalMaxPoints={summary.totalMaxPoints}
-                    onChange={(nextScale) => updateExam({ gradeScale: nextScale })}
-                    onBandChange={(bandId, lowerBound, verbalLabel) =>
-                      updateExam({
-                        gradeScale: {
-                          ...exam.gradeScale,
-                          bands: exam.gradeScale.bands.map((band) =>
-                            band.id === bandId ? { ...band, lowerBound, verbalLabel } : band,
-                          ),
-                        },
-                      })
-                    }
-                  />
+                    )}
+                  </>
+                ) : (
+                  <Card
+                    title="Punkte und Note"
+                    subtitle="Für diese Lerngruppe ist noch kein EWH vorhanden."
+                  >
+                    <div className="surface-muted rounded-2xl p-5">
+                      <p className="themed-strong text-base font-semibold">Noch kein Erwartungshorizont vorhanden</p>
+                      <p className="themed-muted mt-2 text-sm leading-6">
+                        Sobald du einen EWH anlegst oder zuweist, erscheinen hier Punkteskalierung,
+                        Notenschlüssel und die eigentlichen Aufgabenbereiche.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className="button-primary gap-2"
+                          onClick={() => setActiveTab("guidedBuilder")}
+                        >
+                          <PlusIcon />
+                          Wizard starten
+                        </button>
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => setActiveTab("archive")}
+                        >
+                          Archiv öffnen
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
                 )}
 
-                {displayExam.sections.map((section, index) => {
+                {activeWorkspace && displayExam.sections.map((section, index) => {
                   const nextSection = displayExam.sections[index + 1];
                   const isLinkedLead = isLinkedSectionLeader(displayExam.sections, index);
 
@@ -2899,68 +3220,39 @@ function App() {
                   );
                 })}
 
-                <div className="no-print">
-                  <button
-                    type="button"
-                    className="button-primary gap-2"
-                    onClick={() => updateExam({ sections: [...exam.sections, createSection()] })}
-                  >
-                    <PlusIcon />
-                    Abschnitt manuell ergänzen
-                  </button>
-                </div>
-
-                <div className="my-8 flex justify-center">
-                  <hr className="section-divider w-[90%]" />
-                </div>
-
-                <Card
-                  title="Druckvorschau"
-                  subtitle="Vorschau des Bewertungsbogens für Ausdruck und PDF direkt im Editor."
-                  actions={
-                    <div className="control-shell inline-flex items-center gap-1 rounded-full border p-1">
-                      <IconButton
-                        onClick={() => setPrintPreviewCollapsed((current) => !current)}
-                        title={printPreviewCollapsed ? "Aufklappen" : "Zuklappen"}
-                        className="px-2.5 py-2 text-xs"
+                {activeWorkspace ? (
+                  <>
+                    <div className="no-print">
+                      <button
+                        type="button"
+                        className="button-primary gap-2"
+                        onClick={() => updateExam({ sections: [...exam.sections, createSection()] })}
                       >
-                        {printPreviewCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-                      </IconButton>
+                        <PlusIcon />
+                        Abschnitt manuell ergänzen
+                      </button>
                     </div>
-                  }
-                >
-                  {!printPreviewCollapsed && (
-                    <PrintableReport
-                      exam={displayExam}
-                      summary={summary}
-                      studentAlias={activeStudentRecord?.alias ?? null}
-                      studentContext={
-                        activeGroup && activeStudentRecord
-                          ? {
-                              subject: activeGroup.subject,
-                              className: activeGroup.className,
-                              teacherComment: activeAssessment?.teacherComment ?? "",
-                              signatureDataUrl: activeSignatureDataUrl,
-                            }
-                          : null
-                      }
-                    />
-                  )}
-                </Card>
 
-                <Card
-                  title="Ergebnis und Abschlussbereich"
-                  subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
-                >
-                  <ReportSummarySection
-                    exam={displayExam}
-                    summary={summary}
-                    teacherComment={activeAssessment?.teacherComment ?? ""}
-                    signatureDataUrl={activeSignatureDataUrl}
-                    onTeacherCommentChange={activeStudentRecord ? handleTeacherCommentChange : undefined}
-                    onSignatureChange={activeStudentRecord ? handleSignatureChange : undefined}
-                  />
-                </Card>
+                    <div className="my-8 flex justify-center">
+                      <hr className="section-divider w-[90%]" />
+                    </div>
+
+                    <Card
+                      title="Ergebnis und Abschlussbereich"
+                      subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
+                    >
+                      <ReportSummarySection
+                        exam={displayExam}
+                        summary={summary}
+                        teacherComment={activeAssessment?.teacherComment ?? ""}
+                        commentPreview={resolvedTeacherCommentPreview}
+                        signatureDataUrl={activeSignatureDataUrl}
+                        onTeacherCommentChange={activeStudentRecord ? handleTeacherCommentChange : undefined}
+                        onSignatureChange={activeStudentRecord ? handleSignatureChange : undefined}
+                      />
+                    </Card>
+                  </>
+                ) : null}
               </>
             )}
 
@@ -2971,11 +3263,12 @@ function App() {
                 workspaces={draftBundle.workspaces}
                 onOpen={openArchiveEntryInBuilder}
                 onDuplicateToBuilder={duplicateArchiveEntryToBuilder}
+                onAssignCopyToGroup={assignArchiveEntryCopyToGroup}
                 onDelete={(entry) => setArchiveEntryToDelete(entry)}
               />
             )}
 
-            {activeTab === "builder" && (
+            {activeTab === "builder" && activeWorkspace && (
               <div className="no-print">
                 <ImportExportControls
                   onImportBackup={handleImportDatabase}
@@ -2985,11 +3278,19 @@ function App() {
                   onPrintGradeScale={handlePrintGradeScale}
                   onPrintClass={activeGroup ? handlePrintClass : undefined}
                   onPrintClassOverview={activeGroup && classOverview ? handlePrintClassOverview : undefined}
+                  onExportCsvStudent={handleExportStudentCsv}
+                  onExportCsvClass={activeGroup ? () => void handleExportClassCsv() : undefined}
+                  onExportCsvClassOverview={activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
+                  onExportCsvGradeScale={handleExportGradeScaleCsv}
                   printLabel={printLabel}
                   printWithoutDetailsLabel={printWithoutDetailsLabel}
                   printGradeScaleLabel={printGradeScaleLabel}
                   classPrintLabel={classPrintLabel}
                   classOverviewPrintLabel={classOverviewPrintLabel}
+                  exportCsvStudentLabel={exportCsvStudentLabel}
+                  exportCsvClassLabel={exportCsvClassLabel}
+                  exportCsvClassOverviewLabel={exportCsvClassOverviewLabel}
+                  exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
                   printHint={printHint}
                 />
               </div>
@@ -3084,10 +3385,27 @@ function App() {
             : "Möchtest du aus dieser Vorlage eine neue Klassenarbeit anlegen?\nDie aktuelle Klassenarbeit bleibt erhalten und die Vorlage wird als neuer Workspace geöffnet."
         }
         onCancel={() => setTemplateToLoad(null)}
-        onConfirm={() => templateToLoad && applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.gradeScale, templateToLoad.meta)}
+        onConfirm={() =>
+          templateToLoad &&
+          applyTemplate(
+            templateToLoad.template,
+            templateToLoad.target,
+            templateToLoad.gradeScale,
+            templateToLoad.meta,
+            templateToLoad.targetGroupId,
+          )
+        }
         onSaveAndConfirm={() => {
           void saveDraft(draftBundle);
-          if (templateToLoad) applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.gradeScale, templateToLoad.meta);
+          if (templateToLoad) {
+            applyTemplate(
+              templateToLoad.template,
+              templateToLoad.target,
+              templateToLoad.gradeScale,
+              templateToLoad.meta,
+              templateToLoad.targetGroupId,
+            );
+          }
         }}
         confirmLabel="Vorlage laden"
       >

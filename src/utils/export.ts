@@ -1,5 +1,6 @@
 import { ClassOverviewData, Exam, ExamSummary } from "../types";
-import { getEffectiveGradeScaleMode } from "./gradeScaleGenerator";
+import { formatNumber } from "./format";
+import { getEffectiveGradeBands, getEffectiveGradeScaleMode } from "./gradeScaleGenerator";
 import { getGradeScaleRangeDigits, getGradeScaleRanges } from "./gradeScaleRanges";
 import { isLinkedSectionFollower, isLinkedSectionLeader } from "./sectionLinks";
 
@@ -36,6 +37,20 @@ interface PrintPayload {
 }
 
 export type { PrintIdentity, PrintPayload };
+
+export interface CommentTemplateContext {
+  alias?: string | null;
+  fullName?: string | null;
+  subject?: string;
+  className?: string;
+  examTitle?: string;
+  examDate?: string;
+  totalAchievedPoints?: number;
+  totalMaxPoints?: number;
+  percentage?: number;
+  gradeLabel?: string;
+  gradeVerbalLabel?: string;
+}
 
 const escapeHtml = (value: string) =>
   value
@@ -81,6 +96,58 @@ const buildPrintDocumentTitle = (filename?: string) => {
   const trimmed = filename?.trim();
   if (!trimmed) return "Bewertungsbogen";
   return trimmed.toLowerCase().endsWith(".pdf") ? trimmed.slice(0, -4) : trimmed;
+};
+
+const splitFullName = (value: string | null | undefined) => {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) {
+    return {
+      firstName: "",
+      lastName: "",
+    };
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return {
+      firstName: parts[0] ?? "",
+      lastName: "",
+    };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts[parts.length - 1] ?? "",
+  };
+};
+
+export const resolveCommentTemplate = (template: string, context: CommentTemplateContext) => {
+  const { firstName, lastName } = splitFullName(context.fullName);
+  const fallbackName = context.fullName?.trim() || context.alias?.trim() || "";
+  const replacements = new Map<string, string>([
+    ["name", fallbackName],
+    ["sus", fallbackName],
+    ["schueler", fallbackName],
+    ["schüler", fallbackName],
+    ["vorname", firstName || fallbackName],
+    ["nachname", lastName],
+    ["kuerzel", context.alias?.trim() ?? ""],
+    ["kürzel", context.alias?.trim() ?? ""],
+    ["klasse", context.className?.trim() ?? ""],
+    ["fach", context.subject?.trim() ?? ""],
+    ["titel", context.examTitle?.trim() ?? ""],
+    ["datum", context.examDate?.trim() ?? ""],
+    ["punkte", context.totalAchievedPoints !== undefined ? formatNumber(context.totalAchievedPoints) : ""],
+    ["maxpunkte", context.totalMaxPoints !== undefined ? formatNumber(context.totalMaxPoints) : ""],
+    ["prozent", context.percentage !== undefined ? `${formatNumber(context.percentage)} %` : ""],
+    ["note", context.gradeLabel?.trim() ?? ""],
+    ["notenstufe", context.gradeVerbalLabel?.trim() ?? ""],
+  ]);
+
+  return template.replace(/\$([^$]+)\$/g, (token, rawKey) => {
+    const normalizedKey = String(rawKey).trim().toLocaleLowerCase("de-DE");
+    return replacements.get(normalizedKey) ?? token;
+  });
 };
 
 const renderPercentageBar = (value: number) => `
@@ -162,10 +229,198 @@ export const downloadDataFile = (filename: string, payload: unknown) => {
   URL.revokeObjectURL(url);
 };
 
+const escapeCsvCell = (value: string | number | boolean | null | undefined) => {
+  const normalized = value === null || value === undefined ? "" : String(value);
+  const escaped = normalized.replace(/"/g, "\"\"");
+  return `"${escaped}"`;
+};
+
+export const downloadCsvFile = (
+  filename: string,
+  rows: Array<Record<string, string | number | boolean | null | undefined>>,
+) => {
+  if (rows.length === 0) return;
+
+  const headers = Array.from(
+    rows.reduce((set, row) => {
+      Object.keys(row).forEach((key) => set.add(key));
+      return set;
+    }, new Set<string>()),
+  );
+
+  const csv = [
+    headers.map(escapeCsvCell).join(";"),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(";")),
+  ].join("\r\n");
+
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const exportStudentExamCsv = (
+  exam: Exam,
+  summary: ExamSummary,
+  identity?: PrintIdentity,
+) => {
+  const resolvedComment = resolveCommentTemplate(identity?.teacherComment ?? "", {
+    alias: identity?.alias,
+    fullName: identity?.fullName,
+    subject: identity?.subject,
+    className: identity?.className,
+    examTitle: exam.meta.title,
+    examDate: exam.meta.examDate,
+    totalAchievedPoints: summary.totalAchievedPoints,
+    totalMaxPoints: summary.totalMaxPoints,
+    percentage: summary.finalPercentage,
+    gradeLabel: summary.grade.label,
+    gradeVerbalLabel: summary.grade.verbalLabel,
+  });
+
+  const rows = exam.sections.flatMap((section, sectionIndex) =>
+    section.tasks.map((task, taskIndex) => ({
+      Schuelercode: identity?.alias ?? "",
+      Schuelername: identity?.fullName ?? "",
+      Fach: identity?.subject ?? "",
+      Klasse: identity?.className ?? "",
+      Titel: exam.meta.title,
+      Datum: exam.meta.examDate,
+      BereichNr: sectionIndex + 1,
+      Bereich: section.title,
+      AufgabenNr: `${sectionIndex + 1}.${taskIndex + 1}`,
+      Aufgabe: task.title,
+      Beschreibung: task.description,
+      Erwartung: task.expectation,
+      MaxPunkte: task.maxPoints,
+      ErreichtPunkte: task.achievedPoints,
+      Gesamtpunkte: summary.totalAchievedPoints,
+      GesamtMaxPunkte: summary.totalMaxPoints,
+      Prozent: summary.finalPercentage,
+      Note: summary.grade.label,
+      Notenstufe: summary.grade.verbalLabel,
+      Kommentar: resolvedComment,
+    })),
+  );
+
+  const safePrefix = sanitizeFilenamePart(identity?.alias || exam.meta.title || "SuS");
+  downloadCsvFile(`${safePrefix}_Bewertungsbogen.csv`, rows);
+};
+
+export const exportGradeScaleCsv = (
+  exam: Exam,
+  summary: ExamSummary,
+  filenamePrefix?: string,
+) => {
+  const ranges = getGradeScaleRanges(exam, summary.totalMaxPoints);
+  const bandsByLabel = new Map(
+    getEffectiveGradeBands(exam.gradeScale, summary.totalMaxPoints).map((band) => [band.label, band.verbalLabel]),
+  );
+  const rangeDigits = getGradeScaleRangeDigits(exam, summary.totalMaxPoints);
+  const safePrefix = sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche");
+
+  downloadCsvFile(
+    `${safePrefix}_Notenbereiche.csv`,
+    ranges.map((range) => ({
+      Note: range.label,
+      Notenstufe: bandsByLabel.get(range.label) ?? "",
+      Untergrenze: Number(range.lowerBound.toFixed(rangeDigits)),
+      Obergrenze: Number(range.upperBound.toFixed(rangeDigits)),
+      Gesamtpunktzahl: summary.totalMaxPoints,
+      Modus: getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? "Punkte" : "Prozent",
+    })),
+  );
+};
+
+export const exportClassOverviewCsv = (
+  exam: Exam,
+  overview: ClassOverviewData,
+  context?: { subject?: string; className?: string },
+) => {
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Klassenuebersicht");
+  const rows: Array<Record<string, string | number | null | undefined>> = [
+    {
+      Typ: "Kennzahl",
+      Bereich: "Klasse",
+      Label: "Schüler:innen",
+      Wert: overview.studentCount,
+      Zusatz: context?.className ?? "",
+    },
+    {
+      Typ: "Kennzahl",
+      Bereich: "Leistung",
+      Label: "Durchschnitt Prozent",
+      Wert: Number(overview.averagePercentage.toFixed(1)),
+      Zusatz: "",
+    },
+    {
+      Typ: "Kennzahl",
+      Bereich: "Leistung",
+      Label: "Median Prozent",
+      Wert: Number(overview.medianPercentage.toFixed(1)),
+      Zusatz: "",
+    },
+    {
+      Typ: "Kennzahl",
+      Bereich: "Leistung",
+      Label: "Beste Leistung",
+      Wert: Number(overview.bestPercentage.toFixed(1)),
+      Zusatz: "",
+    },
+    {
+      Typ: "Kennzahl",
+      Bereich: "Leistung",
+      Label: "Schwächste Leistung",
+      Wert: Number(overview.lowestPercentage.toFixed(1)),
+      Zusatz: "",
+    },
+    ...overview.gradeDistribution.map((entry) => ({
+      Typ: "Notenspiegel",
+      Bereich: "Note",
+      Label: entry.display,
+      Wert: entry.count,
+      Zusatz: entry.label,
+    })),
+    ...overview.sectionDistribution.map((entry) => ({
+      Typ: "Abschnitt",
+      Bereich: entry.title,
+      Label: "Durchschnitt Prozent",
+      Wert: Number(entry.percentage.toFixed(1)),
+      Zusatz: `${formatNumber(entry.achievedPoints)} / ${formatNumber(entry.maxPoints)} Punkte`,
+    })),
+    ...overview.taskDistribution.map((entry) => ({
+      Typ: "Aufgabe",
+      Bereich: entry.sectionTitle,
+      Label: entry.taskTitle,
+      Wert: Number(entry.percentage.toFixed(1)),
+      Zusatz: `${formatNumber(entry.achievedPoints)} / ${formatNumber(entry.maxPoints)} Punkte`,
+    })),
+  ];
+
+  downloadCsvFile(`${safePrefix}_Klassenuebersicht.csv`, rows);
+};
+
 export const renderPrintDocument = (reports: PrintPayload[]) =>
   reports
     .map(({ exam, summary, identity, options }, reportIndex) => {
-      const teacherComment = options?.hideTeacherComment ? "" : identity?.teacherComment?.trim() ?? "";
+      const teacherComment = options?.hideTeacherComment
+        ? ""
+        : resolveCommentTemplate(identity?.teacherComment?.trim() ?? "", {
+            alias: identity?.alias,
+            fullName: identity?.fullName,
+            subject: identity?.subject,
+            className: identity?.className,
+            examTitle: exam.meta.title,
+            examDate: exam.meta.examDate,
+            totalAchievedPoints: summary.totalAchievedPoints,
+            totalMaxPoints: summary.totalMaxPoints,
+            percentage: summary.finalPercentage,
+            gradeLabel: summary.grade.label,
+            gradeVerbalLabel: summary.grade.verbalLabel,
+          });
       const signatureImageSource = options?.hideSignature ? null : sanitizeImageSource(identity?.signatureDataUrl);
       const germanPrintDate = getGermanPrintDate();
       const footerGridClass = teacherComment && signatureImageSource

@@ -8,6 +8,10 @@ interface Props {
   onPrintGradeScale?: () => void;
   onPrintClass?: () => void;
   onPrintClassOverview?: () => void;
+  onExportCsvStudent?: () => void;
+  onExportCsvClass?: () => void;
+  onExportCsvClassOverview?: () => void;
+  onExportCsvGradeScale?: () => void;
   onImportBackup: (file: File, passphrase: string) => void;
   onExportBackup: (passphrase: string) => Promise<boolean>;
   printLabel?: string;
@@ -15,6 +19,10 @@ interface Props {
   printGradeScaleLabel?: string;
   classPrintLabel?: string;
   classOverviewPrintLabel?: string;
+  exportCsvStudentLabel?: string;
+  exportCsvClassLabel?: string;
+  exportCsvClassOverviewLabel?: string;
+  exportCsvGradeScaleLabel?: string;
   printHint?: string;
 }
 
@@ -26,11 +34,19 @@ export const ImportExportControls = ({
   onPrintGradeScale,
   onPrintClass,
   onPrintClassOverview,
+  onExportCsvStudent,
+  onExportCsvClass,
+  onExportCsvClassOverview,
+  onExportCsvGradeScale,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
   classPrintLabel,
   classOverviewPrintLabel,
+  exportCsvStudentLabel,
+  exportCsvClassLabel,
+  exportCsvClassOverviewLabel,
+  exportCsvGradeScaleLabel,
   printHint,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
@@ -46,22 +62,12 @@ export const ImportExportControls = ({
     <Card title="Drucken / Import / Export" subtitle={printHint}>
       <div className="space-y-4">
         <div className="surface-muted rounded-3xl p-4">
-          <p className="label">Drucken</p>
+          <p className="label">PDF / Druck</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button type="button" className="button-primary gap-2" onClick={onPrint}>
               <ReportIcon />
               {printLabel || "PDF / Drucken"}
             </button>
-            <button type="button" className="button-secondary gap-2" onClick={onPrintWithoutDetails}>
-              <ReportIcon />
-              {printWithoutDetailsLabel || "Ohne Note / Kommentar / Signatur"}
-            </button>
-            {onPrintGradeScale && (
-              <button type="button" className="button-secondary gap-2" onClick={onPrintGradeScale}>
-                <ReportIcon />
-                {printGradeScaleLabel || "Notenbereiche als PDF"}
-              </button>
-            )}
             {onPrintClass && (
               <button type="button" className="button-secondary gap-2" onClick={onPrintClass}>
                 <ReportIcon />
@@ -72,6 +78,45 @@ export const ImportExportControls = ({
               <button type="button" className="button-secondary gap-2" onClick={onPrintClassOverview}>
                 <ReportIcon />
                 {classOverviewPrintLabel || "Klassenübersicht als PDF"}
+              </button>
+            )}
+            <button type="button" className="button-secondary gap-2" onClick={onPrintWithoutDetails}>
+              <ReportIcon />
+              {printWithoutDetailsLabel || "Leerer EWH"}
+            </button>
+            {onPrintGradeScale && (
+              <button type="button" className="button-secondary gap-2" onClick={onPrintGradeScale}>
+                <ReportIcon />
+                {printGradeScaleLabel || "Notenbereiche als PDF"}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="surface-muted rounded-3xl p-4">
+          <p className="label">CSV / Datenexport</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {onExportCsvStudent && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportCsvStudent}>
+                <DownloadIcon />
+                {exportCsvStudentLabel || "SuS als CSV"}
+              </button>
+            )}
+            {onExportCsvClass && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportCsvClass}>
+                <DownloadIcon />
+                {exportCsvClassLabel || "Klasse als CSV"}
+              </button>
+            )}
+            {onExportCsvClassOverview && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportCsvClassOverview}>
+                <DownloadIcon />
+                {exportCsvClassOverviewLabel || "Klassenübersicht als CSV"}
+              </button>
+            )}
+            {onExportCsvGradeScale && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportCsvGradeScale}>
+                <DownloadIcon />
+                {exportCsvGradeScaleLabel || "Notenbereiche als CSV"}
               </button>
             )}
           </div>

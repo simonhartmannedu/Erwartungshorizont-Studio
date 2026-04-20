@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ExamTemplateDefinition } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
-import { ExamMeta, GradeScale } from "../types";
+import { ExamMeta, GradeScale, StudentGroup } from "../types";
 import { formatNumber } from "../utils/format";
 import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
 import { ExamHeaderForm } from "./ExamHeaderForm";
@@ -20,6 +20,8 @@ export interface GuidedSectionDraft {
 export type GuidedBuilderTarget = "current" | "new";
 
 interface Props {
+  groups: Array<Pick<StudentGroup, "id" | "subject" | "className">>;
+  activeGroupId: string;
   templates: ExamTemplateDefinition[];
   initialTotalPoints: number;
   initialGradeScale: GradeScale;
@@ -31,6 +33,7 @@ interface Props {
     target: GuidedBuilderTarget,
     gradeScale: GradeScale,
     meta: ExamMeta,
+    targetGroupId: string | null,
   ) => void;
   onApplyManualStructure: (config: {
     totalPoints: number;
@@ -38,6 +41,7 @@ interface Props {
     sections: GuidedSectionDraft[];
     target: GuidedBuilderTarget;
     meta: ExamMeta;
+    targetGroupId: string | null;
   }) => void;
 }
 
@@ -66,6 +70,8 @@ const stepLabels = (mode: "manual" | "template") =>
 const normalizeSubject = (value: string) => value.trim().toLowerCase();
 
 export const GuidedExamBuilder = ({
+  groups,
+  activeGroupId,
   templates,
   initialTotalPoints,
   initialGradeScale,
@@ -79,6 +85,7 @@ export const GuidedExamBuilder = ({
     BUILDER_SUBJECT_OPTIONS.find((option) => normalizeSubject(option) === normalizeSubject(initialSubject)) ?? null;
   const [step, setStep] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>("new");
+  const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
   const [mode, setMode] = useState<"manual" | "template">("manual");
   const [selectedSubject, setSelectedSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
   const [customSubject, setCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
@@ -156,6 +163,14 @@ export const GuidedExamBuilder = ({
     setMetaDraft({ ...initialMeta });
   }, [initialMeta]);
 
+  useEffect(() => {
+    setTargetGroupId((current) => {
+      if (current && groups.some((group) => group.id === current)) return current;
+      if (activeGroupId && groups.some((group) => group.id === activeGroupId)) return activeGroupId;
+      return groups[0]?.id ?? "";
+    });
+  }, [activeGroupId, groups]);
+
   const weightSum = useMemo(
     () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.weight, 0) * 100) / 100,
     [sectionDrafts],
@@ -184,6 +199,15 @@ export const GuidedExamBuilder = ({
 
   const choiceButtonClass = (active: boolean) =>
     `${active ? "button-primary" : "button-secondary"} w-full justify-start p-4 text-left`;
+
+  const goToStep = (nextStep: number) => {
+    setStep((current) => {
+      if (nextStep > current) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return nextStep;
+    });
+  };
 
   const renderStepBadge = (label: string, index: number) => {
     const isActive = step === index;
@@ -216,7 +240,7 @@ export const GuidedExamBuilder = ({
         <div className="space-y-6">
           <section className="builder-launch-shell">
             <div className="builder-launch-grid">
-              <button type="button" className="builder-launch-orbit-button" onClick={() => setStep(1)}>
+              <button type="button" className="builder-launch-orbit-button" onClick={() => goToStep(1)}>
                 <div className="builder-launch-orbit" aria-hidden="true">
                   <div className="builder-launch-ring builder-launch-ring-primary" />
                   <div className="builder-launch-ring builder-launch-ring-secondary" />
@@ -232,7 +256,7 @@ export const GuidedExamBuilder = ({
 
               <div className="builder-launch-copy">
                 <p className="builder-launch-kicker">Wizard-Startpunkt</p>
-                <h3 className="builder-launch-title">Prüfungsgerüst mit NRW-Regelcheck vorbereiten</h3>
+                <h3 className="builder-launch-title">Erwartungshorizont mit NRW-Regelcheck vorbereiten</h3>
                 <p className="builder-launch-text">
                   Der Builder startet mit Fach und Schulstufe, zieht daraus die recherchierten NRW-Regeln für Sek I
                   oder Sek II und führt dich danach Schritt für Schritt in den bestehenden Aufbau.
@@ -242,7 +266,7 @@ export const GuidedExamBuilder = ({
                   Stand der Quellenrecherche: 19.04.2026
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3">
-                  <button type="button" className="button-primary" onClick={() => setStep(1)}>
+                  <button type="button" className="button-primary" onClick={() => goToStep(1)}>
                     Startpunkt öffnen
                   </button>
                 </div>
@@ -304,9 +328,9 @@ export const GuidedExamBuilder = ({
               type="button"
               className="button-primary w-full sm:w-auto"
               disabled={!resolvedSubject}
-              onClick={() => setStep(2)}
+              onClick={() => goToStep(2)}
             >
-              Weiter zu Sekundarstufe
+              Weiter zu Stufenauswahl
             </button>
           </div>
         </div>
@@ -342,10 +366,10 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(1)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(1)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(3)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(3)}>
               Weiter zu Regelcheck
             </button>
           </div>
@@ -399,9 +423,6 @@ export const GuidedExamBuilder = ({
                 <h4 className="themed-strong text-base font-semibold">Quellen</h4>
                 <p className="status-note mt-1 text-sm">Offizielle NRW-Seiten, auf die sich dieser Wizard-Schritt stützt.</p>
               </div>
-              <button type="button" className="button-secondary" onClick={applyPresetStructure}>
-                Fach-Vorschlag laden
-              </button>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
               {guidance.sources.map((source) => (
@@ -419,10 +440,10 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(2)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(2)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(4)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(4)}>
               Weiter zu Ziel
             </button>
           </div>
@@ -458,11 +479,35 @@ export const GuidedExamBuilder = ({
             </button>
           </div>
 
+          {target === "new" && (
+            groups.length > 0 ? (
+              <Field label="Lerngruppe für die neue Klassenarbeit">
+                <select className="field" value={targetGroupId} onChange={(event) => setTargetGroupId(event.target.value)}>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.subject} · {group.className}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <DismissibleCallout tone="warning" resetKey="guided-builder-no-groups">
+                Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden, damit der EWH direkt korrekt
+                zugeordnet werden kann.
+              </DismissibleCallout>
+            )
+          )}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(3)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(3)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(5)}>
+            <button
+              type="button"
+              className="button-primary w-full sm:w-auto"
+              disabled={target === "new" && !targetGroupId}
+              onClick={() => goToStep(5)}
+            >
               Weiter zu Format
             </button>
           </div>
@@ -506,10 +551,10 @@ export const GuidedExamBuilder = ({
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(4)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(4)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(6)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(6)}>
               Weiter zu Metadaten
             </button>
           </div>
@@ -537,10 +582,10 @@ export const GuidedExamBuilder = ({
           />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(5)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(5)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(7)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(7)}>
               Weiter zu Notenschlüssel
             </button>
           </div>
@@ -570,10 +615,10 @@ export const GuidedExamBuilder = ({
           </DismissibleCallout>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(6)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(6)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(8)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
               {mode === "template" ? "Weiter zu Vorlagen" : "Weiter zu Aufbau"}
             </button>
           </div>
@@ -592,12 +637,20 @@ export const GuidedExamBuilder = ({
               <ExamTemplatePreviewCard
                 key={template.id}
                 template={template}
-                onLoad={() => onSelectTemplate(template, target, gradeScale, metaDraft)}
+                onLoad={() =>
+                  onSelectTemplate(
+                    template,
+                    target,
+                    gradeScale,
+                    metaDraft,
+                    target === "new" ? targetGroupId || null : null,
+                  )
+                }
               />
             ))}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(7)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(7)}>
               Zurück
             </button>
           </div>
@@ -640,22 +693,28 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="surface-muted rounded-3xl p-5">
-            <h4 className="themed-strong text-base font-semibold">Aktueller Fach-Vorschlag</h4>
+            <h4 className="themed-strong text-base font-semibold">Builder-Grundlage</h4>
             <p className="status-note mt-2 text-sm leading-6">
               {resolvedSubject || "Eigenes Fach"} · {guidance.label} · {formatNumber(guidance.preset.totalPoints)} Punkte
             </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" className="button-secondary" onClick={applyPresetStructure}>
-                Vorschlag erneut laden
-              </button>
+            <p className="status-note mt-3 text-sm leading-6">
+              Die hier vorbelegte Grundstruktur wird aus Fach und Stufe abgeleitet und kann im nächsten Schritt
+              vollständig überschrieben oder verfeinert werden.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {guidance.preset.sections.map((section, index) => (
+                <span key={`${section.title}-${index}`} className="button-soft">
+                  {section.title} · {formatNumber(section.weight)} %
+                </span>
+              ))}
             </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(7)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(7)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => setStep(9)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(9)}>
               Weiter zu Sektionen
             </button>
           </div>
@@ -732,17 +791,17 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="flex flex-wrap justify-between gap-3">
-            <button type="button" className="button-secondary" onClick={() => setStep(8)}>
+            <button type="button" className="button-secondary" onClick={() => goToStep(8)}>
               Zurück
             </button>
             <div className="flex flex-wrap gap-3">
               <button type="button" className="button-secondary" onClick={applyPresetStructure}>
-                Fach-Vorschlag zurücksetzen
+                Standardstruktur zurücksetzen
               </button>
               <button
                 type="button"
                 className="button-primary"
-                disabled={difference !== 0 || hasEmptyTitles}
+                disabled={(target === "new" && !targetGroupId) || difference !== 0 || hasEmptyTitles}
                 onClick={() =>
                   onApplyManualStructure({
                     totalPoints,
@@ -750,6 +809,7 @@ export const GuidedExamBuilder = ({
                     sections: sectionDrafts,
                     target,
                     meta: metaDraft,
+                    targetGroupId: target === "new" ? targetGroupId || null : null,
                   })
                 }
               >

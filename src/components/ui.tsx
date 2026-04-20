@@ -125,21 +125,29 @@ export const IconButton = ({
   title,
   variant = "secondary",
   className = "",
+  disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   title: string;
   variant?: "secondary" | "soft";
   className?: string;
+  disabled?: boolean;
 }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    title={title}
-    className={`${variant === "soft" ? "button-soft gap-2" : "button-secondary gap-2"} ${className}`}
-  >
-    {children}
-  </button>
+  <span className="tooltip-anchor inline-flex">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={title}
+      disabled={disabled}
+      className={`${variant === "soft" ? "button-soft gap-2" : "button-secondary gap-2"} ${className}`}
+    >
+      {children}
+    </button>
+    <span className="app-tooltip" role="tooltip">
+      {title}
+    </span>
+  </span>
 );
 
 export const Badge = ({
