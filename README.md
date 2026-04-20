@@ -6,9 +6,7 @@ Browser-based tool for building, editing, assigning, archiving, and printing `Er
 
 ## Screenshot
 
-```md
 ![EWH-Studio](erwartungshorizontstudio.png)
-```
 
 ## Current App State
 
