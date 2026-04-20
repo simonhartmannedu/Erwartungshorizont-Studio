@@ -89,6 +89,42 @@ const renderPercentageBar = (value: number) => `
   </div>
 `;
 
+const renderCompactGradeScaleBlock = (exam: Exam, totalMaxPoints: number) => {
+  const ranges = getGradeScaleRanges(exam, totalMaxPoints);
+  const rangeDigits = getGradeScaleRangeDigits(exam, totalMaxPoints);
+
+  return `
+    <div class="grade-scale-print-block">
+      <div class="grade-scale-print-header">
+        <div>
+          <strong>Notenbereiche</strong>
+          <p>Punktespannen bei ${renderNumber(totalMaxPoints)} erreichbaren Punkten.</p>
+        </div>
+        <span class="grade-scale-print-chip">
+          ${renderText(getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? "Punkteschlüssel" : "Aus Prozent umgerechnet")}
+        </span>
+      </div>
+      <table class="grade-scale-print-table">
+        <thead>
+          <tr>
+            ${ranges.map((range) => `<th>${renderText(range.label)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            ${ranges
+              .map(
+                (range) =>
+                  `<td>${renderNumber(Number(range.lowerBound.toFixed(rangeDigits)))} - ${renderNumber(Number(range.upperBound.toFixed(rangeDigits)))}</td>`,
+              )
+              .join("")}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
 const renderCompactTaskColumns = (overview: ClassOverviewData) => {
   const columnCount = 3;
   const rowsPerColumn = Math.ceil(overview.taskDistribution.length / columnCount);
@@ -248,6 +284,7 @@ export const renderPrintDocument = (reports: PrintPayload[]) =>
             <div class="summary-row"><span>Rohpunkte</span><strong>${renderNumber(summary.totalAchievedPoints)} / ${renderNumber(summary.totalMaxPoints)}</strong></div>
             ${options?.hideGrade ? "" : `<div class="summary-row"><span>Note</span><strong>${renderText(`${summary.grade.label} (${summary.grade.verbalLabel})`, "-")}</strong></div>`}
             ${options?.hideGrade ? "" : `<div class="summary-line-row"><span></span><strong>________________</strong></div>`}
+            ${renderCompactGradeScaleBlock(exam, summary.totalMaxPoints)}
             ${footerBoxes ? `<div class="${footerGridClass}">${footerBoxes}</div>` : ""}
           </section>
         </article>
@@ -292,6 +329,13 @@ const openPrintPopup = (reports: PrintPayload[], filename?: string) => {
           .score-cell { text-align: center; white-space: nowrap; font-weight: 700; }
           .summary-row { margin-top: 3px; display: flex; justify-content: space-between; gap: 6px; font-size: 8.2px; }
           .summary-line-row { margin-top: 1px; display: flex; justify-content: space-between; gap: 6px; font-size: 8.2px; }
+          .grade-scale-print-block { margin-top: 4px; border: 1px solid #bbb; padding: 4px; }
+          .grade-scale-print-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; margin-bottom: 3px; }
+          .grade-scale-print-header p { margin-top: 2px; font-size: 8px; color: #444; }
+          .grade-scale-print-chip { border: 1px solid #bbb; border-radius: 999px; padding: 1px 5px; font-size: 7.8px; font-weight: 700; white-space: nowrap; }
+          .grade-scale-print-table { margin-top: 0; }
+          .grade-scale-print-table th,
+          .grade-scale-print-table td { text-align: center; font-size: 8px; padding: 2px; }
           .footer-grid { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 4px; }
           .footer-grid-halves { grid-template-columns: 1fr 1fr; }
           .footer-box { border: 1px solid #bbb; min-height: 38px; padding: 4px; margin-top: 0; }

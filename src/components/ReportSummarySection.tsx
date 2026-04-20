@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Exam, ExamSummary } from "../types";
 import { formatNumber } from "../utils/format";
+import { AutomatedFeedbackStyle, generateAutomatedExamFeedback } from "../utils/reportFeedback";
 import { GradeScaleRangeSection } from "./GradeScaleRangeSection";
 import { SignaturePad } from "./SignaturePad";
 
@@ -24,6 +26,18 @@ export const ReportSummarySection = ({
   const hasPrintedComment = Boolean(normalizedTeacherComment);
   const hasPrintedSignature = Boolean(signatureDataUrl);
   const useTwoColumns = hasEditableFooter || (hasPrintedComment && hasPrintedSignature);
+  const [feedbackStyle, setFeedbackStyle] = useState<AutomatedFeedbackStyle>("balanced");
+
+  const applyAutomatedFeedback = () => {
+    if (!onTeacherCommentChange) return;
+    onTeacherCommentChange(
+      generateAutomatedExamFeedback({
+        exam,
+        summary,
+        style: feedbackStyle,
+      }),
+    );
+  };
 
   return (
     <section className="surface-elevated rounded-3xl border p-5 print-sheet print-summary">
@@ -72,12 +86,34 @@ export const ReportSummarySection = ({
               <div className="surface-elevated min-h-32 rounded-2xl border p-4">
                 <p className="label">Lehrer*innenkommentar</p>
                 {onTeacherCommentChange ? (
-                  <textarea
-                    className="field mt-3 min-h-32 no-print"
-                    value={teacherComment ?? ""}
-                    placeholder="Optionaler Kommentar für den Ausdruck"
-                    onChange={(event) => onTeacherCommentChange(event.target.value)}
-                  />
+                  <>
+                    <div className="no-print mt-3 rounded-2xl border p-3">
+                      <p className="label">Automatischer Feedback-Vorschlag</p>
+                      <p className="themed-muted mt-2 text-sm leading-6">
+                        Der Vorschlag kombiniert eine Stärke, einen klaren Entwicklungsbereich und einen nächsten Arbeitsschritt.
+                      </p>
+                      <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+                        <select
+                          className="field"
+                          value={feedbackStyle}
+                          onChange={(event) => setFeedbackStyle(event.target.value as AutomatedFeedbackStyle)}
+                        >
+                          <option value="balanced">Ausgewogen</option>
+                          <option value="encouraging">Ermutigend</option>
+                          <option value="direct">Klar und direkt</option>
+                        </select>
+                        <button type="button" className="button-secondary" onClick={applyAutomatedFeedback}>
+                          Vorschlag einsetzen
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      className="field mt-3 min-h-32 no-print"
+                      value={teacherComment ?? ""}
+                      placeholder="Optionaler Kommentar für den Ausdruck"
+                      onChange={(event) => onTeacherCommentChange(event.target.value)}
+                    />
+                  </>
                 ) : (
                   <p className="mt-3 whitespace-pre-wrap">{normalizedTeacherComment}</p>
                 )}

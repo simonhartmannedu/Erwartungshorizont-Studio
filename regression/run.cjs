@@ -23,12 +23,14 @@ const { calculateExamSummary } = require("../.regression-dist/src/utils/calculat
 const { createPasswordVerifier, decryptText, encryptText, verifyPassword } = require(
   "../.regression-dist/src/utils/crypto.js",
 );
+const { cloneExam, withExamMeta } = require("../.regression-dist/src/utils/exam.js");
 const {
   createEncryptedStudentDatabaseBackup,
   describeBackupStatus,
   parseStudentDatabaseBackup,
 } = require("../.regression-dist/src/utils/backup.js");
 const { renderPrintDocument } = require("../.regression-dist/src/utils/export.js");
+const { generateAutomatedExamFeedback } = require("../.regression-dist/src/utils/reportFeedback.js");
 const { parseDraftBundle, parseStudentDatabaseState } = require("../.regression-dist/src/utils/storage.js");
 const {
   getEffectiveSignatureDataUrl,
@@ -207,6 +209,7 @@ const testPrintEscaping = async () => {
   assert.match(html, /Strong effort &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /javascript:alert\(1\)/);
   assert.match(html, /data:image\/png;base64,AA==/);
+  assert.match(html, /Notenbereiche/);
 };
 
 const testClassDefaultSignatureFallback = async () => {
@@ -240,7 +243,7 @@ const testClassDefaultSignatureFallback = async () => {
     },
   ]);
 
-  assert.match(html, /src="\/signature\.svg"/);
+  assert.match(html, /src="data:image\/png;base64,AA=="/);
 };
 
 const testTaskScoreScaling = async () => {
@@ -339,6 +342,38 @@ const testDuplicatedArchiveExamGetsFreshIds = () => {
   );
 };
 
+const testExamMetadataIsScopedPerClone = () => {
+  const original = cloneExam(sampleExam);
+  const duplicate = withExamMeta(sampleExam, {
+    ...sampleExam.meta,
+    title: "Neue Klassenarbeit",
+  });
+
+  duplicate.meta.title = "Geaenderte Kopie";
+
+  assert.equal(
+    original.meta.title,
+    sampleExam.meta.title,
+    "changing cloned exam metadata must not mutate the original exam",
+  );
+  assert.equal(
+    sampleExam.meta.title,
+    "Englisch-Klassenarbeit Unit 4",
+    "source exam metadata should stay attached to its own exam instance",
+  );
+};
+
+const testAutomatedFeedbackIncludesStrengthAndNextStep = () => {
+  const feedback = generateAutomatedExamFeedback({
+    exam: sampleExam,
+    summary: calculateExamSummary(sampleExam),
+    style: "balanced",
+  });
+
+  assert.match(feedback, /Besonders gelungen|Besonders positiv|Am stärksten/);
+  assert.match(feedback, /Achte bei der nächsten Arbeit besonders auf|Nächster Schritt:|gezielt übst/);
+};
+
 Promise.all([
   Promise.resolve().then(testStorageMigration),
   testGroupUnlockAndDecrypt(),
@@ -348,6 +383,8 @@ Promise.all([
   testTaskScoreScaling(),
   testStudentReorderingKeepsAssessments(),
   Promise.resolve().then(testDuplicatedArchiveExamGetsFreshIds),
+  Promise.resolve().then(testExamMetadataIsScopedPerClone),
+  Promise.resolve().then(testAutomatedFeedbackIncludesStrengthAndNextStep),
 ])
   .then(() => {
     console.log("Regression checks passed.");

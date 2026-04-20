@@ -25,14 +25,19 @@ interface Props {
   initialGradeScale: GradeScale;
   initialSections: GuidedSectionDraft[];
   initialSubject?: string;
-  meta: ExamMeta;
-  onMetaChange: <K extends keyof ExamMeta>(key: K, value: ExamMeta[K]) => void;
-  onSelectTemplate: (template: ExamTemplateDefinition, target: GuidedBuilderTarget, gradeScale: GradeScale) => void;
+  initialMeta: ExamMeta;
+  onSelectTemplate: (
+    template: ExamTemplateDefinition,
+    target: GuidedBuilderTarget,
+    gradeScale: GradeScale,
+    meta: ExamMeta,
+  ) => void;
   onApplyManualStructure: (config: {
     totalPoints: number;
     gradeScale: GradeScale;
     sections: GuidedSectionDraft[];
     target: GuidedBuilderTarget;
+    meta: ExamMeta;
   }) => void;
 }
 
@@ -66,8 +71,7 @@ export const GuidedExamBuilder = ({
   initialGradeScale,
   initialSections,
   initialSubject = "",
-  meta,
-  onMetaChange,
+  initialMeta,
   onSelectTemplate,
   onApplyManualStructure,
 }: Props) => {
@@ -97,6 +101,9 @@ export const GuidedExamBuilder = ({
   const [sectionDrafts, setSectionDrafts] = useState<GuidedSectionDraft[]>(
     initialSections.length > 0 ? initialSections : createFallbackSections(),
   );
+  const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({
+    ...initialMeta,
+  }));
 
   const resolvedSubject = selectedSubject === "__custom__" ? customSubject.trim() : selectedSubject;
   const guidance = useMemo(
@@ -144,6 +151,10 @@ export const GuidedExamBuilder = ({
       if (step > 7) setStep(7);
     }
   }, [mode, step, templatesEnabled]);
+
+  useEffect(() => {
+    setMetaDraft({ ...initialMeta });
+  }, [initialMeta]);
 
   const weightSum = useMemo(
     () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.weight, 0) * 100) / 100,
@@ -515,7 +526,15 @@ export const GuidedExamBuilder = ({
             </p>
           </div>
 
-          <ExamHeaderForm meta={meta} onChange={onMetaChange} />
+          <ExamHeaderForm
+            meta={metaDraft}
+            onChange={(key, value) => {
+              setMetaDraft((current) => ({
+                ...current,
+                [key]: value,
+              }));
+            }}
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
             <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => setStep(5)}>
@@ -573,7 +592,7 @@ export const GuidedExamBuilder = ({
               <ExamTemplatePreviewCard
                 key={template.id}
                 template={template}
-                onLoad={() => onSelectTemplate(template, target, gradeScale)}
+                onLoad={() => onSelectTemplate(template, target, gradeScale, metaDraft)}
               />
             ))}
           </div>
@@ -724,7 +743,15 @@ export const GuidedExamBuilder = ({
                 type="button"
                 className="button-primary"
                 disabled={difference !== 0 || hasEmptyTitles}
-                onClick={() => onApplyManualStructure({ totalPoints, gradeScale, sections: sectionDrafts, target })}
+                onClick={() =>
+                  onApplyManualStructure({
+                    totalPoints,
+                    gradeScale,
+                    sections: sectionDrafts,
+                    target,
+                    meta: metaDraft,
+                  })
+                }
               >
                 In EWH-Editor übernehmen
               </button>
