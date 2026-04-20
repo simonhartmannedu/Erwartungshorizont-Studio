@@ -7,7 +7,7 @@ Browser-based tool for building, editing, assigning, archiving, and printing `Er
 ## Screenshot
 
 ```md
-![App screenshot](./docs/screenshot-current-state.png)
+![EWH-Studio](erwartungshorizontstudio.png)
 ```
 
 ## Current App State
