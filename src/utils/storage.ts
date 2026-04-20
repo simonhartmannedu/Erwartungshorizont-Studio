@@ -1,5 +1,6 @@
 import { DraftBundle, Exam, ExpectationArchiveEntry, StudentDatabase, ThemeMode, VisualTheme } from "../types";
 import { isArchiveEntry } from "./archive";
+import { createEmptyExamMeta } from "./exam";
 import { createGradeScaleGeneratorSettings } from "./gradeScaleGenerator";
 import { createEmptyStudentDatabase, isStudentDatabase } from "./studentDatabase";
 
@@ -19,6 +20,10 @@ type SqliteDatabase = import("sql.js").Database;
 const normalizeExamDraft = (exam: Exam): Exam => ({
   ...exam,
   id: exam.id || crypto.randomUUID(),
+  meta: {
+    ...createEmptyExamMeta(),
+    ...(exam.meta ?? {}),
+  },
   gradeScale: {
     ...exam.gradeScale,
     id: exam.gradeScale.id || crypto.randomUUID(),
@@ -56,6 +61,12 @@ const normalizeExamDraft = (exam: Exam): Exam => ({
       id: task.id || crypto.randomUUID(),
     })),
   })),
+  printSettings: {
+    showExpectations: exam.printSettings?.showExpectations ?? true,
+    showTeacherComment: exam.printSettings?.showTeacherComment ?? true,
+    compactRows: exam.printSettings?.compactRows ?? false,
+    showWeightedOverview: exam.printSettings?.showWeightedOverview ?? false,
+  },
 });
 
 const normalizeWorkspaceVersion = (version: { id?: string; savedAt?: string; exam: Exam }) => ({

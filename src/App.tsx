@@ -120,6 +120,7 @@ import {
 import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { playUiFeedback } from "./utils/feedback";
+import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 
 type TabId = "guidedBuilder" | "builder" | "groups" | "archive";
 type PendingArchiveOverwrite = {
@@ -129,6 +130,8 @@ type PendingArchiveOverwrite = {
 type PendingTemplateLoad = {
   template: ExamTemplateDefinition;
   target: GuidedBuilderTarget;
+  gradeScale: Exam["gradeScale"];
+  meta: Exam["meta"];
 };
 type PendingSectionTotalChange = {
   sectionId: string;
@@ -274,16 +277,7 @@ const createSection = (): Section => ({
 
 const createEmptyExam = (): Exam => ({
   id: crypto.randomUUID(),
-  meta: {
-    schoolYear: "",
-    gradeLevel: "",
-    course: "",
-    teacher: "",
-    examDate: "",
-    title: "",
-    unit: "",
-    notes: "",
-  },
+  meta: createEmptyExamMeta(),
   evaluationMode: "direct",
   gradeScale: createDefaultGradeScale(),
   sections: [createSection()],
@@ -303,7 +297,7 @@ const createDraftWorkspace = (
 ): DraftWorkspace => ({
   id: crypto.randomUUID(),
   label,
-  exam,
+  exam: cloneExam(exam),
   activeArchiveEntryId,
   assignedGroupId,
   updatedAt: new Date().toISOString(),
@@ -361,7 +355,7 @@ const getMedian = (values: number[]) => {
 const MAX_WORKSPACE_VERSIONS = 10;
 const WORKSPACE_VERSION_INTERVAL_MS = 1000 * 60 * 15;
 
-const cloneExamSnapshot = (exam: Exam): Exam => JSON.parse(JSON.stringify(exam)) as Exam;
+const cloneExamSnapshot = (exam: Exam): Exam => cloneExam(exam);
 
 function App() {
   const defaultPrintSettings = {
@@ -1477,11 +1471,21 @@ function App() {
     setSectionDropIndicator(null);
   };
 
-  const applyTemplate = (template: ExamTemplateDefinition, target: GuidedBuilderTarget, gradeScale: Exam["gradeScale"]) => {
-    const nextExam = normalizeExamStructure({
-      ...template.build(),
-      gradeScale,
-    });
+  const applyTemplate = (
+    template: ExamTemplateDefinition,
+    target: GuidedBuilderTarget,
+    gradeScale: Exam["gradeScale"],
+    meta: Exam["meta"],
+  ) => {
+    const nextExam = normalizeExamStructure(
+      withExamMeta(
+        {
+          ...template.build(),
+          gradeScale,
+        },
+        meta,
+      ),
+    );
     if (target === "current") {
       setActiveWorkspaceExam(nextExam);
       setActiveWorkspaceArchiveEntryId(null);
@@ -1506,9 +1510,11 @@ function App() {
     gradeScale: Exam["gradeScale"];
     sections: GuidedSectionDraft[];
     target: GuidedBuilderTarget;
+    meta: Exam["meta"];
   }) => {
     const nextExam = {
       ...exam,
+      meta: { ...config.meta },
       evaluationMode: "direct" as const,
       gradeScale: config.gradeScale,
       sections: config.sections.map((section) => ({
@@ -2661,26 +2667,19 @@ function App() {
                 initialTotalPoints={summary.totalMaxPoints}
                 initialGradeScale={exam.gradeScale}
                 initialSubject={activeGroup?.subject || ""}
-                meta={exam.meta}
-                onMetaChange={(key, value) =>
-                  setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
-                }
+                initialMeta={exam.meta}
                 initialSections={exam.sections.map((section) => ({
                   id: section.id,
                   title: section.title,
                   weight: section.weight,
                   description: section.description,
                 }))}
-                onSelectTemplate={(template, target, gradeScale) => {
+                onSelectTemplate={(template, target, gradeScale, meta) => {
                   setTemplateToLoad({
-                    template: {
-                      ...template,
-                      build: () => ({
-                        ...template.build(),
-                        gradeScale,
-                      }),
-                    },
+                    template,
                     target,
+                    gradeScale,
+                    meta: { ...meta },
                   });
                 }}
                 onApplyManualStructure={applyGuidedBuilderStructure}
@@ -3085,10 +3084,10 @@ function App() {
             : "Möchtest du aus dieser Vorlage eine neue Klassenarbeit anlegen?\nDie aktuelle Klassenarbeit bleibt erhalten und die Vorlage wird als neuer Workspace geöffnet."
         }
         onCancel={() => setTemplateToLoad(null)}
-        onConfirm={() => templateToLoad && applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.template.build().gradeScale)}
+        onConfirm={() => templateToLoad && applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.gradeScale, templateToLoad.meta)}
         onSaveAndConfirm={() => {
           void saveDraft(draftBundle);
-          if (templateToLoad) applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.template.build().gradeScale);
+          if (templateToLoad) applyTemplate(templateToLoad.template, templateToLoad.target, templateToLoad.gradeScale, templateToLoad.meta);
         }}
         confirmLabel="Vorlage laden"
       >

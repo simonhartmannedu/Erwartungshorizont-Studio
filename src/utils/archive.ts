@@ -1,7 +1,6 @@
 import { Exam, ExpectationArchiveEntry } from "../types";
 import { calculateExamSummary } from "./calculations";
-
-const cloneExam = (exam: Exam): Exam => JSON.parse(JSON.stringify(exam)) as Exam;
+import { cloneExam } from "./exam";
 
 const resetExamIds = (exam: Exam, titleSuffix = ""): Exam => ({
   ...cloneExam(exam),
