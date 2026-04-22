@@ -1,5 +1,14 @@
-import { KeyboardEvent, ReactNode, useEffect, useState } from "react";
-import { CheckIcon, CloseIcon, InfoIcon } from "./icons";
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  ReactNode,
+  TextareaHTMLAttributes,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { CheckIcon, CloseIcon, CompactIcon, InfoIcon, ListIcon } from "./icons";
 
 export const Card = ({
   title,
@@ -116,6 +125,119 @@ export const NumberInput = ({
       onBlur={commit}
       onKeyDown={handleKeyDown}
     />
+  );
+};
+
+export const TextAreaField = ({
+  className = "",
+  spellCheck = true,
+  onChange,
+  onInput,
+  style,
+  onValueChange,
+  showListTransform = false,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  onValueChange?: (nextValue: string) => void;
+  showListTransform?: boolean;
+}) => {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [previousCompactValue, setPreviousCompactValue] = useState<string | null>(null);
+  const currentValue = typeof props.value === "string" ? props.value : typeof props.defaultValue === "string" ? props.defaultValue : "";
+
+  const toBulletList = (value: string) =>
+    value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => `- ${item}`)
+      .join("\n");
+
+  const syncHeight = () => {
+    const element = textareaRef.current;
+    if (!element) return;
+
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  };
+
+  useLayoutEffect(() => {
+    syncHeight();
+  }, [props.value, props.defaultValue]);
+
+  useEffect(() => {
+    if (!previousCompactValue) return;
+    const transformedValue = toBulletList(previousCompactValue);
+    if (currentValue !== previousCompactValue && currentValue !== transformedValue) {
+      setPreviousCompactValue(null);
+    }
+  }, [currentValue, previousCompactValue]);
+
+  const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    syncHeight();
+    onValueChange?.(event.target.value);
+    onChange?.(event);
+  };
+
+  const commaSeparatedItems = currentValue
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const canTransformToList = showListTransform && commaSeparatedItems.length >= 2 && Boolean(onValueChange);
+  const canRestoreCompact = showListTransform && Boolean(onValueChange && previousCompactValue);
+
+  const handleListTransform = () => {
+    if (!canTransformToList || !onValueChange) return;
+    setPreviousCompactValue(currentValue);
+    onValueChange(toBulletList(currentValue));
+    window.requestAnimationFrame(() => syncHeight());
+  };
+
+  const handleRestoreCompact = () => {
+    if (!canRestoreCompact || !onValueChange || !previousCompactValue) return;
+    onValueChange(previousCompactValue);
+    setPreviousCompactValue(null);
+    window.requestAnimationFrame(() => syncHeight());
+  };
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        {...props}
+        ref={textareaRef}
+        spellCheck={spellCheck}
+        style={style}
+        className={`field field-textarea ${className}`.trim()}
+        onInput={(event) => {
+          syncHeight();
+          onInput?.(event);
+        }}
+        onChange={handleChange}
+      />
+      {showListTransform ? (
+        <div className="no-print flex justify-end gap-2">
+          {canRestoreCompact ? (
+            <IconButton
+              onClick={handleRestoreCompact}
+              title="Kompakt"
+              className="px-2.5 py-2 text-xs"
+            >
+              <CompactIcon />
+            </IconButton>
+          ) : null}
+          <IconButton
+            onClick={handleListTransform}
+            title="In Liste umwandeln"
+            variant="soft"
+            className="px-2.5 py-2 text-xs"
+            disabled={!canTransformToList}
+          >
+            <ListIcon />
+          </IconButton>
+        </div>
+      ) : null}
+    </div>
   );
 };
 

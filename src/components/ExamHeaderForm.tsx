@@ -1,5 +1,5 @@
 import { ExamMeta } from "../types";
-import { Field } from "./ui";
+import { Field, TextAreaField } from "./ui";
 
 interface Props {
   meta: ExamMeta;
@@ -31,7 +31,13 @@ export const ExamHeaderForm = ({ meta, onChange, disabled = false }: Props) => (
       <input className="field" value={meta.unit} disabled={disabled} onChange={(e) => onChange("unit", e.target.value)} />
     </Field>
     <Field label="Hinweise">
-      <textarea className="field min-h-24" value={meta.notes} disabled={disabled} onChange={(e) => onChange("notes", e.target.value)} />
+      <TextAreaField
+        className="min-h-24"
+        value={meta.notes}
+        disabled={disabled}
+        showListTransform
+        onValueChange={(value) => onChange("notes", value)}
+      />
     </Field>
   </div>
 );

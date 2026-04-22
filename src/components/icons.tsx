@@ -215,6 +215,24 @@ export const TemplateIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const ListIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <circle cx="6.5" cy="7" r="1" fill="currentColor" stroke="none" />
+    <circle cx="6.5" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="6.5" cy="17" r="1" fill="currentColor" stroke="none" />
+    <path d="M10 7h8M10 12h8M10 17h8" strokeLinecap="round" />
+  </svg>
+);
+
+export const CompactIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M5 8h4M15 8h4M9 8h2" strokeLinecap="round" />
+    <path d="M13 8h0.5" strokeLinecap="round" />
+    <path d="M5 16h4M15 16h4M9 16h2" strokeLinecap="round" />
+    <path d="M13 16h0.5" strokeLinecap="round" />
+  </svg>
+);
+
 export const ReplaceIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <path d="M7 7.5h10" strokeLinecap="round" />

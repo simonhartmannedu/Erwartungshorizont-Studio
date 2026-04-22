@@ -13,6 +13,7 @@ interface Props {
   recommendedStage?: GradeScaleRecommendedStage | null;
   onChange: (nextScale: GradeScale) => void;
   onBandChange: (bandId: string, lowerBound: number, verbalLabel: string) => void;
+  onTotalMaxPointsChange?: (nextTotalMaxPoints: number) => void;
 }
 
 const modeOptions: { value: GradeScaleMode; label: string }[] = [
@@ -36,6 +37,7 @@ export const GradeScaleEditor = ({
   recommendedStage = null,
   onChange,
   onBandChange,
+  onTotalMaxPointsChange,
 }: Props) => {
   const effectiveMode = getEffectiveGradeScaleMode(scale);
   const effectiveBands = getEffectiveGradeBands(scale, totalMaxPoints);
@@ -161,7 +163,17 @@ export const GradeScaleEditor = ({
               </Field>
 
               <Field label="Gesamtpunktzahl der Arbeit">
-                <input className="field" value={String(totalMaxPoints)} readOnly />
+                {onTotalMaxPointsChange ? (
+                  <NumberInput
+                    className="field"
+                    value={totalMaxPoints}
+                    min={1}
+                    step={1}
+                    onCommit={(value) => onTotalMaxPointsChange(Math.max(1, Math.round(value)))}
+                  />
+                ) : (
+                  <input className="field" value={String(totalMaxPoints)} readOnly />
+                )}
               </Field>
             </div>
 

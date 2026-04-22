@@ -533,6 +533,15 @@
     color: var(--app-text-strong);
   }
 
+  .field-textarea {
+    min-height: 6.5rem;
+    resize: vertical;
+    overflow-y: hidden;
+    line-height: 1.6;
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
   .field:hover {
     border-color: color-mix(in srgb, var(--app-field-focus) 18%, var(--app-field-border));
     background: color-mix(in srgb, var(--app-field-bg) 96%, var(--app-secondary-hover));
@@ -542,8 +551,7 @@
     border-color: var(--app-field-focus);
     box-shadow:
       0 0 0 2px var(--app-field-ring),
-      0 10px 24px color-mix(in srgb, var(--app-field-focus) 10%, transparent);
-    transform: translateY(-1px);
+      0 8px 20px color-mix(in srgb, var(--app-field-focus) 10%, transparent);
   }
 
   .label {

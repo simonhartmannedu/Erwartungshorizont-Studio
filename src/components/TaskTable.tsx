@@ -1,6 +1,6 @@
 import { Task } from "../types";
 import { DuplicateIcon, PlusIcon, TrashIcon } from "./icons";
-import { Field, IconButton, NumberInput } from "./ui";
+import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
 
 interface Props {
   tasks: Task[];
@@ -52,10 +52,11 @@ export const TaskTable = ({
               />
             </Field>
             <Field label="Mögl. Schülerantwort">
-              <textarea
-                className="field min-h-28 !px-3 !py-2.5 text-sm leading-6"
+              <TextAreaField
+                className="min-h-28 !px-3 !py-2.5 text-sm leading-6"
                 value={task.description}
-                onChange={(e) => onChange(task.id, { description: e.target.value })}
+                showListTransform
+                onValueChange={(value) => onChange(task.id, { description: value })}
                 placeholder="Stichpunkte oder mögliche Schülerantwort"
               />
             </Field>
@@ -124,10 +125,11 @@ export const TaskTable = ({
                       <p className="themed-muted text-[11px] font-semibold uppercase tracking-[0.16em]">
                         Inhalt
                       </p>
-                      <textarea
-                        className="field min-h-28 min-w-[18rem] !px-3 !py-2.5 text-sm leading-6"
+                      <TextAreaField
+                        className="min-h-28 min-w-[18rem] !px-3 !py-2.5 text-sm leading-6"
                         value={task.description}
-                        onChange={(e) => onChange(task.id, { description: e.target.value })}
+                        showListTransform
+                        onValueChange={(value) => onChange(task.id, { description: value })}
                         placeholder="Stichpunkte oder mögliche Schülerantwort"
                       />
                     </div>

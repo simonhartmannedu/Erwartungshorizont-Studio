@@ -4,6 +4,7 @@ import { formatNumber } from "../utils/format";
 import { AutomatedFeedbackStyle, generateAutomatedExamFeedback } from "../utils/reportFeedback";
 import { GradeScaleRangeSection } from "./GradeScaleRangeSection";
 import { SignaturePad } from "./SignaturePad";
+import { TextAreaField } from "./ui";
 
 export const ReportSummarySection = ({
   exam,
@@ -110,8 +111,8 @@ export const ReportSummarySection = ({
                         </button>
                       </div>
                     </div>
-                    <textarea
-                      className="field mt-3 min-h-32 no-print"
+                    <TextAreaField
+                      className="mt-3 min-h-32 no-print"
                       value={teacherComment ?? ""}
                       placeholder="Kommentar für den Ausdruck. Platzhalter: $Name$, $Vorname$, $Nachname$, $Kürzel$, $Klasse$, $Fach$, $Punkte$, $MaxPunkte$, $Prozent$, $Note$."
                       onChange={(event) => onTeacherCommentChange(event.target.value)}
