@@ -1,10 +1,10 @@
 # EWH Module
 
-Short overview of the `notenrechner-nrw-english` module.
+Short overview of the `ErwartungshorizontStudio` module.
 
 ## Overview
 
-This is a Vite + React module for building and reviewing English assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I / Gymnasium NRW.
+This is a Vite + React module for building and reviewing student assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I+II/ Gymnasium NRW.
 
 License summary:
 
@@ -57,7 +57,6 @@ General behavior:
 
 - data is local to the current browser/profile unless exported manually
 - if the browser profile is reset or the device changes, recovery depends on a previously exported backup file and its backup password
-- on the first start after this storage change, existing browser data is migrated automatically into SQLite
 - popup and print handling depend on browser settings; blocked popups or browser-specific PDF behavior can affect export workflows
 - password-protected student name decryption only works when the correct class password is available for that session
 - print layouts are optimized for browser printing, so exact pagination may vary slightly between browsers
