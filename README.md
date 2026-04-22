@@ -57,7 +57,6 @@ General behavior:
 
 - data is local to the current browser/profile unless exported manually
 - if the browser profile is reset or the device changes, recovery depends on a previously exported backup file and its backup password
-- on the first start after this storage change, existing browser data is migrated automatically into SQLite
 - popup and print handling depend on browser settings; blocked popups or browser-specific PDF behavior can affect export workflows
 - password-protected student name decryption only works when the correct class password is available for that session
 - print layouts are optimized for browser printing, so exact pagination may vary slightly between browsers
