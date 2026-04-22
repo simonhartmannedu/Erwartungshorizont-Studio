@@ -4,15 +4,22 @@ import { TemplateIcon } from "./icons";
 
 interface Props {
   template: ExamTemplateDefinition;
+  actionLabel?: string;
   onLoad: () => void;
+  selected?: boolean;
 }
 
-export const ExamTemplatePreviewCard = ({ template, onLoad }: Props) => (
+export const ExamTemplatePreviewCard = ({
+  template,
+  actionLabel = "Vorlage laden",
+  onLoad,
+  selected = false,
+}: Props) => (
   <Card
     title={template.title}
     subtitle={template.description}
-    className="template-preview-card h-full"
-    actions={<Badge tone="amber">Komplette Vorlage</Badge>}
+    className={`template-preview-card h-full ${selected ? "ring-2 ring-[color:var(--accent-strong)]" : ""}`}
+    actions={<Badge tone={selected ? "emerald" : "amber"}>{selected ? "Ausgewählt" : "Komplette Vorlage"}</Badge>}
   >
     <div className="space-y-4">
       <p className="subsection-copy text-sm leading-6">{template.pedagogicalHint}</p>
@@ -31,7 +38,7 @@ export const ExamTemplatePreviewCard = ({ template, onLoad }: Props) => (
       </div>
       <button type="button" className="button-primary w-full gap-2" onClick={onLoad}>
         <TemplateIcon />
-        Vorlage laden
+        {actionLabel}
       </button>
     </div>
   </Card>

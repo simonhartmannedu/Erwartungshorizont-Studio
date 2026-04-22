@@ -5,7 +5,7 @@ import { formatNumber } from "../utils/format";
 import { getSectionRecommendation } from "../utils/sectionWeights";
 import { getWritingLanguageMetrics } from "../utils/writing";
 import { ChevronDownIcon, ChevronRightIcon, DragIcon, DuplicateIcon, LinkIcon, TrashIcon, UnlinkIcon } from "./icons";
-import { Badge, Card, DismissibleCallout, Field, IconButton, NumberInput } from "./ui";
+import { Badge, Card, DismissibleCallout, Field, IconButton, NumberInput, TextAreaField } from "./ui";
 import { TaskTable } from "./TaskTable";
 
 const SECTION_TONES = {
@@ -119,9 +119,6 @@ export const SectionEditor = ({
   return (
     <div
       className={`space-y-2 transition-[opacity,transform] duration-200 ${isDragging ? "opacity-70" : ""}`}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
       onDragOver={(event) => {
         event.preventDefault();
         onDragOver?.(section.id, handleDragPosition(event));
@@ -186,7 +183,14 @@ export const SectionEditor = ({
           <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${tone.badgeClass}`}>
             Teil {getSectionToneKey(section.title, index)}
           </span>
-          <span className="themed-muted inline-flex cursor-grab items-center gap-1.5 rounded-full border border-dashed px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: "var(--app-secondary-border)" }}>
+          <span
+            draggable={draggable}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            className="themed-muted inline-flex cursor-grab items-center gap-1.5 rounded-full border border-dashed px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ borderColor: "var(--app-secondary-border)" }}
+            title="Aufgabenteil ziehen"
+          >
             <DragIcon className="h-3.5 w-3.5" />
             Ziehen
           </span>
@@ -239,10 +243,11 @@ export const SectionEditor = ({
         </div>
         <div className="mb-4 grid gap-3 lg:grid-cols-2">
           <Field label="Notiz / Erwartungshorizont">
-            <textarea
-              className="field min-h-24 !px-3 !py-2.5 text-sm"
+            <TextAreaField
+              className="min-h-24 !px-3 !py-2.5 text-sm"
               value={section.note}
-              onChange={(e) => onChange({ note: e.target.value })}
+              showListTransform
+              onValueChange={(value) => onChange({ note: value })}
               placeholder="Hinweise, Bewertungsraster, Erwartungshorizont"
             />
           </Field>
