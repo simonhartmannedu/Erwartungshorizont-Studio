@@ -1,10 +1,10 @@
 # EWH Module
 
-Short overview of the `notenrechner-nrw-english` module.
+Short overview of the `ErwartungshorizontStudio` module.
 
 ## Overview
 
-This is a Vite + React module for building and reviewing English assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I / Gymnasium NRW.
+This is a Vite + React module for building and reviewing student assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I+II/ Gymnasium NRW.
 
 License summary:
 
