@@ -4,6 +4,9 @@ export const AppFooter = () => {
   const emailUser = "simonhartmann";
   const emailHost = "mailbox.org";
   const emailAddress = `${emailUser}@${emailHost}`;
+  const publicBase = import.meta.env.BASE_URL;
+  const licenseUrl = `${publicBase}LICENSE.txt`;
+  const soundsLicenseUrl = `${publicBase}licenses/kenney-interface-sounds-license.txt`;
 
   return (
     <footer className="app-footer mt-10 border-t pt-6 no-print">
@@ -25,17 +28,17 @@ export const AppFooter = () => {
           </p>
           <p className="app-footer-text">
             Copyright und Lizenzhinweis: Die Anwendung selbst unterliegt den Bedingungen der lokalen{" "}
-            <a className="app-footer-link" href="/LICENSE" target="_blank" rel="noreferrer">
+            <a className="app-footer-link" href={licenseUrl} target="_blank" rel="noreferrer">
               Lizenzdatei
             </a>
             . Die gebündelten UI-Sounds stammen aus Kenney&apos;s CC0-Pack; der Lizenztext liegt unter{" "}
             <a
               className="app-footer-link"
-              href="/licenses/kenney-interface-sounds-license.txt"
+              href={soundsLicenseUrl}
               target="_blank"
               rel="noreferrer"
             >
-              /licenses/kenney-interface-sounds-license.txt
+              {soundsLicenseUrl}
             </a>
             .
           </p>
