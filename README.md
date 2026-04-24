@@ -22,7 +22,7 @@ Main capabilities:
 - create fully encrypted student-database backups for export and recovery
 - save reusable rubric snapshots in the archive
 - generate print-friendly report views and browser PDF exports
-- switch between light/dark mode and two visual themes
+- switch between light/dark mode and a few visual themes
 
 ## Usage Notes
 
