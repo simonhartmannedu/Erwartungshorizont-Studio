@@ -12,6 +12,8 @@ License summary:
 - commercial use or redistribution requires a separate written license
 - full terms are in [LICENSE](LICENSE.MD)
 
+![EWH](erwartungshorizontstudio.png)
+
 Main capabilities:
 
 - edit section-based assessment sheets
