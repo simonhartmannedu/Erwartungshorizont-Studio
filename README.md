@@ -10,7 +10,7 @@ License summary:
 
 - personal, educational, and other noncommercial use is allowed
 - commercial use or redistribution requires a separate written license
-- full terms are in [LICENSE](LICENSE.MD)
+- full terms are in [LICENSE](LICENSE)
 
 Main capabilities:
 
@@ -37,10 +37,22 @@ Production build:
 npm run build
 ```
 
+Production end-check:
+
+```bash
+npm run check:release
+```
+
 Offline regression checks:
 
 ```bash
 npm run test:regression
+```
+
+GitHub Pages demo build:
+
+```bash
+npm run build:demo
 ```
 
 General behavior:
@@ -52,6 +64,7 @@ General behavior:
 - PDF export uses the browser print dialog, not a server-side PDF generator
 - the visual theme picker changes the app palette independently of light/dark mode
 - subtle one-shot UI feedback sounds are bundled locally from Kenney's CC0 `Interface Sounds` pack; license text is stored in `public/licenses/kenney-interface-sounds-license.txt`
+- demo builds (`npm run build:demo`) seed a local sample exam on first start and expose a reset button so the public Pages version stays explorable without shipping real user data
 
 ## Caveats
 
@@ -61,3 +74,11 @@ General behavior:
 - password-protected student name decryption only works when the correct class password is available for that session
 - print layouts are optimized for browser printing, so exact pagination may vary slightly between browsers
 - this repository is source-available, not open-source in the OSI sense, because commercial use is restricted
+
+## GitHub Handoff
+
+Before publishing the repository:
+
+- run `npm run check:release`
+- keep `dist/` out of version control; the demo site is deployed through `.github/workflows/deploy-demo.yml`
+- enable GitHub Pages with GitHub Actions as the source if you want the demo deployed automatically from `main`

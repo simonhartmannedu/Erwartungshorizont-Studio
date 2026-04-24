@@ -13,6 +13,7 @@ import {
   VisualTheme,
 } from "./types";
 import { ExamTemplateDefinition, examTemplates } from "./data/templates";
+import { sampleExam } from "./data/sampleExam";
 import { calculateExamSummary } from "./utils/calculations";
 import {
   mergeArchiveEntries,
@@ -215,6 +216,8 @@ type PendingImportPreview =
     };
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
+const runtimeQuery = new URLSearchParams(window.location.search);
+const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 
 const TabIcon = ({ id }: { id: TabId }) => {
   switch (id) {
@@ -315,8 +318,8 @@ const createDraftWorkspace = (
   versions: [],
 });
 
-const createDraftBundle = (exam: Exam): DraftBundle => {
-  const workspace = createDraftWorkspace(exam, "Klassenarbeit 1");
+const createDraftBundle = (exam: Exam, label = "Klassenarbeit 1"): DraftBundle => {
+  const workspace = createDraftWorkspace(exam, label);
   return {
     activeWorkspaceId: workspace.id,
     workspaces: [workspace],
@@ -499,6 +502,9 @@ function App() {
     );
   };
 
+  const createInitialDraftBundle = () => createDraftBundle(normalizeExamStructure(createEmptyExam()));
+  const createDemoDraftBundle = () => createDraftBundle(normalizeExamStructure(cloneExam(sampleExam)), "Demo-Klassenarbeit");
+
   const getSectionBlockBounds = (sections: Section[], sectionId: string) => {
     const currentIndex = sections.findIndex((section) => section.id === sectionId);
     if (currentIndex === -1) return null;
@@ -513,7 +519,7 @@ function App() {
   };
 
   const [draftBundle, setDraftBundle] = useState<DraftBundle>(() =>
-    createDraftBundle(normalizeExamStructure(createEmptyExam())),
+    createInitialDraftBundle(),
   );
   const [archiveEntries, setArchiveEntries] = useState<ExpectationArchiveEntry[]>([]);
   const [studentDatabase, setStudentDatabase] = useState<StudentDatabase>(() => createEmptyStudentDatabase());
@@ -592,7 +598,12 @@ function App() {
 
         if (cancelled) return;
 
-        setDraftBundle(storedDraft ?? createDraftBundle(normalizeExamStructure(createEmptyExam())));
+        const hasStoredStudentData =
+          storedStudentDatabase.groups.length > 0 || Object.keys(storedStudentDatabase.assessments).length > 0;
+        const shouldSeedDemoWorkspace =
+          isDemoModeEnabled && !storedDraft && storedArchiveEntries.length === 0 && !hasStoredStudentData;
+
+        setDraftBundle(shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle());
         setArchiveEntries(storedArchiveEntries);
         setStudentDatabase(storedStudentDatabase);
         setActiveGroupId(storedStudentDatabase.groups[0]?.id ?? "");
@@ -738,6 +749,26 @@ function App() {
     activeStudentId,
     lastBackupAt,
   });
+
+  const resetDemoWorkspace = () => {
+    const nextDraftBundle = createDemoDraftBundle();
+    const nextArchiveEntries: ExpectationArchiveEntry[] = [];
+    const nextStudentDatabase = createEmptyStudentDatabase();
+
+    setDraftBundle(nextDraftBundle);
+    setArchiveEntries(nextArchiveEntries);
+    void saveExpectationArchive(nextArchiveEntries);
+    setStudentDatabase(nextStudentDatabase);
+    setActiveGroupId("");
+    setActiveStudentId("");
+    setUnlockedGroupPasswords({});
+    setRestoreCheckpoint(null);
+    setPendingImportPreview(null);
+    setLastBackupAt(null);
+    clearBackupComplete();
+    setActiveTab("builder");
+    pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
+  };
 
   const applyImportedState = (
     nextDraftBundle: DraftBundle,
@@ -2680,6 +2711,23 @@ function App() {
             <DismissibleCallout tone={appNotice.tone} resetKey={appNotice.id}>
               <p className="font-semibold">{appNotice.title}</p>
               {appNotice.detail ? <p>{appNotice.detail}</p> : null}
+            </DismissibleCallout>
+          </div>
+        ) : null}
+
+        {isDemoModeEnabled ? (
+          <div className="mb-6 no-print">
+            <DismissibleCallout tone="info" resetKey={`demo-${draftBundle.activeWorkspaceId}`}>
+              <p className="font-semibold">Demo-Modus aktiv</p>
+              <p>
+                Diese GitHub-Pages-Demo lädt beim ersten Aufruf eine lokale Beispiel-Klassenarbeit. Alle Änderungen
+                bleiben nur in diesem Browser.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button type="button" className="button-secondary" onClick={resetDemoWorkspace}>
+                  Demo-Daten zurücksetzen
+                </button>
+              </div>
             </DismissibleCallout>
           </div>
         ) : null}
