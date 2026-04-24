@@ -4,7 +4,7 @@ Short overview of the `ErwartungshorizontStudio` module.
 
 ## Overview
 
-This is a Vite + React module for building and reviewing student assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I+II/ Gymnasium NRW.
+This is a Vite + React module for building and reviewing student assessment rubrics (`Erwartungshorizonte`) for Sekundarstufe I+II/ Gymnasium/Gesamtschule/Sekundarschule/Realschule NRW.
 
 License summary:
 
