@@ -51,12 +51,6 @@ Offline regression checks:
 npm run test:regression
 ```
 
-GitHub Pages demo build:
-
-```bash
-npm run build:demo
-```
-
 General behavior:
 
 - draft data, archive entries, and student database state are stored in a browser-local SQLite database persisted in IndexedDB
@@ -76,11 +70,3 @@ General behavior:
 - password-protected student name decryption only works when the correct class password is available for that session
 - print layouts are optimized for browser printing, so exact pagination may vary slightly between browsers
 - this repository is source-available, not open-source in the OSI sense, because commercial use is restricted
-
-## GitHub Handoff
-
-Before publishing the repository:
-
-- run `npm run check:release`
-- keep `dist/` out of version control; the demo site is deployed through `.github/workflows/deploy-demo.yml`
-- enable GitHub Pages with GitHub Actions as the source if you want the demo deployed automatically from `main`
