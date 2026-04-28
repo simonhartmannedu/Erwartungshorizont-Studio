@@ -1,15 +1,17 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { GroupAccessMode, StudentDatabase, StudentGroup, StudentRecord } from "../types";
+import { DraftWorkspace, GroupAccessMode, StudentDatabase, StudentGroup, StudentRecord } from "../types";
 import { ImportSortOptions } from "../utils/studentImport";
-import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, PlusIcon, TrashIcon, UploadIcon, UserIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, EyeIcon, PlusIcon, TrashIcon, UploadIcon, UserIcon } from "./icons";
 import { Badge, Card, DismissibleCallout, Field, IconButton } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { StudentPerformanceView } from "./StudentPerformanceView";
 
 type GroupSortField = "alias" | "lastName" | "firstName" | "fullName";
 type SortDirection = "ascending" | "descending";
 
 interface Props {
   database: StudentDatabase;
+  workspaces: DraftWorkspace[];
   defaultImportSubject: string;
   activeGroupId: string;
   activeStudentId: string;
@@ -93,6 +95,7 @@ const getStudentDisplayLabel = (student: StudentRecord, namesByStudentId: Record
 
 export const StudentRosterPanel = ({
   database,
+  workspaces,
   defaultImportSubject,
   activeGroupId,
   activeStudentId,
@@ -128,6 +131,7 @@ export const StudentRosterPanel = ({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
   const [studentDraftsByGroupId, setStudentDraftsByGroupId] = useState<Record<string, { alias: string; fullName: string }>>({});
   const [pendingStudentDelete, setPendingStudentDelete] = useState<{ groupId: string; studentId: string; label: string } | null>(null);
+  const [viewedStudent, setViewedStudent] = useState<{ groupId: string; studentId: string } | null>(null);
   const [resolvedNamesByGroupId, setResolvedNamesByGroupId] = useState<Record<string, Record<string, string>>>({});
   const [sortStateByGroupId, setSortStateByGroupId] = useState<
     Record<string, { field: GroupSortField; direction: SortDirection }>
@@ -152,6 +156,15 @@ export const StudentRosterPanel = ({
       return nextCollapsedIds;
     });
   }, [database.groups, activeGroupId]);
+
+  useEffect(() => {
+    if (!viewedStudent) return;
+
+    const group = database.groups.find((entry) => entry.id === viewedStudent.groupId);
+    if (!group?.students.some((student) => student.id === viewedStudent.studentId)) {
+      setViewedStudent(null);
+    }
+  }, [database.groups, viewedStudent]);
 
   useEffect(() => {
     const unlockedGroupIdSet = new Set(unlockedGroupIds);
@@ -219,6 +232,16 @@ export const StudentRosterPanel = ({
   const selectStudent = (groupId: string, studentId: string) => {
     onSelectGroup(groupId);
     onSelectStudent(studentId);
+  };
+
+  const openStudentPerformanceView = (groupId: string, studentId: string) => {
+    selectStudent(groupId, studentId);
+    setCollapsedGroupIds((current) => current.filter((entry) => entry !== groupId));
+    setViewedStudent((current) =>
+      current?.groupId === groupId && current.studentId === studentId
+        ? null
+        : { groupId, studentId },
+    );
   };
 
   const updateStudentDraft = (groupId: string, patch: Partial<{ alias: string; fullName: string }>) => {
@@ -626,7 +649,7 @@ export const StudentRosterPanel = ({
                                     <th className="px-4 py-3">{renderSortButton(group, "lastName", "Nachname", !isUnlocked)}</th>
                                     <th className="px-4 py-3">{renderSortButton(group, "firstName", "Vorname", !isUnlocked)}</th>
                                     <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3 text-right">Reihenfolge</th>
+                                    <th className="px-4 py-3 text-right">Aktionen</th>
                                   </tr>
                                 </thead>
                                 <tbody className="themed-table-body">
@@ -670,6 +693,20 @@ export const StudentRosterPanel = ({
                                           <div className="flex justify-end gap-2">
                                             <button
                                               type="button"
+                                              className={`px-3 py-2 text-xs ${
+                                                viewedStudent?.groupId === group.id && viewedStudent.studentId === student.id
+                                                  ? "button-primary"
+                                                  : "button-secondary"
+                                              }`}
+                                              title="SuS-View öffnen"
+                                              aria-label={`SuS-View für ${student.alias} öffnen`}
+                                              aria-expanded={viewedStudent?.groupId === group.id && viewedStudent.studentId === student.id}
+                                              onClick={() => openStudentPerformanceView(group.id, student.id)}
+                                            >
+                                              <EyeIcon className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                              type="button"
                                               className="button-secondary px-3 py-2 text-xs"
                                               onClick={() => moveStudent(group, student.id, "up")}
                                               disabled={index === 0}
@@ -706,6 +743,22 @@ export const StudentRosterPanel = ({
                             </div>
                           </div>
                         )}
+                        {viewedStudent?.groupId === group.id ? (() => {
+                          const viewedRecord = group.students.find((student) => student.id === viewedStudent.studentId);
+                          if (!viewedRecord) return null;
+
+                          return (
+                            <div className="mt-5">
+                              <StudentPerformanceView
+                                database={database}
+                                group={group}
+                                student={viewedRecord}
+                                studentLabel={getStudentDisplayLabel(viewedRecord, namesByStudentId)}
+                                workspaces={workspaces}
+                              />
+                            </div>
+                          );
+                        })() : null}
                       </div>
                     )}
                   </section>

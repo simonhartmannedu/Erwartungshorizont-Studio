@@ -603,11 +603,11 @@
   }
 
   .panel:hover {
-    border-color: color-mix(in srgb, var(--app-field-focus) 24%, var(--app-border));
+    border-color: color-mix(in srgb, var(--app-field-focus) 14%, var(--app-border));
     box-shadow:
-      0 24px 58px color-mix(in srgb, var(--app-text-strong) 10%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--app-field-focus) 10%, transparent);
-    transform: translateY(-1px);
+      0 18px 44px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--app-field-focus) 5%, transparent);
+    transform: translateY(-0.5px);
   }
 
   .field {
@@ -1268,6 +1268,103 @@
   .template-preview-item:hover {
     transform: translateY(-1px);
     box-shadow: 0 12px 26px color-mix(in srgb, var(--app-text-strong) 8%, transparent);
+  }
+
+  .student-performance-view {
+    border-color: color-mix(in srgb, var(--app-field-focus) 18%, var(--app-border));
+    background:
+      radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--app-field-focus) 10%, transparent), transparent 34%),
+      color-mix(in srgb, var(--app-panel-bg) 94%, transparent);
+    color: var(--app-text);
+  }
+
+  .student-performance-empty {
+    border-color: var(--app-secondary-border);
+    background: color-mix(in srgb, var(--app-secondary-hover) 72%, transparent);
+    color: var(--app-text);
+  }
+
+  .student-performance-radar {
+    min-height: 320px;
+    border-radius: 1.5rem;
+    border: 1px solid color-mix(in srgb, var(--app-field-focus) 14%, var(--app-border));
+    background:
+      radial-gradient(circle at center, color-mix(in srgb, var(--app-field-focus) 9%, transparent), transparent 58%),
+      color-mix(in srgb, var(--app-secondary-bg) 92%, transparent);
+    padding: 0.75rem;
+  }
+
+  .student-performance-radar svg {
+    display: block;
+    width: 100%;
+    height: min(58vw, 360px);
+    min-height: 300px;
+  }
+
+  .student-performance-radar-grid {
+    fill: none;
+    stroke: color-mix(in srgb, var(--app-text-muted) 20%, transparent);
+    stroke-width: 1;
+  }
+
+  .student-performance-radar-axis {
+    stroke: color-mix(in srgb, var(--app-text-muted) 22%, transparent);
+    stroke-width: 1;
+  }
+
+  .student-performance-radar-student {
+    fill: color-mix(in srgb, var(--app-field-focus) 30%, transparent);
+    stroke: var(--app-field-focus);
+    stroke-linejoin: round;
+    stroke-width: 2.5;
+  }
+
+  .student-performance-radar-class {
+    fill: color-mix(in srgb, #64748b 12%, transparent);
+    stroke: color-mix(in srgb, var(--app-text-muted) 80%, transparent);
+    stroke-dasharray: 6 5;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .student-performance-radar-line {
+    fill: none;
+    stroke: var(--app-field-focus);
+    stroke-linecap: round;
+    stroke-width: 2.5;
+  }
+
+  .student-performance-radar-dot {
+    fill: var(--app-field-focus);
+    stroke: color-mix(in srgb, var(--app-panel-bg) 92%, white);
+    stroke-width: 2;
+  }
+
+  .student-performance-radar-label {
+    fill: var(--app-text);
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+
+  .student-performance-legend {
+    color: var(--app-text);
+  }
+
+  .student-performance-key {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.35rem;
+    border-radius: 9999px;
+    vertical-align: -0.1rem;
+  }
+
+  .student-performance-key-student {
+    background: var(--app-field-focus);
+  }
+
+  .student-performance-key-class {
+    border: 2px dashed var(--app-text-muted);
   }
 
   .point-preview-grid {
@@ -2292,7 +2389,7 @@
   padding: 1rem 1.15rem;
   text-align: left;
   box-shadow:
-    0 20px 44px color-mix(in srgb, var(--app-text-strong) 10%, transparent),
+    0 10px 24px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
     inset 0 1px 0 color-mix(in srgb, white 30%, transparent);
   transition:
     transform 180ms ease,
@@ -2303,18 +2400,36 @@
 }
 
 .security-key-trigger:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--app-field-focus) 34%, var(--app-secondary-border-hover));
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--app-field-focus) 28%, var(--app-secondary-border-hover));
   box-shadow:
-    0 24px 54px color-mix(in srgb, var(--app-text-strong) 12%, transparent),
+    0 14px 30px color-mix(in srgb, var(--app-text-strong) 8%, transparent),
     inset 0 1px 0 color-mix(in srgb, white 36%, transparent);
+}
+
+.security-key-trigger:hover:not(:disabled) .security-key-trigger-key {
+  animation-duration: 1.5s;
+}
+
+.security-key-trigger:hover:not(:disabled) .security-key-trigger-lock {
+  animation: none;
+}
+
+.security-key-trigger.is-locked:hover:not(:disabled) .security-key-trigger-lock {
+  color: #dc2626;
+  transform: translateY(-1px) rotate(-5deg);
+}
+
+.security-key-trigger.is-unlocked:hover:not(:disabled) .security-key-trigger-lock {
+  color: #059669;
+  transform: translateY(-1px) rotate(5deg);
 }
 
 .security-key-trigger:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--app-field-ring) 92%, transparent),
-    0 20px 44px color-mix(in srgb, var(--app-text-strong) 10%, transparent);
+    0 10px 24px color-mix(in srgb, var(--app-text-strong) 7%, transparent);
 }
 
 .security-key-trigger:disabled {
@@ -2334,7 +2449,7 @@
     linear-gradient(160deg, color-mix(in srgb, var(--app-field-focus) 22%, white 78%), color-mix(in srgb, var(--app-panel-bg) 88%, var(--app-field-focus) 12%));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 50%, transparent),
-    0 18px 34px color-mix(in srgb, var(--app-field-focus) 22%, transparent);
+    0 10px 22px color-mix(in srgb, var(--app-field-focus) 15%, transparent);
   overflow: hidden;
 }
 
@@ -2372,8 +2487,12 @@
   border-radius: 9999px;
   background: color-mix(in srgb, var(--app-panel-bg) 88%, white 12%);
   color: var(--app-text-strong);
-  box-shadow: 0 10px 18px color-mix(in srgb, var(--app-text-strong) 12%, transparent);
+  box-shadow: 0 5px 10px color-mix(in srgb, var(--app-text-strong) 8%, transparent);
   animation: security-lock-bob 3.4s ease-in-out infinite;
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .security-key-trigger-copy {
