@@ -136,7 +136,6 @@ import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { playUiFeedback } from "./utils/feedback";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
-import { ImportedExamSuggestion } from "./pdf/types";
 
 const GuidedExamBuilder = lazy(async () => {
   const module = await import("./components/GuidedExamBuilder");
@@ -297,19 +296,6 @@ const createTask = (): Task => ({
   expectation: "",
 });
 
-const createImportedTask = (
-  draft: ImportedExamSuggestion["sections"][number]["tasks"][number],
-  fallbackIndex: number,
-): Task => ({
-  id: crypto.randomUUID(),
-  title: draft.title.trim() || `Aufgabe ${fallbackIndex + 1}`,
-  description: draft.description.trim(),
-  category: "Inhalt",
-  maxPoints: Number.isFinite(draft.maxPoints) ? Math.max(0, draft.maxPoints) : 5,
-  achievedPoints: 0,
-  expectation: draft.expectation.trim(),
-});
-
 const createSection = (): Section => ({
   id: crypto.randomUUID(),
   title: "Neuer Abschnitt",
@@ -319,22 +305,6 @@ const createSection = (): Section => ({
   maxPointsOverride: null,
   note: "",
   tasks: [createTask()],
-});
-
-const createImportedSection = (
-  draft: ImportedExamSuggestion["sections"][number],
-  fallbackIndex: number,
-): Section => ({
-  id: crypto.randomUUID(),
-  title: draft.title.trim() || `Importierter Abschnitt ${fallbackIndex + 1}`,
-  description: draft.description.trim(),
-  weight: Number.isFinite(draft.weight) ? Math.max(0, draft.weight) : 25,
-  linkedSectionId: null,
-  maxPointsOverride: null,
-  note: draft.note.trim(),
-  tasks: draft.tasks.length > 0
-    ? draft.tasks.map((task, index) => createImportedTask(task, index))
-    : [createTask()],
 });
 
 const createEmptyExam = (): Exam => ({
@@ -1433,47 +1403,6 @@ function App() {
           ? config.newDetail.replace("{group}", `${assignedGroup.subject} · ${assignedGroup.className}`)
           : config.newDetail.replace(" für {group}", ""),
     );
-  };
-
-  const applyImportedExamSuggestion = (config: {
-    suggestion: ImportedExamSuggestion;
-    target: GuidedBuilderTarget;
-    gradeScale: Exam["gradeScale"];
-    meta: Exam["meta"];
-    targetGroupId: string | null;
-  }) => {
-    const { suggestion } = config;
-    const baseExam = createEmptyExam();
-    const nextExam = normalizeExamStructure({
-      ...baseExam,
-      meta: {
-        ...config.meta,
-        schoolYear: suggestion.meta.schoolYear.trim() || config.meta.schoolYear,
-        gradeLevel: suggestion.meta.gradeLevel.trim() || config.meta.gradeLevel,
-        course: suggestion.meta.course.trim() || config.meta.course,
-        teacher: config.meta.teacher,
-        examDate: suggestion.meta.examDate.trim() || config.meta.examDate,
-        title: suggestion.meta.title.trim() || config.meta.title,
-        unit: suggestion.meta.unit.trim() || config.meta.unit,
-        notes: [config.meta.notes.trim(), suggestion.meta.notes.trim()].filter(Boolean).join("\n\n"),
-      },
-      evaluationMode: "direct",
-      gradeScale: config.gradeScale,
-      printSettings: exam.printSettings,
-      sections:
-        suggestion.sections.length > 0
-          ? suggestion.sections.map((section, index) => createImportedSection(section, index))
-          : baseExam.sections,
-    });
-
-    commitBuiltExam(nextExam, {
-      target: config.target,
-      targetGroupId: config.targetGroupId,
-      currentTitle: "PDF-Vorschlag übernommen",
-      currentDetail: `${suggestion.sections.length} Abschnitt(e) und erkannte Metadaten wurden in den aktiven EWH übernommen.`,
-      newTitle: "PDF-Vorschlag als Klassenarbeit angelegt",
-      newDetail: "Der PDF-Vorschlag wurde als neue Klassenarbeit für {group} angelegt.",
-    });
   };
 
   const updateSection = (sectionId: string, patch: Partial<Section>) => {
@@ -3322,7 +3251,6 @@ function App() {
                     });
                   }}
                   onApplyManualStructure={applyGuidedBuilderStructure}
-                  onApplyPdfSuggestion={applyImportedExamSuggestion}
                 />
               </Suspense>
             )}
