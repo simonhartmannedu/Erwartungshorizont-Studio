@@ -46,8 +46,11 @@ export const isStudentAssessment = (value: unknown): value is StudentAssessment 
   (value.workspaceId === null || value.workspaceId === undefined || typeof value.workspaceId === "string") &&
   typeof value.studentId === "string" &&
   isFiniteNumberRecord(value.taskScores) &&
+  (value.encryptedTaskScores == null || isEncryptedText(value.encryptedTaskScores)) &&
   typeof value.teacherComment === "string" &&
   (value.signatureDataUrl == null || typeof value.signatureDataUrl === "string") &&
+  (value.encryptedTeacherComment == null || isEncryptedText(value.encryptedTeacherComment)) &&
+  (value.encryptedSignatureDataUrl == null || isEncryptedText(value.encryptedSignatureDataUrl)) &&
   isIsoTimestamp(value.updatedAt) &&
   (value.printedAt === null || isIsoTimestamp(value.printedAt));
 

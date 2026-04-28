@@ -1,4 +1,4 @@
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, KeyboardEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   DraftBundle,
   DraftWorkspace,
@@ -9,6 +9,7 @@ import {
   StudentDatabase,
   Task,
   ClassOverviewData,
+  GroupAccessMode,
   ThemeMode,
   VisualTheme,
 } from "./types";
@@ -75,9 +76,11 @@ import {
   getEffectiveSignatureDataUrl,
   getStudentGroup,
   getStudentRecord,
+  hydrateSensitiveAssessmentsForGroup,
   markStudentPrinted,
   removeStudentGroup,
   removeStudentFromGroup,
+  scrubSensitiveAssessmentsForGroups,
   scaleTaskScoresForStudents,
   setStudentOrderInGroup,
   updateStudentAbsentStatus,
@@ -95,10 +98,13 @@ import {
   openBatchPrintWindow,
   openClassOverviewPrintWindow,
   openGradeScalePrintWindow,
+  openPrintPopupHost,
   openPrintWindow,
+  openSecurityTokenPrintWindow,
   resolveCommentTemplate,
 } from "./utils/export";
 import { ImportSortOptions, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
+import { generateSecurityToken, SecurityTokenCard } from "./utils/securityTokens";
 import { ExamHeaderForm } from "./components/ExamHeaderForm";
 import { SectionEditor } from "./components/SectionEditor";
 import { GradeScaleEditor } from "./components/GradeScaleEditor";
@@ -106,7 +112,6 @@ import { SummaryPanel } from "./components/SummaryPanel";
 import { ClassOverviewPanel } from "./components/ClassOverviewPanel";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
-import { ExpectationArchiveDashboard } from "./components/ExpectationArchiveDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
 import { CelebrationOverlay } from "./components/CelebrationOverlay";
@@ -114,14 +119,13 @@ import { PointScaleControl } from "./components/PointScaleControl";
 import { GradeScaleRangeSection } from "./components/GradeScaleRangeSection";
 import { StudentRosterPanel } from "./components/StudentRosterPanel";
 import { StudentSelectionPanel } from "./components/StudentSelectionPanel";
-import { GuidedBuilderTarget, GuidedExamBuilder, GuidedSectionDraft } from "./components/GuidedExamBuilder";
+import type { GuidedBuilderTarget, GuidedSectionDraft } from "./components/GuidedExamBuilder";
 import {
   ArchiveIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   DashboardIcon,
   GroupIcon,
-  LockIcon,
   SaveIcon,
   MoonIcon,
   PaletteIcon,
@@ -132,6 +136,17 @@ import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { playUiFeedback } from "./utils/feedback";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
+import { ImportedExamSuggestion } from "./pdf/types";
+
+const GuidedExamBuilder = lazy(async () => {
+  const module = await import("./components/GuidedExamBuilder");
+  return { default: module.GuidedExamBuilder };
+});
+
+const ExpectationArchiveDashboard = lazy(async () => {
+  const module = await import("./components/ExpectationArchiveDashboard");
+  return { default: module.ExpectationArchiveDashboard };
+});
 
 type TabId = "guidedBuilder" | "builder" | "groups" | "archive";
 type PendingArchiveOverwrite = {
@@ -242,8 +257,12 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "archive", label: "EWH-Archiv" },
 ];
 
+const getTabButtonId = (tabId: TabId) => `app-tab-${tabId}`;
+const getTabPanelId = (tabId: TabId) => `app-tabpanel-${tabId}`;
+
 const visualThemeOptions: { value: VisualTheme; label: string }[] = [
   { value: "earth-paper", label: "Bernsteinzimmer" },
+  { value: "nrw-trikolore", label: "NRW-Trikolore" },
   { value: "waldmeister-schorle", label: "Waldmeister-Schorle" },
   { value: "blaubeer-pommesbude", label: "Blaubeer-Pommesbude" },
   { value: "flieder-feierabend", label: "Flieder-Feierabend" },
@@ -278,6 +297,19 @@ const createTask = (): Task => ({
   expectation: "",
 });
 
+const createImportedTask = (
+  draft: ImportedExamSuggestion["sections"][number]["tasks"][number],
+  fallbackIndex: number,
+): Task => ({
+  id: crypto.randomUUID(),
+  title: draft.title.trim() || `Aufgabe ${fallbackIndex + 1}`,
+  description: draft.description.trim(),
+  category: "Inhalt",
+  maxPoints: Number.isFinite(draft.maxPoints) ? Math.max(0, draft.maxPoints) : 5,
+  achievedPoints: 0,
+  expectation: draft.expectation.trim(),
+});
+
 const createSection = (): Section => ({
   id: crypto.randomUUID(),
   title: "Neuer Abschnitt",
@@ -287,6 +319,22 @@ const createSection = (): Section => ({
   maxPointsOverride: null,
   note: "",
   tasks: [createTask()],
+});
+
+const createImportedSection = (
+  draft: ImportedExamSuggestion["sections"][number],
+  fallbackIndex: number,
+): Section => ({
+  id: crypto.randomUUID(),
+  title: draft.title.trim() || `Importierter Abschnitt ${fallbackIndex + 1}`,
+  description: draft.description.trim(),
+  weight: Number.isFinite(draft.weight) ? Math.max(0, draft.weight) : 25,
+  linkedSectionId: null,
+  maxPointsOverride: null,
+  note: draft.note.trim(),
+  tasks: draft.tasks.length > 0
+    ? draft.tasks.map((task, index) => createImportedTask(task, index))
+    : [createTask()],
 });
 
 const createEmptyExam = (): Exam => ({
@@ -531,12 +579,19 @@ function App() {
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState<StorageErrorState | null>(null);
   const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
-  const [unlockedGroupPasswords, setUnlockedGroupPasswords] = useState<Record<string, string>>({});
+  const unlockedGroupPasswordsRef = useRef<Record<string, string>>({});
+  const [unlockedGroupIds, setUnlockedGroupIds] = useState<string[]>([]);
   const unlockActivityAtRef = useRef<number>(Date.now());
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(() => loadLastBackupAt());
   const [restoreCheckpoint, setRestoreCheckpoint] = useState<RestoreCheckpoint | null>(null);
   const [pendingImportPreview, setPendingImportPreview] = useState<PendingImportPreview | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("builder");
+  const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
+    groups: null,
+    guidedBuilder: null,
+    builder: null,
+    archive: null,
+  });
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [sectionDropIndicator, setSectionDropIndicator] = useState<SectionDropIndicator>(null);
   const [collapsedSectionIds, setCollapsedSectionIds] = useState<string[]>([]);
@@ -553,6 +608,10 @@ function App() {
   const [printPasswordDialogOpen, setPrintPasswordDialogOpen] = useState(false);
   const [printPasswordInput, setPrintPasswordInput] = useState("");
   const [pendingPrintMode, setPendingPrintMode] = useState<PrintMode>(null);
+  const [headerUnlockDialogOpen, setHeaderUnlockDialogOpen] = useState(false);
+  const [headerUnlockPasswordInput, setHeaderUnlockPasswordInput] = useState("");
+  const [headerUnlockError, setHeaderUnlockError] = useState("");
+  const [pendingSecurityTokenCards, setPendingSecurityTokenCards] = useState<SecurityTokenCard[]>([]);
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
@@ -571,9 +630,30 @@ function App() {
   };
 
   const clearUnlockedGroups = (notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
-    setUnlockedGroupPasswords({});
+    const lockedGroupIds = Object.keys(unlockedGroupPasswordsRef.current);
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
+    if (lockedGroupIds.length > 0) {
+      setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, lockedGroupIds));
+    }
     if (notice) {
       pushNotice(notice.tone ?? "warning", notice.title, notice.detail);
+    }
+  };
+
+  const lockGroupSession = (groupId: string, notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
+    if (!groupId) return;
+
+    const nextPasswords = { ...unlockedGroupPasswordsRef.current };
+    if (!(groupId in nextPasswords)) return;
+
+    delete nextPasswords[groupId];
+    unlockedGroupPasswordsRef.current = nextPasswords;
+    setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
+    setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, [groupId]));
+
+    if (notice) {
+      pushNotice(notice.tone ?? "info", notice.title, notice.detail);
     }
   };
 
@@ -636,7 +716,7 @@ function App() {
 
   useEffect(() => {
     if (!storageReady) return;
-    void saveStudentDatabase(studentDatabase);
+    void saveStudentDatabase(studentDatabase, (groupId) => unlockedGroupPasswordsRef.current[groupId] ?? null);
   }, [studentDatabase, storageReady]);
 
   useEffect(() => {
@@ -661,7 +741,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (Object.keys(unlockedGroupPasswords).length === 0) return;
+    if (unlockedGroupIds.length === 0) return;
 
     const intervalId = window.setInterval(() => {
       if (Date.now() - unlockActivityAtRef.current < UNLOCK_SESSION_TIMEOUT_MS) return;
@@ -673,7 +753,7 @@ function App() {
     }, 30_000);
 
     return () => window.clearInterval(intervalId);
-  }, [unlockedGroupPasswords]);
+  }, [unlockedGroupIds]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -693,6 +773,44 @@ function App() {
     saveVisualTheme(visualTheme);
     document.documentElement.dataset.theme = visualTheme;
   }, [visualTheme]);
+
+  const focusTabButton = (tabId: TabId) => {
+    tabButtonRefs.current[tabId]?.focus();
+  };
+
+  const activateTab = (tabId: TabId) => {
+    setActiveTab(tabId);
+    window.requestAnimationFrame(() => focusTabButton(tabId));
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentTabId: TabId) => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === currentTabId);
+    if (currentIndex === -1) return;
+
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (currentIndex + 1) % tabs.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    activateTab(tabs[nextIndex].id);
+  };
 
   useEffect(() => {
     const currentGroup = getStudentGroup(studentDatabase, activeGroupId);
@@ -733,7 +851,16 @@ function App() {
     ? getStudentAssessment(studentDatabase, activeStudentId, activeWorkspace?.id ?? null)
     : null;
   const activeSignatureDataUrl = getEffectiveSignatureDataUrl(activeGroup, activeAssessment);
-  const activeGroupPassword = activeGroupId ? unlockedGroupPasswords[activeGroupId] ?? "" : "";
+  const activeGroupPassword = activeGroupId ? unlockedGroupPasswordsRef.current[activeGroupId] ?? "" : "";
+  const assessmentLocked = Boolean(activeGroup?.passwordVerifier) && !activeGroupPassword;
+  const activeGroupIsProtected = Boolean(activeGroup?.passwordVerifier);
+  const activeUnlockButtonLabel = !activeGroup
+    ? "Keine Klasse aktiv"
+    : !activeGroupIsProtected
+      ? "Aktive Klasse ohne Passwort"
+      : assessmentLocked
+        ? "Klasse entsperren"
+        : "Klasse sperren";
   const [activeStudentLiveLabel, setActiveStudentLiveLabel] = useState<string | null>(null);
   const [activeStudentLiveLabelTitle, setActiveStudentLiveLabelTitle] = useState("Aktiver Schülercode");
   const backupStatus = useMemo(
@@ -761,7 +888,8 @@ function App() {
     setStudentDatabase(nextStudentDatabase);
     setActiveGroupId("");
     setActiveStudentId("");
-    setUnlockedGroupPasswords({});
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
     setRestoreCheckpoint(null);
     setPendingImportPreview(null);
     setLastBackupAt(null);
@@ -781,7 +909,8 @@ function App() {
     setArchiveEntries(nextArchiveEntries);
     void saveExpectationArchive(nextArchiveEntries);
     setStudentDatabase(nextStudentDatabase);
-    setUnlockedGroupPasswords({});
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
 
     const importedActiveWorkspace =
       nextDraftBundle.workspaces.find((workspace) => workspace.id === nextDraftBundle.activeWorkspaceId) ??
@@ -812,7 +941,8 @@ function App() {
     setArchiveEntries(restoreCheckpoint.archiveEntries);
     void saveExpectationArchive(restoreCheckpoint.archiveEntries);
     setStudentDatabase(restoreCheckpoint.studentDatabase);
-    setUnlockedGroupPasswords({});
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
     setActiveGroupId(restoreCheckpoint.activeGroupId);
     setActiveStudentId(restoreCheckpoint.activeStudentId);
     if (restoreCheckpoint.lastBackupAt) {
@@ -873,7 +1003,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [activeGroup, activeStudentRecord, unlockedGroupPasswords]);
+  }, [activeGroup, activeStudentRecord, unlockedGroupIds]);
 
   useEffect(() => {
     if (!activeGroupId || visibleWorkspaces.length === 0) return;
@@ -1034,9 +1164,18 @@ function App() {
   );
   const correctionCompletionState = useMemo(() => {
     if (!activeGroup || !activeWorkspace) {
-      return { key: null, allCorrected: false, correctedCount: 0, relevantStudentCount: 0 };
+      return {
+        key: null,
+        allCorrected: false,
+        correctedCount: 0,
+        relevantStudentCount: 0,
+        inProgressCount: 0,
+        uncorrectedCount: 0,
+        absentCount: 0,
+      };
     }
 
+    const absentCount = activeGroup.students.filter((student) => student.isAbsent).length;
     const relevantStudents = activeGroup.students.filter((student) => !student.isAbsent);
     if (relevantStudents.length === 0) {
       return {
@@ -1044,22 +1183,31 @@ function App() {
         allCorrected: false,
         correctedCount: 0,
         relevantStudentCount: 0,
+        inProgressCount: 0,
+        uncorrectedCount: 0,
+        absentCount,
       };
     }
 
-    const correctedCount = relevantStudents.reduce((count, student) => {
+    const statusCounts = relevantStudents.reduce((counts, student) => {
       const correctionStatus = getStudentCorrectionStatus(
         exam,
         getStudentAssessment(studentDatabase, student.id, activeWorkspace.id),
       );
-      return correctionStatus === "corrected" ? count + 1 : count;
-    }, 0);
+      if (correctionStatus === "corrected") counts.correctedCount += 1;
+      if (correctionStatus === "inProgress") counts.inProgressCount += 1;
+      if (correctionStatus === "uncorrected") counts.uncorrectedCount += 1;
+      return counts;
+    }, { correctedCount: 0, inProgressCount: 0, uncorrectedCount: 0 });
 
     return {
       key: `${activeGroup.id}::${activeWorkspace.id}`,
-      allCorrected: correctedCount === relevantStudents.length,
-      correctedCount,
+      allCorrected: statusCounts.correctedCount === relevantStudents.length,
+      correctedCount: statusCounts.correctedCount,
       relevantStudentCount: relevantStudents.length,
+      inProgressCount: statusCounts.inProgressCount,
+      uncorrectedCount: statusCounts.uncorrectedCount,
+      absentCount,
     };
   }, [activeGroup, activeWorkspace, exam, studentDatabase]);
   const sectionPointTargets = useMemo(
@@ -1080,11 +1228,6 @@ function App() {
 
     completedCorrectionCelebrationKeysRef.current[completionKey] = true;
     triggerExamCelebration();
-    pushNotice(
-      "success",
-      "Korrektursatz abgeschlossen",
-      `${correctionCompletionState.correctedCount} von ${correctionCompletionState.relevantStudentCount} Schülerarbeiten sind jetzt korrigiert.`,
-    );
   }, [correctionCompletionState]);
 
   useEffect(() => {
@@ -1251,6 +1394,87 @@ function App() {
 
   const updateExam = (patch: Partial<Exam>) =>
     setActiveWorkspaceExam((current) => normalizeExamStructure({ ...current, ...patch }));
+
+  const commitBuiltExam = (
+    nextExam: Exam,
+    config: {
+      target: GuidedBuilderTarget;
+      targetGroupId: string | null;
+      currentTitle: string;
+      currentDetail: string;
+      newTitle: string;
+      newDetail: string;
+    },
+  ) => {
+    const normalizedExam = normalizeExamStructure(nextExam);
+
+    if (config.target === "current") {
+      setActiveWorkspaceExam(normalizedExam);
+      setActiveWorkspaceArchiveEntryId(null);
+      setActiveWorkspaceGroupId(activeGroupId || null);
+    } else {
+      const assignedGroupId = config.targetGroupId || activeGroupId || null;
+      addWorkspace(normalizedExam, { assignedGroupId });
+      syncBuilderToGroup(assignedGroupId);
+    }
+
+    setCollapsedSectionIds([]);
+    setActiveTab("builder");
+    const assignedGroup =
+      config.target === "new"
+        ? getStudentGroup(studentDatabaseRef.current, config.targetGroupId || activeGroupId || "")
+        : null;
+    pushNotice(
+      "success",
+      config.target === "current" ? config.currentTitle : config.newTitle,
+      config.target === "current"
+        ? config.currentDetail
+        : assignedGroup
+          ? config.newDetail.replace("{group}", `${assignedGroup.subject} · ${assignedGroup.className}`)
+          : config.newDetail.replace(" für {group}", ""),
+    );
+  };
+
+  const applyImportedExamSuggestion = (config: {
+    suggestion: ImportedExamSuggestion;
+    target: GuidedBuilderTarget;
+    gradeScale: Exam["gradeScale"];
+    meta: Exam["meta"];
+    targetGroupId: string | null;
+  }) => {
+    const { suggestion } = config;
+    const baseExam = createEmptyExam();
+    const nextExam = normalizeExamStructure({
+      ...baseExam,
+      meta: {
+        ...config.meta,
+        schoolYear: suggestion.meta.schoolYear.trim() || config.meta.schoolYear,
+        gradeLevel: suggestion.meta.gradeLevel.trim() || config.meta.gradeLevel,
+        course: suggestion.meta.course.trim() || config.meta.course,
+        teacher: config.meta.teacher,
+        examDate: suggestion.meta.examDate.trim() || config.meta.examDate,
+        title: suggestion.meta.title.trim() || config.meta.title,
+        unit: suggestion.meta.unit.trim() || config.meta.unit,
+        notes: [config.meta.notes.trim(), suggestion.meta.notes.trim()].filter(Boolean).join("\n\n"),
+      },
+      evaluationMode: "direct",
+      gradeScale: config.gradeScale,
+      printSettings: exam.printSettings,
+      sections:
+        suggestion.sections.length > 0
+          ? suggestion.sections.map((section, index) => createImportedSection(section, index))
+          : baseExam.sections,
+    });
+
+    commitBuiltExam(nextExam, {
+      target: config.target,
+      targetGroupId: config.targetGroupId,
+      currentTitle: "PDF-Vorschlag übernommen",
+      currentDetail: `${suggestion.sections.length} Abschnitt(e) und erkannte Metadaten wurden in den aktiven EWH übernommen.`,
+      newTitle: "PDF-Vorschlag als Klassenarbeit angelegt",
+      newDetail: "Der PDF-Vorschlag wurde als neue Klassenarbeit für {group} angelegt.",
+    });
+  };
 
   const updateSection = (sectionId: string, patch: Partial<Section>) => {
     setActiveWorkspaceExam((current) =>
@@ -1612,29 +1836,15 @@ function App() {
         meta,
       ),
     );
-    if (target === "current") {
-      setActiveWorkspaceExam(nextExam);
-      setActiveWorkspaceArchiveEntryId(null);
-      setActiveWorkspaceGroupId(activeGroupId || null);
-    } else {
-      const assignedGroupId = targetGroupId || activeGroupId || null;
-      addWorkspace(nextExam, { assignedGroupId });
-      syncBuilderToGroup(assignedGroupId);
-    }
-    setCollapsedSectionIds([]);
-    setActiveTab("builder");
+    commitBuiltExam(nextExam, {
+      target,
+      targetGroupId,
+      currentTitle: "Vorlage übernommen",
+      currentDetail: "Die aktuelle Klassenarbeit wurde mit der gewählten Vorlage vollständig aufgebaut.",
+      newTitle: "Klassenarbeit erstellt",
+      newDetail: "Die gewählte Vorlage wurde als neue Klassenarbeit für {group} angelegt.",
+    });
     setTemplateToLoad(null);
-    const assignedGroup =
-      target === "new" ? getStudentGroup(studentDatabaseRef.current, targetGroupId || activeGroupId || "") : null;
-    pushNotice(
-      "success",
-      target === "current" ? "Vorlage übernommen" : "Klassenarbeit erstellt",
-      target === "current"
-        ? "Die aktuelle Klassenarbeit wurde mit der gewählten Vorlage vollständig aufgebaut."
-        : assignedGroup
-          ? `Die gewählte Vorlage wurde als neue Klassenarbeit für ${assignedGroup.subject} · ${assignedGroup.className} angelegt.`
-          : "Die gewählte Vorlage wurde als neue Klassenarbeit angelegt.",
-    );
   };
 
   const applyGuidedBuilderStructure = (config: {
@@ -1671,30 +1881,14 @@ function App() {
         ],
       })),
     };
-    if (config.target === "current") {
-      setActiveWorkspaceExam(normalizeExamStructure(nextExam));
-      setActiveWorkspaceArchiveEntryId(null);
-      setActiveWorkspaceGroupId(activeGroupId || null);
-    } else {
-      const assignedGroupId = config.targetGroupId || activeGroupId || null;
-      addWorkspace(nextExam, { assignedGroupId });
-      syncBuilderToGroup(assignedGroupId);
-    }
-    setCollapsedSectionIds([]);
-    setActiveTab("builder");
-    const assignedGroup =
-      config.target === "new"
-        ? getStudentGroup(studentDatabaseRef.current, config.targetGroupId || activeGroupId || "")
-        : null;
-    pushNotice(
-      "success",
-      config.target === "current" ? "Klassenarbeit aufgebaut" : "Neue Klassenarbeit erstellt",
-      config.target === "current"
-        ? "Die aktuelle Klassenarbeit wurde mit dem geführten Aufbau ersetzt."
-        : assignedGroup
-          ? `Der geführte Aufbau wurde als neue Klassenarbeit für ${assignedGroup.subject} · ${assignedGroup.className} angelegt.`
-          : "Der geführte Aufbau wurde als neue Klassenarbeit angelegt.",
-    );
+    commitBuiltExam(nextExam, {
+      target: config.target,
+      targetGroupId: config.targetGroupId,
+      currentTitle: "Klassenarbeit aufgebaut",
+      currentDetail: "Die aktuelle Klassenarbeit wurde mit dem geführten Aufbau ersetzt.",
+      newTitle: "Neue Klassenarbeit erstellt",
+      newDetail: "Der geführte Aufbau wurde als neue Klassenarbeit für {group} angelegt.",
+    });
   };
 
   const openArchiveEntryInBuilder = (entry: ExpectationArchiveEntry) => {
@@ -1769,13 +1963,29 @@ function App() {
     persistArchiveEntry(incomingEntry);
   };
 
-  const handleAddGroup = async (subject: string, className: string, password: string) => {
+  const handleAddGroup = async (
+    subject: string,
+    className: string,
+    access: { mode: GroupAccessMode; password?: string },
+  ) => {
     const group = createStudentGroup(subject, className);
-    group.passwordVerifier = await createPasswordVerifier(group.id, password);
+    const token = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
+    group.passwordVerifier = await createPasswordVerifier(group.id, token);
     setStudentDatabase((current) => addStudentGroup(current, group));
-    setUnlockedGroupPasswords((current) => ({ ...current, [group.id]: password }));
+    unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [group.id]: token };
+    setUnlockedGroupIds((current) => (current.includes(group.id) ? current : [...current, group.id]));
     setActiveGroupId(group.id);
     setActiveStudentId("");
+    if (access.mode === "generated") {
+      setPendingSecurityTokenCards([
+        {
+          groupId: group.id,
+          subject,
+          className,
+          token,
+        },
+      ]);
+    }
   };
 
   const handleUnlockGroup = async (groupId: string, password: string, options?: { silent?: boolean }) => {
@@ -1796,25 +2006,57 @@ function App() {
     }
 
     unlockActivityAtRef.current = Date.now();
-    setUnlockedGroupPasswords((current) => ({ ...current, [groupId]: password }));
+    unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [groupId]: password };
+    setUnlockedGroupIds((current) => (current.includes(groupId) ? current : [...current, groupId]));
+    const hydratedDatabase = await hydrateSensitiveAssessmentsForGroup(studentDatabaseRef.current, groupId, password);
+    setStudentDatabase(hydratedDatabase);
     return true;
+  };
+
+  const openHeaderUnlockDialog = () => {
+    if (!activeGroup?.passwordVerifier) {
+      pushNotice("warning", "Keine geschützte Klasse aktiv", "Wähle zuerst eine passwortgeschützte Lerngruppe aus.");
+      return;
+    }
+
+    setHeaderUnlockDialogOpen(true);
+    setHeaderUnlockPasswordInput("");
+    setHeaderUnlockError("");
+  };
+
+  const handleHeaderLockToggle = () => {
+    if (!activeGroup?.id || !activeGroup.passwordVerifier) {
+      pushNotice("warning", "Keine geschützte Klasse aktiv", "Wähle zuerst eine passwortgeschützte Lerngruppe aus.");
+      return;
+    }
+
+    if (activeGroupPassword) {
+      lockGroupSession(activeGroup.id, {
+        title: "Klasse wieder gesperrt",
+        detail: `${activeGroup.subject} · ${activeGroup.className} wurde lokal aus dem Arbeitsspeicher entfernt.`,
+        tone: "info",
+      });
+      return;
+    }
+
+    openHeaderUnlockDialog();
   };
 
   const getUsableUnlockedGroupPassword = async (groupId: string) => {
     const group = getStudentGroup(studentDatabaseRef.current, groupId);
     if (!group?.passwordVerifier) return "";
 
-    const password = unlockedGroupPasswords[groupId]?.trim() ?? "";
+    const password = unlockedGroupPasswordsRef.current[groupId]?.trim() ?? "";
     if (!password) return "";
 
     const isValidPassword = await verifyPassword(group.passwordVerifier, group.id, password);
     if (isValidPassword) return password;
 
-    setUnlockedGroupPasswords((current) => {
-      const next = { ...current };
-      delete next[groupId];
-      return next;
-    });
+    const nextPasswords = { ...unlockedGroupPasswordsRef.current };
+    delete nextPasswords[groupId];
+    unlockedGroupPasswordsRef.current = nextPasswords;
+    setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
+    setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, [groupId]));
     return "";
   };
 
@@ -1825,7 +2067,7 @@ function App() {
       return false;
     }
 
-    const password = unlockedGroupPasswords[groupId];
+    const password = unlockedGroupPasswordsRef.current[groupId];
     if (!password) {
       pushNotice("warning", "Klasse zuerst entsperren", "Zum Anlegen verschlüsselter Schüler muss die Klasse zuerst entsperrt werden.");
       return false;
@@ -1891,11 +2133,10 @@ function App() {
         workspace.assignedGroupId === groupId ? { ...workspace, assignedGroupId: null } : workspace,
       ),
     }));
-    setUnlockedGroupPasswords((current) => {
-      const next = { ...current };
-      delete next[groupId];
-      return next;
-    });
+    const nextPasswords = { ...unlockedGroupPasswordsRef.current };
+    delete nextPasswords[groupId];
+    unlockedGroupPasswordsRef.current = nextPasswords;
+    setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
     if (activeGroupId === groupId) {
       const fallbackGroup = studentDatabase.groups.find((group) => group.id !== groupId) ?? null;
       setActiveGroupId(fallbackGroup?.id ?? "");
@@ -1905,6 +2146,7 @@ function App() {
 
   const handleTeacherCommentChange = (value: string) => {
     if (!activeStudentId) return;
+    if (activeGroup?.passwordVerifier && !activeGroupPassword) return;
     setStudentDatabase((current) => {
       const next = updateTeacherComment(current, activeWorkspace?.id ?? null, activeStudentId, value);
       studentDatabaseRef.current = next;
@@ -1914,6 +2156,7 @@ function App() {
 
   const handleSignatureChange = (value: string | null) => {
     if (!activeGroup || !activeStudentId) return;
+    if (activeGroup.passwordVerifier && !activeGroupPassword) return;
     setStudentDatabase((current) => {
       if (value === "/signature.svg") {
         let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, null);
@@ -1929,39 +2172,6 @@ function App() {
       studentDatabaseRef.current = next;
       return next;
     });
-  };
-
-  const handleRevealStudentName = async (groupId: string, studentId: string, passwordOverride?: string) => {
-    const group = getStudentGroup(studentDatabase, groupId);
-    const student = getStudentRecord(studentDatabase, studentId);
-    if (!group || !student) return null;
-    if (!group.passwordVerifier) {
-      pushNotice("warning", "Kein Klassenpasswort vorhanden", "Für diese Klasse ist noch kein Passwort gesetzt.");
-      return null;
-    }
-
-    const unlockedPassword = passwordOverride?.trim() || unlockedGroupPasswords[groupId]?.trim() || "";
-    if (!unlockedPassword) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Bitte entsperre diese Klasse zuerst über „Klarname“.");
-      return null;
-    }
-
-    const isValidPassword = await verifyPassword(group.passwordVerifier, group.id, unlockedPassword);
-    if (!isValidPassword) {
-      clearUnlockedGroups({
-        title: "Sitzungspasswörter zurückgesetzt",
-        detail: "Das gespeicherte Klassenpasswort ist nicht mehr gültig. Entsperre die Lerngruppe erneut.",
-      });
-      return null;
-    }
-
-    try {
-      unlockActivityAtRef.current = Date.now();
-      return await decryptText(student.encryptedName, unlockedPassword);
-    } catch {
-      pushNotice("danger", "Klarname konnte nicht entschlüsselt werden");
-      return null;
-    }
   };
 
   const handleRevealGroupStudentNames = async (groupId: string) => {
@@ -2100,7 +2310,7 @@ function App() {
 
   const handleImportStudents = (
     file: File,
-    importPassword: string,
+    access: { mode: GroupAccessMode; password?: string },
     subject: string,
     sortOptions: ImportSortOptions,
   ) => {
@@ -2113,9 +2323,10 @@ function App() {
         }
 
         let nextDatabase = studentDatabase;
-        const nextUnlockedPasswords = { ...unlockedGroupPasswords };
+        const nextUnlockedPasswords = { ...unlockedGroupPasswordsRef.current };
         const passwordCache = new Map<string, string>();
         const importedStudentsPerClass = new Map<string, number>();
+        const generatedSecurityTokens: SecurityTokenCard[] = [];
         const skippedClasses = new Set<string>();
         const groupByClassName = new Map(
           nextDatabase.groups.map((group) => [group.className.trim().toLocaleLowerCase("de-DE"), group]),
@@ -2127,16 +2338,25 @@ function App() {
           let group = groupByClassName.get(classKey) ?? null;
 
           if (!group) {
-            if (!importPassword.trim()) {
+            if (access.mode === "manual" && !access.password?.trim()) {
               throw new Error("Fuer neue Klassen wird ein Import-Passwort benoetigt.");
             }
 
             group = createStudentGroup(subject.trim() || exam.meta.course || "Englisch", className);
-            group.passwordVerifier = await createPasswordVerifier(group.id, importPassword.trim());
+            const nextToken = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
+            group.passwordVerifier = await createPasswordVerifier(group.id, nextToken);
             nextDatabase = addStudentGroup(nextDatabase, group);
-            nextUnlockedPasswords[group.id] = importPassword.trim();
-            passwordCache.set(group.id, importPassword.trim());
+            nextUnlockedPasswords[group.id] = nextToken;
+            passwordCache.set(group.id, nextToken);
             groupByClassName.set(classKey, group);
+            if (access.mode === "generated") {
+              generatedSecurityTokens.push({
+                groupId: group.id,
+                subject: group.subject,
+                className: group.className,
+                token: nextToken,
+              });
+            }
           }
 
           if (!group.passwordVerifier) {
@@ -2184,8 +2404,9 @@ function App() {
           importedStudentsPerClass.set(group.className, (importedStudentsPerClass.get(group.className) ?? 0) + 1);
         }
 
+        unlockedGroupPasswordsRef.current = nextUnlockedPasswords;
+        setUnlockedGroupIds(Object.keys(nextUnlockedPasswords));
         setStudentDatabase(nextDatabase);
-        setUnlockedGroupPasswords(nextUnlockedPasswords);
 
         const firstImportedClassName = importedStudentsPerClass.keys().next().value as string | undefined;
         if (firstImportedClassName) {
@@ -2209,6 +2430,9 @@ function App() {
           "Klassenliste importiert",
           `Importiert: ${importedCount} Schüler. ${importedClasses.replace(/\n/g, " · ")}.${skippedText}`,
         );
+        if (generatedSecurityTokens.length > 0) {
+          setPendingSecurityTokenCards(generatedSecurityTokens);
+        }
       } catch (error) {
         pushNotice("danger", "Klassenliste konnte nicht importiert werden", error instanceof Error ? error.message : undefined);
       }
@@ -2216,17 +2440,25 @@ function App() {
   };
 
   const printWithResolvedIdentity = async (password?: string) => {
+    const popup = openPrintPopupHost();
+    if (!popup) {
+      pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return false;
+    }
+
     const latestAssessment = activeStudentId
       ? getStudentAssessment(studentDatabaseRef.current, activeStudentId, activeWorkspace?.id ?? null)
       : null;
     let fullName: string | null = null;
     if (activeStudentRecord && activeGroup?.passwordVerifier) {
       if (!password?.trim()) {
+        popup.close();
         pushNotice("warning", "Klassenpasswort fehlt", "Bitte gib das Klassenpasswort ein.");
         return false;
       }
       const isValidPassword = await verifyPassword(activeGroup.passwordVerifier, activeGroup.id, password);
       if (!isValidPassword) {
+        popup.close();
         pushNotice("danger", "Klassenpasswort falsch");
         return false;
       }
@@ -2248,9 +2480,10 @@ function App() {
           teacherComment: latestAssessment?.teacherComment ?? "",
           signatureDataUrl: getEffectiveSignatureDataUrl(activeGroup, latestAssessment),
         }
-      : undefined);
+      : undefined, undefined, popup);
 
     if (!opened) {
+      popup.close();
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
       return false;
     }
@@ -2273,15 +2506,23 @@ function App() {
       return false;
     }
 
+    const popup = openPrintPopupHost();
+    if (!popup) {
+      pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return false;
+    }
+
     const resolvedPassword = password?.trim() ?? "";
     if (activeGroup.passwordVerifier) {
       if (!resolvedPassword) {
+        popup.close();
         pushNotice("warning", "Klassenpasswort fehlt", "Bitte gib das Klassenpasswort ein.");
         return false;
       }
 
       const isValidPassword = await verifyPassword(activeGroup.passwordVerifier, activeGroup.id, resolvedPassword);
       if (!isValidPassword) {
+        popup.close();
         pushNotice("danger", "Klassenpasswort falsch");
         return false;
       }
@@ -2302,6 +2543,7 @@ function App() {
         try {
           fullName = await decryptText(student.encryptedName, resolvedPassword);
         } catch {
+          popup.close();
           pushNotice("danger", "Klarname konnte nicht entschlüsselt werden", `Der Klarname für ${student.alias} konnte nicht entschlüsselt werden.`);
           return false;
         }
@@ -2321,8 +2563,9 @@ function App() {
       });
     }
 
-    const opened = openBatchPrintWindow(reports);
+    const opened = openBatchPrintWindow(reports, popup);
     if (!opened) {
+      popup.close();
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
       return false;
     }
@@ -2399,6 +2642,11 @@ function App() {
       return;
     }
 
+    if (activeGroup.passwordVerifier && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Die Klassenübersicht wird erst nach Entsperrung mit echten Bewertungsdaten erstellt.");
+      return;
+    }
+
     if (!classOverview) {
       pushNotice("warning", "Keine auswertbaren Daten", "Für die aktive Klasse liegen noch keine auswertbaren Daten vor.");
       return;
@@ -2427,6 +2675,11 @@ function App() {
   };
 
   const handleExportStudentCsv = () => {
+    if (activeGroup?.passwordVerifier && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "CSV-Exporte mit Bewertungsdaten sind für diese Lerngruppe erst nach Entsperrung möglich.");
+      return;
+    }
+
     exportStudentExamCsv(
       displayExam,
       summary,
@@ -2450,6 +2703,11 @@ function App() {
 
     if (activeGroup.students.length === 0) {
       pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
+      return;
+    }
+
+    if (activeGroup.passwordVerifier && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Klassenexporte mit Bewertungsdaten sind erst nach Entsperrung möglich.");
       return;
     }
 
@@ -2522,6 +2780,11 @@ function App() {
       return;
     }
 
+    if (activeGroup.passwordVerifier && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Die Klassenübersicht wird erst nach Entsperrung berechnet und exportiert.");
+      return;
+    }
+
     if (!classOverview) {
       pushNotice("warning", "Keine auswertbaren Daten", "Für die aktive Klasse liegen noch keine auswertbaren Daten vor.");
       return;
@@ -2554,9 +2817,18 @@ function App() {
   const exportCsvGradeScaleLabel = "Notenbereiche als CSV";
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
-      ? "Beim Drucken wird das Klassenpasswort abgefragt und der Klarname nur lokal im Druckfenster entschlüsselt."
+      ? assessmentLocked
+        ? "Geschützte Lerngruppe: erst entsperren, dann stehen Druck und CSV mit vollständigen Bewertungsdaten bereit."
+        : "Geschützte Lerngruppe entsperrt: Druck und CSV arbeiten mit lokal entschlüsselten Bewertungsdaten."
       : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und CSV-Exporte nutzen deshalb nur den Schülercode."
     : "PDF für Ausdrucke, CSV für Tabellenkalkulationen und JSON für Sicherungen.";
+
+  const handlePrintSecurityTokens = () => {
+    const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
+    if (!opened) {
+      pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+    }
+  };
 
   const resolvedTeacherCommentPreview = resolveCommentTemplate(activeAssessment?.teacherComment ?? "", {
     alias: activeStudentRecord?.alias ?? "",
@@ -2688,21 +2960,6 @@ function App() {
               {theme === "light" ? <MoonIcon /> : <SunIcon />}
               {theme === "light" ? "Dark Mode" : "Light Mode"}
             </button>
-            {Object.keys(unlockedGroupPasswords).length > 0 ? (
-              <button
-                type="button"
-                className="button-secondary w-full gap-2 sm:w-auto sm:self-end"
-                onClick={() =>
-                  clearUnlockedGroups({
-                    title: "Alle Klassen wurden gesperrt",
-                    detail: "Lokale Sitzungspasswörter wurden entfernt.",
-                    tone: "info",
-                  })}
-              >
-                <LockIcon />
-                Alle Klassen sperren
-              </button>
-            ) : null}
           </div>
         </header>
 
@@ -2734,17 +2991,28 @@ function App() {
 
         <div className="mb-6 no-print">
           <div className="flex gap-3 overflow-x-auto pb-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} shrink-0 gap-2 whitespace-nowrap`}
-              >
-                <TabIcon id={tab.id} />
-                {tab.label}
-              </button>
-            ))}
+            <div role="tablist" aria-label="Hauptbereiche" className="flex gap-3">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  id={getTabButtonId(tab.id)}
+                  ref={(element) => {
+                    tabButtonRefs.current[tab.id] = element;
+                  }}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={getTabPanelId(tab.id)}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+                  className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} shrink-0 gap-2 whitespace-nowrap`}
+                >
+                  <TabIcon id={tab.id} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={saveExpectationsToArchive}
@@ -2920,7 +3188,6 @@ function App() {
               workspaces={visibleWorkspaces}
               activeExam={exam}
               activeWorkspaceId={draftBundle.activeWorkspaceId}
-              selectedStudent={selectedStudent}
               activeGroupId={activeGroupId}
               activeStudentId={activeStudentId}
               onSelectGroup={(groupId) => setActiveGroupId(groupId)}
@@ -2929,16 +3196,24 @@ function App() {
                 setActiveTab("builder");
               }}
               onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
-              onRemoveStudent={handleRemoveStudent}
               onToggleStudentAbsent={handleToggleStudentAbsent}
-              onRevealStudentName={handleRevealStudentName}
               onRevealGroupStudentNames={handleRevealGroupStudentNames}
-              onUnlockGroup={handleUnlockGroup}
               isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
+              activeGroupIsProtected={activeGroupIsProtected}
+              securityActionLabel={activeUnlockButtonLabel}
+              onToggleSecurity={handleHeaderLockToggle}
             />
           </aside>
 
           <main className="space-y-6">
+            <div
+              id={getTabPanelId("groups")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("groups")}
+              hidden={activeTab !== "groups"}
+              tabIndex={0}
+              className="space-y-6"
+            >
             {activeTab === "groups" && (
               <StudentRosterPanel
                 database={studentDatabase}
@@ -2954,7 +3229,7 @@ function App() {
                 onAddGroup={handleAddGroup}
                 onAddStudent={handleAddStudent}
                 onRemoveStudent={handleRemoveStudent}
-                unlockedGroupIds={Object.keys(unlockedGroupPasswords)}
+                unlockedGroupIds={unlockedGroupIds}
                 onImportStudents={handleImportStudents}
                 onRemoveGroup={(groupId, groupLabel, studentCount) =>
                   setGroupToDelete({ id: groupId, label: groupLabel, studentCount })
@@ -2967,7 +3242,16 @@ function App() {
                 onRollbackImport={rollbackLastImport}
               />
             )}
+            </div>
 
+            <div
+              id={getTabPanelId("builder")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("builder")}
+              hidden={activeTab !== "builder"}
+              tabIndex={0}
+              className="space-y-6"
+            >
             {activeTab === "builder" && (
               <Card title="Metadaten" subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft.">
                 <ExamHeaderForm
@@ -2988,39 +3272,63 @@ function App() {
                 ) : null}
               </Card>
             )}
+            </div>
 
+            <div
+              id={getTabPanelId("guidedBuilder")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("guidedBuilder")}
+              hidden={activeTab !== "guidedBuilder"}
+              tabIndex={0}
+              className="space-y-6"
+            >
             {activeTab === "guidedBuilder" && (
-              <GuidedExamBuilder
-                groups={studentDatabase.groups.map((group) => ({
-                  id: group.id,
-                  subject: group.subject,
-                  className: group.className,
-                }))}
-                activeGroupId={activeGroupId}
-                templates={examTemplates}
-                initialTotalPoints={summary.totalMaxPoints}
-                initialGradeScale={exam.gradeScale}
-                initialSubject={activeGroup?.subject || ""}
-                initialMeta={exam.meta}
-                initialSections={exam.sections.map((section) => ({
-                  id: section.id,
-                  title: section.title,
-                  weight: section.weight,
-                  description: section.description,
-                }))}
-                onSelectTemplate={(template, target, gradeScale, meta, targetGroupId) => {
-                  setTemplateToLoad({
-                    template,
-                    target,
-                    gradeScale,
-                    meta: { ...meta },
-                    targetGroupId,
-                  });
-                }}
-                onApplyManualStructure={applyGuidedBuilderStructure}
-              />
+              <Suspense
+                fallback={(
+                  <Card title="Wizard lädt" subtitle="Der geführte Builder wird bei Bedarf nachgeladen.">
+                    <div className="surface-muted rounded-3xl p-5">
+                      <p className="themed-muted text-sm leading-6">
+                        Die Wizard-Oberfläche wird vorbereitet.
+                      </p>
+                    </div>
+                  </Card>
+                )}
+              >
+                <GuidedExamBuilder
+                  groups={studentDatabase.groups.map((group) => ({
+                    id: group.id,
+                    subject: group.subject,
+                    className: group.className,
+                  }))}
+                  activeGroupId={activeGroupId}
+                  templates={examTemplates}
+                  initialTotalPoints={summary.totalMaxPoints}
+                  initialGradeScale={exam.gradeScale}
+                  initialSubject={activeGroup?.subject || ""}
+                  initialMeta={exam.meta}
+                  initialSections={exam.sections.map((section) => ({
+                    id: section.id,
+                    title: section.title,
+                    weight: section.weight,
+                    description: section.description,
+                  }))}
+                  onSelectTemplate={(template, target, gradeScale, meta, targetGroupId) => {
+                    setTemplateToLoad({
+                      template,
+                      target,
+                      gradeScale,
+                      meta: { ...meta },
+                      targetGroupId,
+                    });
+                  }}
+                  onApplyManualStructure={applyGuidedBuilderStructure}
+                  onApplyPdfSuggestion={applyImportedExamSuggestion}
+                />
+              </Suspense>
             )}
+            </div>
 
+            <div hidden={activeTab !== "builder"} className="space-y-6">
             {activeTab === "builder" && (
               <>
                 {activeWorkspace ? (
@@ -3201,6 +3509,7 @@ function App() {
                         )
                       }
                       onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
+                      scoresLocked={assessmentLocked}
                       onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
                       onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
                       onDuplicate={() => duplicateSection(entry.id)}
@@ -3295,26 +3604,56 @@ function App() {
                         teacherComment={activeAssessment?.teacherComment ?? ""}
                         commentPreview={resolvedTeacherCommentPreview}
                         signatureDataUrl={activeSignatureDataUrl}
-                        onTeacherCommentChange={activeStudentRecord ? handleTeacherCommentChange : undefined}
-                        onSignatureChange={activeStudentRecord ? handleSignatureChange : undefined}
+                        onTeacherCommentChange={
+                          activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                            ? handleTeacherCommentChange
+                            : undefined
+                        }
+                        onSignatureChange={
+                          activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                            ? handleSignatureChange
+                            : undefined
+                        }
                       />
                     </Card>
                   </>
                 ) : null}
               </>
             )}
+            </div>
 
+            <div
+              id={getTabPanelId("archive")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("archive")}
+              hidden={activeTab !== "archive"}
+              tabIndex={0}
+              className="space-y-6"
+            >
             {activeTab === "archive" && (
-              <ExpectationArchiveDashboard
-                entries={archiveEntries}
-                studentDatabase={studentDatabase}
-                workspaces={draftBundle.workspaces}
-                onOpen={openArchiveEntryInBuilder}
-                onDuplicateToBuilder={duplicateArchiveEntryToBuilder}
-                onAssignCopyToGroup={assignArchiveEntryCopyToGroup}
-                onDelete={(entry) => setArchiveEntryToDelete(entry)}
-              />
+              <Suspense
+                fallback={(
+                  <Card title="Archiv lädt" subtitle="Die Archivansicht wird bei Bedarf nachgeladen.">
+                    <div className="surface-muted rounded-3xl p-5">
+                      <p className="themed-muted text-sm leading-6">
+                        Das Archiv-Dashboard wird vorbereitet.
+                      </p>
+                    </div>
+                  </Card>
+                )}
+              >
+                <ExpectationArchiveDashboard
+                  entries={archiveEntries}
+                  studentDatabase={studentDatabase}
+                  workspaces={draftBundle.workspaces}
+                  onOpen={openArchiveEntryInBuilder}
+                  onDuplicateToBuilder={duplicateArchiveEntryToBuilder}
+                  onAssignCopyToGroup={assignArchiveEntryCopyToGroup}
+                  onDelete={(entry) => setArchiveEntryToDelete(entry)}
+                />
+              </Suspense>
             )}
+            </div>
 
             {activeTab === "builder" && activeWorkspace && (
               <div className="no-print">
@@ -3350,8 +3689,10 @@ function App() {
               summary={summary}
               studentLabel={activeStudentLiveLabel}
               studentLabelTitle={activeStudentLiveLabelTitle}
+              locked={assessmentLocked}
+              correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
             />
-            {classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
+            {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
           </aside>
         </div>
         <AppFooter />
@@ -3385,6 +3726,87 @@ function App() {
       </ConfirmDialog>
 
       <ConfirmDialog
+        open={pendingSecurityTokenCards.length > 0}
+        title="Security-Token sichern"
+        description="Das generierte Token wird nicht dauerhaft im Klartext gespeichert. Drucke oder kopiere es jetzt und bewahre es getrennt von Schülerlisten auf."
+        onCancel={() => setPendingSecurityTokenCards([])}
+        onConfirm={handlePrintSecurityTokens}
+        confirmLabel="Druckkarte öffnen"
+      >
+        <div className="space-y-3">
+          {pendingSecurityTokenCards.map((entry) => (
+            <div key={entry.groupId} className="surface-muted rounded-2xl p-4">
+              <p className="label">Lerngruppe</p>
+              <p className="themed-strong text-base font-semibold">{entry.subject} · {entry.className}</p>
+              <p className="themed-muted mt-1 text-xs">Gruppen-ID: {entry.groupId}</p>
+              <div className="surface-elevated mt-3 rounded-2xl border p-4">
+                <p className="label">Security-Token</p>
+                <p className="themed-strong text-lg font-semibold tracking-[0.18em]" style={{ fontFamily: "\"Courier New\", monospace" }}>
+                  {entry.token}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={headerUnlockDialogOpen}
+        title="Klassenpasswort eingeben"
+        description="Nach erfolgreicher Prüfung werden Bewertungsdaten, Kommentare, Signaturen und Klarnamen dieser Lerngruppe nur lokal für die aktuelle Sitzung geladen."
+        onCancel={() => {
+          setHeaderUnlockDialogOpen(false);
+          setHeaderUnlockPasswordInput("");
+          setHeaderUnlockError("");
+        }}
+        onConfirm={async () => {
+          if (!activeGroup) return;
+          const password = headerUnlockPasswordInput.trim();
+          if (!password) {
+            setHeaderUnlockError("Bitte gib das Klassenpasswort ein.");
+            return;
+          }
+
+          const unlocked = await handleUnlockGroup(activeGroup.id, password, { silent: true });
+          if (!unlocked) {
+            setHeaderUnlockError("Das Klassenpasswort ist falsch.");
+            return;
+          }
+
+          setHeaderUnlockDialogOpen(false);
+          setHeaderUnlockPasswordInput("");
+          setHeaderUnlockError("");
+        }}
+        confirmLabel="Lerngruppe entschlüsseln"
+      >
+        <div className="dialog-preview rounded-2xl p-4">
+          <Field
+            as="div"
+            label={`Passwort für ${activeGroup?.subject ?? "Klasse"} · ${activeGroup?.className ?? ""}`}
+            inputId="header-unlock-password"
+          >
+            <input
+              id="header-unlock-password"
+              className="field"
+              type="password"
+              value={headerUnlockPasswordInput}
+              onChange={(event) => {
+                setHeaderUnlockPasswordInput(event.target.value);
+                if (headerUnlockError) {
+                  setHeaderUnlockError("");
+                }
+              }}
+            />
+          </Field>
+          {headerUnlockError ? (
+            <p className="mt-3 text-sm font-medium" style={{ color: "var(--app-soft-text)" }}>
+              {headerUnlockError}
+            </p>
+          ) : null}
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
         open={printPasswordDialogOpen}
         title="Klassenpasswort eingeben"
         description="Für den Druck mit Klarname wird das Passwort der ausgewählten Klasse lokal abgefragt. Nach erfolgreicher Prüfung bleibt es für diese Sitzung verfügbar."
@@ -3402,7 +3824,10 @@ function App() {
             : await printWithResolvedIdentity(successPassword);
           if (printed) {
             if (activeGroup?.passwordVerifier) {
-              setUnlockedGroupPasswords((current) => ({ ...current, [activeGroup.id]: successPassword }));
+              unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [activeGroup.id]: successPassword };
+              setUnlockedGroupIds((current) => (current.includes(activeGroup.id) ? current : [...current, activeGroup.id]));
+              const hydratedDatabase = await hydrateSensitiveAssessmentsForGroup(studentDatabaseRef.current, activeGroup.id, successPassword);
+              setStudentDatabase(hydratedDatabase);
             }
             setPrintPasswordDialogOpen(false);
             setPrintPasswordInput("");
@@ -3574,7 +3999,7 @@ function App() {
                 Bereits erfasste Bewertungen für diese Aufgabe: {pendingTaskMaxPointsChange.affectedStudentCount}
               </p>
             </div>
-            <Field label="Bestehende Schülerpunkte">
+            <Field label="Bestehende Schülerpunkte" as="div">
               <label className="flex items-start gap-3 rounded-2xl border px-4 py-3">
                 <input
                   type="checkbox"

@@ -4,8 +4,10 @@ export type GradeScaleSource = "manual" | "notengenerator";
 export type GradeAccumulationMode = "top" | "middle" | "bottom";
 export type GradeScaleRecommendedStage = "sek1" | "sek2";
 export type ThemeMode = "light" | "dark";
+export type GroupAccessMode = "generated" | "manual";
 export type VisualTheme =
   | "earth-paper"
+  | "nrw-trikolore"
   | "waldmeister-schorle"
   | "blaubeer-pommesbude"
   | "flieder-feierabend"
@@ -106,8 +108,11 @@ export interface StudentAssessment {
   workspaceId: string | null;
   studentId: string;
   taskScores: Record<string, number>;
+  encryptedTaskScores?: EncryptedText | null;
   teacherComment: string;
   signatureDataUrl?: string | null;
+  encryptedTeacherComment?: EncryptedText | null;
+  encryptedSignatureDataUrl?: EncryptedText | null;
   updatedAt: string;
   printedAt: string | null;
 }

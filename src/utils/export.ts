@@ -3,6 +3,7 @@ import { formatNumber } from "./format";
 import { getEffectiveGradeBands, getEffectiveGradeScaleMode } from "./gradeScaleGenerator";
 import { getGradeScaleRangeDigits, getGradeScaleRanges } from "./gradeScaleRanges";
 import { isLinkedSectionFollower, isLinkedSectionLeader } from "./sectionLinks";
+import { SecurityTokenCard } from "./securityTokens";
 
 export const downloadJson = (exam: Exam) => {
   const blob = new Blob([JSON.stringify(exam, null, 2)], { type: "application/json" });
@@ -35,6 +36,8 @@ interface PrintPayload {
   identity?: PrintIdentity;
   options?: PrintOptions;
 }
+
+export type PrintPopupHandle = Window;
 
 export type { PrintIdentity, PrintPayload };
 
@@ -97,6 +100,110 @@ const buildPrintDocumentTitle = (filename?: string) => {
   if (!trimmed) return "Bewertungsbogen";
   return trimmed.toLowerCase().endsWith(".pdf") ? trimmed.slice(0, -4) : trimmed;
 };
+
+const openPopupHost = (width: number, height: number, title = "Druckansicht"): PrintPopupHandle | null => {
+  const popup = window.open("", "_blank", `width=${width},height=${height}`);
+  if (!popup) return null;
+  popup.opener = null;
+  popup.document.write(`
+    <!doctype html>
+    <html lang="de">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 24px; color: #111; }
+          .status { max-width: 560px; margin: 12vh auto 0; border: 1px solid #d0d0d0; border-radius: 16px; padding: 20px; }
+          h1 { margin: 0 0 8px; font-size: 20px; }
+          p { margin: 0; line-height: 1.5; color: #444; }
+        </style>
+      </head>
+      <body>
+        <div class="status">
+          <h1>Druckansicht wird vorbereitet</h1>
+          <p>Wenn Safari den Druckdialog nicht automatisch öffnet, nutze danach den Button "Drucken" oben rechts.</p>
+        </div>
+      </body>
+    </html>
+  `);
+  popup.document.close();
+  return popup;
+};
+
+export const openPrintPopupHost = (options?: {
+  width?: number;
+  height?: number;
+  title?: string;
+}) => openPopupHost(options?.width ?? 1024, options?.height ?? 1400, options?.title ?? "Druckansicht");
+
+const buildPrintActivationScript = (waitForImages = false) => `
+  <script>
+    const triggerPrint = () => {
+      const run = () => {
+        window.focus();
+        window.print();
+      };
+      if (window.requestAnimationFrame) {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(run));
+        return;
+      }
+      window.setTimeout(run, 0);
+    };
+
+    const ensureToolbar = () => {
+      if (document.getElementById("manual-print-button")) return;
+      const button = document.createElement("button");
+      button.id = "manual-print-button";
+      button.type = "button";
+      button.textContent = "Drucken";
+      button.setAttribute("aria-label", "Druckdialog öffnen");
+      button.style.position = "fixed";
+      button.style.top = "12px";
+      button.style.right = "12px";
+      button.style.zIndex = "9999";
+      button.style.border = "1px solid #111";
+      button.style.borderRadius = "999px";
+      button.style.background = "#fff";
+      button.style.color = "#111";
+      button.style.padding = "10px 14px";
+      button.style.font = "600 14px Arial, sans-serif";
+      button.style.boxShadow = "0 4px 18px rgba(0,0,0,0.12)";
+      button.addEventListener("click", triggerPrint);
+      document.body.appendChild(button);
+    };
+
+    const afterReady = async () => {
+      ensureToolbar();
+      ${waitForImages
+        ? `const images = Array.from(document.images);
+      if (images.length > 0) {
+        await Promise.all(images.map((image) => {
+          if (image.complete && image.naturalWidth > 0) return Promise.resolve();
+          return new Promise((resolve) => {
+            const finish = () => resolve();
+            image.addEventListener("load", finish, { once: true });
+            image.addEventListener("error", finish, { once: true });
+          });
+        }));
+      }`
+        : ""}
+      triggerPrint();
+    };
+
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      void afterReady();
+    } else {
+      window.addEventListener("DOMContentLoaded", () => {
+        void afterReady();
+      }, { once: true });
+    }
+
+    window.addEventListener("pageshow", () => {
+      ensureToolbar();
+    });
+  </script>
+`;
 
 const splitFullName = (value: string | null | undefined) => {
   const normalized = value?.trim() ?? "";
@@ -547,14 +654,12 @@ export const renderPrintDocument = (reports: PrintPayload[]) =>
     })
     .join("");
 
-const openPrintPopup = (reports: PrintPayload[], filename?: string) => {
-  const popup = window.open("", "_blank", "width=1024,height=1400");
-  if (!popup) return false;
-  popup.opener = null;
-
+const openPrintPopup = (reports: PrintPayload[], filename?: string, popup?: PrintPopupHandle | null) => {
+  const targetPopup = popup ?? openPopupHost(1024, 1400, "Druckansicht");
+  if (!targetPopup) return false;
   const documentTitle = buildPrintDocumentTitle(filename);
 
-  popup.document.write(`
+  targetPopup.document.write(`
     <!doctype html>
     <html lang="de">
       <head>
@@ -605,32 +710,11 @@ const openPrintPopup = (reports: PrintPayload[], filename?: string) => {
       </head>
       <body>
         ${renderPrintDocument(reports)}
-        <script>
-          const waitForImages = () => {
-            const images = Array.from(document.images);
-            if (images.length === 0) return Promise.resolve();
-
-            return Promise.all(
-              images.map((image) => {
-                if (image.complete && image.naturalWidth > 0) return Promise.resolve();
-                return new Promise((resolve) => {
-                  const finish = () => resolve();
-                  image.addEventListener("load", finish, { once: true });
-                  image.addEventListener("error", finish, { once: true });
-                });
-              }),
-            );
-          };
-
-          window.onload = async () => {
-            await waitForImages();
-            window.setTimeout(() => window.print(), 150);
-          };
-        </script>
+        ${buildPrintActivationScript(true)}
       </body>
     </html>
   `);
-  popup.document.close();
+  targetPopup.document.close();
   return true;
 };
 
@@ -639,19 +723,20 @@ export const openPrintWindow = (
   summary: ExamSummary,
   identity?: PrintIdentity,
   options?: PrintOptions,
+  popup?: PrintPopupHandle | null,
 ) => {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
   const alias = sanitizeFilenamePart(identity?.alias || "Bewertungsbogen");
   const filename = `${alias}_Bewertungsbogen_${timestamp}.pdf`;
-  return openPrintPopup([{ exam, summary, identity, options }], filename);
+  return openPrintPopup([{ exam, summary, identity, options }], filename, popup);
 };
 
-export const openBatchPrintWindow = (reports: PrintPayload[]) => {
+export const openBatchPrintWindow = (reports: PrintPayload[], popup?: PrintPopupHandle | null) => {
   if (reports.length === 0) return false;
   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
   const className = sanitizeFilenamePart(reports[0]?.identity?.className || "Klasse");
   const filename = `${className}_${timestamp}.pdf`;
-  return openPrintPopup(reports, filename);
+  return openPrintPopup(reports, filename, popup);
 };
 
 export const openGradeScalePrintWindow = (
@@ -659,9 +744,8 @@ export const openGradeScalePrintWindow = (
   summary: ExamSummary,
   filenamePrefix?: string,
 ) => {
-  const popup = window.open("", "_blank", "width=960,height=720");
+  const popup = openPopupHost(960, 720, "Notenbereiche");
   if (!popup) return false;
-  popup.opener = null;
 
   const ranges = getGradeScaleRanges(exam, summary.totalMaxPoints);
   const rangeDigits = getGradeScaleRangeDigits(exam, summary.totalMaxPoints);
@@ -718,11 +802,7 @@ export const openGradeScalePrintWindow = (
             </tbody>
           </table>
         </section>
-        <script>
-          window.onload = () => {
-            window.setTimeout(() => window.print(), 150);
-          };
-        </script>
+        ${buildPrintActivationScript(false)}
       </body>
     </html>
   `);
@@ -735,9 +815,8 @@ export const openClassOverviewPrintWindow = (
   overview: ClassOverviewData,
   context?: { subject?: string; className?: string },
 ) => {
-  const popup = window.open("", "_blank", "width=1040,height=900");
+  const popup = openPopupHost(1040, 900, "Klassenübersicht");
   if (!popup) return false;
-  popup.opener = null;
 
   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
   const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Klassenuebersicht");
@@ -848,11 +927,71 @@ export const openClassOverviewPrintWindow = (
             Hinweis: Die Aufgabenübersicht zeigt den durchschnittlichen Prozentwert je Aufgabe über alle anwesenden Schüler:innen.
           </p>
         </section>
-        <script>
-          window.onload = () => {
-            window.setTimeout(() => window.print(), 150);
-          };
-        </script>
+        ${buildPrintActivationScript(false)}
+      </body>
+    </html>
+  `);
+  popup.document.close();
+  return true;
+};
+
+export const openSecurityTokenPrintWindow = (entries: SecurityTokenCard[]) => {
+  if (entries.length === 0) return false;
+
+  const popup = openPopupHost(940, 760, "Klassentokens");
+  if (!popup) return false;
+
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+  const documentTitle = buildPrintDocumentTitle(`Klassentokens_${timestamp}.pdf`);
+
+  popup.document.write(`
+    <!doctype html>
+    <html lang="de">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(documentTitle)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; margin: 0; padding: 18px; font-size: 12px; line-height: 1.45; background: #fff; }
+          h1, h2, p { margin: 0; }
+          h1 { font-size: 20px; }
+          h2 { font-size: 12px; color: #444; font-weight: 400; margin-top: 4px; }
+          .sheet { display: grid; gap: 12px; }
+          .intro { border: 1px solid #bbb; padding: 14px 16px; }
+          .token-grid { display: grid; gap: 12px; }
+          .token-card { border: 1.5px solid #222; border-radius: 16px; padding: 16px; page-break-inside: avoid; }
+          .token-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #444; font-weight: 700; }
+          .token-title { margin-top: 8px; font-size: 22px; font-weight: 700; }
+          .token-meta { margin-top: 6px; font-size: 13px; color: #333; }
+          .token-value-wrap { margin-top: 16px; border: 1px dashed #666; border-radius: 14px; padding: 14px 16px; }
+          .token-value-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; font-weight: 700; }
+          .token-value { margin-top: 10px; font-size: 24px; font-weight: 700; letter-spacing: 0.16em; font-family: "Courier New", monospace; }
+          .token-note { margin-top: 12px; font-size: 11px; color: #444; }
+          @page { size: A4 portrait; margin: 14mm; }
+        </style>
+      </head>
+      <body>
+        <section class="sheet">
+          <div class="intro">
+            <h1>Security-Tokens für Lerngruppen</h1>
+            <h2>Diese Tokens dienen als Entsperrschlüssel für verschlüsselte Schülerdaten.</h2>
+            <p style="margin-top:10px;">Nur intern aufbewahren. Wer das Token kennt, kann die jeweilige Lerngruppe lokal entschlüsseln.</p>
+          </div>
+          <div class="token-grid">
+            ${entries.map((entry) => `
+              <article class="token-card">
+                <div class="token-kicker">Lerngruppe</div>
+                <div class="token-title">${renderText(entry.className, "-")}</div>
+                <div class="token-meta">${renderText(entry.subject, "-")} | Gruppen-ID: ${renderText(entry.groupId, "-")}</div>
+                <div class="token-value-wrap">
+                  <div class="token-value-label">Security-Token</div>
+                  <div class="token-value">${renderText(entry.token, "-")}</div>
+                </div>
+                <p class="token-note">Empfehlung: ausdrucken, getrennt von Schülerlisten ablegen und nicht digital weiterleiten.</p>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+        ${buildPrintActivationScript(false)}
       </body>
     </html>
   `);

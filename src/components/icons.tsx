@@ -133,6 +133,13 @@ export const UnlockIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const KeyIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <circle cx="8" cy="12" r="3.5" />
+    <path d="M11.5 12H20M16 12v3M18.5 12v2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const UserIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <circle cx="12" cy="8" r="3.5" />
@@ -255,6 +262,14 @@ export const InfoIcon = ({ className = "h-4 w-4" }: IconProps) => (
     <circle cx="12" cy="12" r="8.5" />
     <path d="M12 10.5v5" strokeLinecap="round" />
     <circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const WarningIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M12 4.5 20 19H4l8-14.5Z" strokeLinejoin="round" />
+    <path d="M12 9v4.5" strokeLinecap="round" />
+    <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
   </svg>
 );
 

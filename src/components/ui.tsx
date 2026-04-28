@@ -48,15 +48,56 @@ export const Card = ({
 export const Field = ({
   label,
   children,
+  inputId,
+  hint,
+  error,
+  as = "label",
 }: {
   label: string;
   children: ReactNode;
-}) => (
-  <label className="block">
-    <span className="label">{label}</span>
-    {children}
-  </label>
-);
+  inputId?: string;
+  hint?: ReactNode;
+  error?: ReactNode;
+  as?: "label" | "div";
+}) => {
+  if (as === "div") {
+    return (
+      <div className="block">
+        <label className="label" htmlFor={inputId}>
+          {label}
+        </label>
+        {children}
+        {hint ? (
+          <p className="themed-muted mt-2 text-sm leading-6">
+            {hint}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mt-2 text-sm leading-6 text-rose-700 dark:text-rose-300">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <label className="block" htmlFor={inputId}>
+      <span className="label">{label}</span>
+      {children}
+      {hint ? (
+        <p className="themed-muted mt-2 text-sm leading-6">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm leading-6 text-rose-700 dark:text-rose-300">
+          {error}
+        </p>
+      ) : null}
+    </label>
+  );
+};
 
 const formatEditableNumber = (value: number) => {
   if (!Number.isFinite(value)) return "";
@@ -75,6 +116,7 @@ export const NumberInput = ({
   step = 1,
   className = "",
   placeholder,
+  disabled = false,
 }: {
   value: number;
   onCommit: (value: number) => void;
@@ -82,6 +124,7 @@ export const NumberInput = ({
   step?: number;
   className?: string;
   placeholder?: string;
+  disabled?: boolean;
 }) => {
   const [draft, setDraft] = useState(() => formatEditableNumber(value));
 
@@ -121,6 +164,7 @@ export const NumberInput = ({
       inputMode="decimal"
       value={draft}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={handleKeyDown}
@@ -266,7 +310,7 @@ export const IconButton = ({
     >
       {children}
     </button>
-    <span className="app-tooltip" role="tooltip">
+    <span className="app-tooltip" aria-hidden="true">
       {title}
     </span>
   </span>

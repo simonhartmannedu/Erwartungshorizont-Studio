@@ -4,6 +4,7 @@ import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
 
 interface Props {
   tasks: Task[];
+  scoresLocked?: boolean;
   onChange: (taskId: string, patch: Partial<Task>) => void;
   onAdd: () => void;
   onDelete: (taskId: string) => void;
@@ -13,6 +14,7 @@ interface Props {
 
 export const TaskTable = ({
   tasks,
+  scoresLocked = false,
   onChange,
   onAdd,
   onDelete,
@@ -44,7 +46,7 @@ export const TaskTable = ({
             </div>
           </div>
           <div className="grid gap-4">
-            <Field label="Aufgabenname">
+            <Field label="Aufgabentyp">
               <input
                 className="field !px-3 !py-2.5 text-sm font-medium"
                 value={task.title}
@@ -76,6 +78,7 @@ export const TaskTable = ({
                   min={0}
                   step={0.5}
                   value={task.achievedPoints}
+                  disabled={scoresLocked}
                   onCommit={(value) => onChange(task.id, { achievedPoints: value })}
                 />
               </Field>
@@ -111,7 +114,7 @@ export const TaskTable = ({
                   <td className="px-3 py-3">
                     <div className="space-y-2">
                       <p className="themed-muted text-[11px] font-semibold uppercase tracking-[0.16em]">
-                        Aufgabenname
+                        Aufgabentyp
                       </p>
                       <input
                         className="field min-w-[9rem] !px-3 !py-2.5 text-sm font-medium"
@@ -149,6 +152,7 @@ export const TaskTable = ({
                       min={0}
                       step={0.5}
                       value={task.achievedPoints}
+                      disabled={scoresLocked}
                       onCommit={(value) => onChange(task.id, { achievedPoints: value })}
                     />
                   </td>
@@ -177,7 +181,7 @@ export const TaskTable = ({
         </div>
       </div>
     </div>
-    <Field label="Neue Unteraufgabe">
+    <Field label="Neue Unteraufgabe" as="div">
       <button type="button" className="button-secondary w-full gap-2 sm:w-auto" onClick={onAdd}>
         <PlusIcon />
         Unteraufgabe ergänzen

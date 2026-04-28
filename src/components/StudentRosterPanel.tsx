@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { StudentDatabase, StudentGroup, StudentRecord } from "../types";
+import { GroupAccessMode, StudentDatabase, StudentGroup, StudentRecord } from "../types";
 import { ImportSortOptions } from "../utils/studentImport";
 import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, PlusIcon, TrashIcon, UploadIcon, UserIcon } from "./icons";
 import { Badge, Card, DismissibleCallout, Field, IconButton } from "./ui";
@@ -24,10 +24,15 @@ interface Props {
   lastBackupAt: string | null;
   onSelectGroup: (groupId: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onAddGroup: (subject: string, className: string, password: string) => Promise<void>;
+  onAddGroup: (subject: string, className: string, access: { mode: GroupAccessMode; password?: string }) => Promise<void>;
   onAddStudent: (groupId: string, alias: string, fullName: string) => Promise<boolean>;
   onRemoveStudent: (groupId: string, studentId: string) => void;
-  onImportStudents: (file: File, password: string, subject: string, sortOptions: ImportSortOptions) => void;
+  onImportStudents: (
+    file: File,
+    access: { mode: GroupAccessMode; password?: string },
+    subject: string,
+    sortOptions: ImportSortOptions,
+  ) => void;
   onRemoveGroup: (groupId: string, groupLabel: string, studentCount: number) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   onApplyStudentOrder: (groupId: string, orderedStudentIds: string[]) => void;
@@ -112,7 +117,9 @@ export const StudentRosterPanel = ({
 }: Props) => {
   const [subject, setSubject] = useState("");
   const [className, setClassName] = useState("");
+  const [groupAccessMode, setGroupAccessMode] = useState<GroupAccessMode>("generated");
   const [groupPassword, setGroupPassword] = useState("");
+  const [importAccessMode, setImportAccessMode] = useState<GroupAccessMode>("generated");
   const [importPassword, setImportPassword] = useState("");
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [importSubject, setImportSubject] = useState(defaultImportSubject);
@@ -193,7 +200,10 @@ export const StudentRosterPanel = ({
   const handleStudentImport = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    onImportStudents(file, importPassword.trim(), importSubject.trim() || defaultImportSubject, {
+    onImportStudents(file, {
+      mode: importAccessMode,
+      password: importAccessMode === "manual" ? importPassword.trim() : undefined,
+    }, importSubject.trim() || defaultImportSubject, {
       field: importSortField,
       direction: importSortDirection,
     });
@@ -351,24 +361,53 @@ export const StudentRosterPanel = ({
               <Field label="Klasse">
                 <input className="field" placeholder="Klasse, z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
               </Field>
-              <Field label="Klassenpasswort">
-                <input
-                  className="field"
-                  type="password"
-                  placeholder="Klassenpasswort für Verschlüsselung"
-                  value={groupPassword}
-                  onChange={(event) => setGroupPassword(event.target.value)}
-                />
+              <Field as="div" label="Zugangsschutz">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className={groupAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
+                    onClick={() => setGroupAccessMode("generated")}
+                  >
+                    Token generieren
+                  </button>
+                  <button
+                    type="button"
+                    className={groupAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
+                    onClick={() => setGroupAccessMode("manual")}
+                  >
+                    Eigenes Passwort
+                  </button>
+                </div>
               </Field>
+              {groupAccessMode === "manual" ? (
+                <Field label="Klassenpasswort">
+                  <input
+                    className="field"
+                    type="password"
+                    placeholder="Klassenpasswort für Verschlüsselung"
+                    value={groupPassword}
+                    onChange={(event) => setGroupPassword(event.target.value)}
+                  />
+                </Field>
+              ) : (
+                <p className="status-note text-xs leading-5">
+                  Beim Anlegen wird automatisch ein starkes Security-Token erzeugt und direkt als Druckkarte angeboten.
+                </p>
+              )}
               <button
                 type="button"
                 className="button-primary w-full gap-2"
                 onClick={async () => {
-                  if (!subject.trim() || !className.trim() || !groupPassword.trim()) return;
-                  await onAddGroup(subject.trim(), className.trim(), groupPassword.trim());
+                  if (!subject.trim() || !className.trim()) return;
+                  if (groupAccessMode === "manual" && !groupPassword.trim()) return;
+                  await onAddGroup(subject.trim(), className.trim(), {
+                    mode: groupAccessMode,
+                    password: groupAccessMode === "manual" ? groupPassword.trim() : undefined,
+                  });
                   setSubject("");
                   setClassName("");
                   setGroupPassword("");
+                  setGroupAccessMode("generated");
                 }}
               >
                 <PlusIcon />
@@ -387,13 +426,37 @@ export const StudentRosterPanel = ({
                   placeholder="Fach fuer neu importierte Klassen"
                   onChange={(event) => setImportSubject(event.target.value)}
                 />
-                <input
-                  className="field"
-                  type="password"
-                  value={importPassword}
-                  placeholder="Passwort fuer neu importierte Klassen"
-                  onChange={(event) => setImportPassword(event.target.value)}
-                />
+                <Field as="div" label="Zugangsschutz für neue Klassen">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      className={importAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
+                      onClick={() => setImportAccessMode("generated")}
+                    >
+                      Token generieren
+                    </button>
+                    <button
+                      type="button"
+                      className={importAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
+                      onClick={() => setImportAccessMode("manual")}
+                    >
+                      Eigenes Passwort
+                    </button>
+                  </div>
+                </Field>
+                {importAccessMode === "manual" ? (
+                  <input
+                    className="field"
+                    type="password"
+                    value={importPassword}
+                    placeholder="Passwort fuer neu importierte Klassen"
+                    onChange={(event) => setImportPassword(event.target.value)}
+                  />
+                ) : (
+                  <p className="status-note text-xs leading-5">
+                    Für jede neu angelegte Import-Klasse wird automatisch ein eigenes Security-Token erzeugt und gesammelt druckbar gemacht.
+                  </p>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <select
                     className="field"
