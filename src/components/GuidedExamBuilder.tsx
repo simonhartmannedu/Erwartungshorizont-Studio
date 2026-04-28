@@ -8,6 +8,8 @@ import { ExamHeaderForm } from "./ExamHeaderForm";
 import { ExamTemplatePreviewCard } from "./ExamTemplatePreviewCard";
 import { GradeScaleEditor } from "./GradeScaleEditor";
 import { DashboardIcon, InfoIcon, PencilIcon, PlusIcon, ReplaceIcon, TemplateIcon } from "./icons";
+import { ImportedExamSuggestion } from "../pdf/types";
+import { PdfImportAssistant } from "./PdfImportAssistant";
 import { Card, DismissibleCallout, Field, NumberInput, TextAreaField } from "./ui";
 
 export interface GuidedSectionDraft {
@@ -18,7 +20,7 @@ export interface GuidedSectionDraft {
 }
 
 export type GuidedBuilderTarget = "current" | "new";
-type GuidedBuilderSource = "manual" | "template";
+type GuidedBuilderSource = "manual" | "template" | "pdf";
 
 interface Props {
   groups: Array<Pick<StudentGroup, "id" | "subject" | "className">>;
@@ -41,6 +43,13 @@ interface Props {
     gradeScale: GradeScale;
     sections: GuidedSectionDraft[];
     target: GuidedBuilderTarget;
+    meta: ExamMeta;
+    targetGroupId: string | null;
+  }) => void;
+  onApplyPdfSuggestion: (config: {
+    suggestion: ImportedExamSuggestion;
+    target: GuidedBuilderTarget;
+    gradeScale: GradeScale;
     meta: ExamMeta;
     targetGroupId: string | null;
   }) => void;
@@ -67,6 +76,8 @@ const stepLabels = (source: GuidedBuilderSource) => {
   switch (source) {
     case "template":
       return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Vorlage"];
+    case "pdf":
+      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "PDF-Import"];
     case "manual":
     default:
       return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Aufbau", "Sektionen"];
@@ -86,6 +97,7 @@ export const GuidedExamBuilder = ({
   initialMeta,
   onSelectTemplate,
   onApplyManualStructure,
+  onApplyPdfSuggestion,
 }: Props) => {
   const builderRef = useRef<HTMLDivElement | null>(null);
   const detectedInitialSubject =
@@ -302,7 +314,7 @@ export const GuidedExamBuilder = ({
 
         {step === 1 && (
           <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-3">
             <button type="button" className={choiceButtonClass(source === "manual")} onClick={() => setSource("manual")}>
               <span className="flex items-start gap-3">
                 <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
@@ -324,6 +336,18 @@ export const GuidedExamBuilder = ({
                   <strong>Mit Vorlage starten</strong>
                   <br />
                   Nach Fach und Stufe passende Vorlagen im Wizard laden und übernehmen.
+                </span>
+              </span>
+            </button>
+            <button type="button" className={choiceButtonClass(source === "pdf")} onClick={() => setSource("pdf")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <InfoIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>PDF-Import nutzen</strong>
+                  <br />
+                  Aufgabenblatt oder Korrekturvorschlag einlesen und als Wizard-Zweig übernehmen.
                 </span>
               </span>
             </button>
@@ -632,9 +656,13 @@ export const GuidedExamBuilder = ({
               <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
                 Weiter zu Aufbau
               </button>
-            ) : (
+            ) : source === "template" ? (
               <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
                 Weiter zu Vorlagen
+              </button>
+            ) : (
+              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
+                Weiter zu PDF-Import
               </button>
             )}
           </div>
@@ -829,7 +857,7 @@ export const GuidedExamBuilder = ({
           ) : (
             <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}`} tone="info">
               Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es aktuell keine spezifische Vorlage.
-              Wechsle bei Bedarf über "Zurück" zum manuellen Aufbau oder zu einer Vorlage.
+              Wechsle bei Bedarf über "Zurück" zum manuellen Aufbau oder PDF-Import.
             </DismissibleCallout>
           )}
 
@@ -853,6 +881,39 @@ export const GuidedExamBuilder = ({
               }
             >
               Mit Vorlage in EWH-Editor
+            </button>
+          </div>
+        </div>
+        )}
+
+        {source === "pdf" && step === 8 && (
+          <div className="space-y-6">
+          <div className="surface-muted rounded-3xl p-5">
+            <h3 className="themed-strong text-base font-semibold">PDF als Wizard-Zweig übernehmen</h3>
+            <p className="status-note mt-2 text-sm leading-6">
+              Der PDF-Vorschlag landet nicht mehr direkt im Editor, sondern übernimmt Ziel, Metadaten und
+              Notenschlüssel aus diesem Wizard-Durchlauf.
+            </p>
+          </div>
+
+          <PdfImportAssistant
+            embedded
+            disabled={target === "new" && !targetGroupId}
+            applyLabel="Mit PDF-Vorschlag in EWH-Editor"
+            onApplySuggestion={(suggestion) =>
+              onApplyPdfSuggestion({
+                suggestion,
+                target,
+                gradeScale,
+                meta: metaDraft,
+                targetGroupId: target === "new" ? targetGroupId || null : null,
+              })
+            }
+          />
+
+          <div className="flex justify-start">
+            <button type="button" className="button-secondary" onClick={() => goToStep(7)}>
+              Zurück
             </button>
           </div>
         </div>
