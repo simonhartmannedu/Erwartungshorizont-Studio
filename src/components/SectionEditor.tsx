@@ -49,6 +49,7 @@ const getSectionToneKey = (title: string, index: number): keyof typeof SECTION_T
 interface Props {
   section: Section;
   index: number;
+  scoresLocked?: boolean;
   targetPointsFromWeight?: number | null;
   draggable?: boolean;
   isDragging?: boolean;
@@ -78,6 +79,7 @@ interface Props {
 export const SectionEditor = ({
   section,
   index,
+  scoresLocked = false,
   targetPointsFromWeight,
   draggable,
   isDragging,
@@ -258,11 +260,11 @@ export const SectionEditor = ({
             </div>
             <div>
               <p className="label">Erreicht</p>
-              <p className="themed-strong text-xl font-semibold">{formatNumber(result.achievedPoints)}</p>
+              <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : formatNumber(result.achievedPoints)}</p>
             </div>
             <div>
               <p className="label">Ergebnis</p>
-              <p className="themed-strong text-xl font-semibold">{formatNumber(result.percentage)} %</p>
+              <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : `${formatNumber(result.percentage)} %`}</p>
             </div>
             {writingMetrics && (
               <div>
@@ -307,6 +309,7 @@ export const SectionEditor = ({
         )}
         <TaskTable
           tasks={section.tasks}
+          scoresLocked={scoresLocked}
           onChange={onTaskChange}
           onAdd={onAddTask}
           onDelete={onDeleteTask}

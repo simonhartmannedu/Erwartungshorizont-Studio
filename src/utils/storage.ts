@@ -3,6 +3,7 @@ import { isArchiveEntry } from "./archive";
 import { createEmptyExamMeta } from "./exam";
 import { createGradeScaleGeneratorSettings } from "./gradeScaleGenerator";
 import { createEmptyStudentDatabase, isStudentDatabase } from "./studentDatabase";
+import { serializeStudentDatabaseForStorage } from "./students";
 
 const DRAFT_KEY = "notenrechner-english-nrw-draft";
 const ARCHIVE_KEY = "notenrechner-english-nrw-expectation-archive";
@@ -354,9 +355,15 @@ export const loadStudentDatabase = async (): Promise<StudentDatabase> => {
   return parseStudentDatabaseState(readStoredValue(database, STUDENT_DATABASE_KEY));
 };
 
-export const saveStudentDatabase = (databaseState: StudentDatabase) =>
-  enqueueWrite((database) => {
-    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(databaseState));
+export const saveStudentDatabase = (
+  databaseState: StudentDatabase,
+  getUnlockedPassword?: (groupId: string) => string | null,
+) =>
+  enqueueWrite(async (database) => {
+    const serializedState = getUnlockedPassword
+      ? await serializeStudentDatabaseForStorage(databaseState, getUnlockedPassword)
+      : databaseState;
+    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(serializedState));
   });
 
 export const loadTheme = (): ThemeMode => {
@@ -371,6 +378,7 @@ export const saveTheme = (theme: ThemeMode) => {
 export const loadVisualTheme = (): VisualTheme => {
   const raw = window.localStorage.getItem(VISUAL_THEME_KEY);
   switch (raw) {
+    case "nrw-trikolore":
     case "waldmeister-schorle":
     case "blaubeer-pommesbude":
     case "flieder-feierabend":

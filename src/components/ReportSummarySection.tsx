@@ -61,7 +61,7 @@ export const ReportSummarySection = ({
           <p className="text-xl font-semibold">{summary.grade.label}</p>
         </div>
         <div className="surface-elevated rounded-2xl border p-4">
-          <p className="label">Stufe</p>
+          <p className="label">Ausg. Note</p>
           <p className="themed-strong text-xl font-semibold">{summary.grade.verbalLabel}</p>
         </div>
       </div>

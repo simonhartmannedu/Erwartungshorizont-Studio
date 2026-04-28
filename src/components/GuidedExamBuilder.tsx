@@ -8,6 +8,8 @@ import { ExamHeaderForm } from "./ExamHeaderForm";
 import { ExamTemplatePreviewCard } from "./ExamTemplatePreviewCard";
 import { GradeScaleEditor } from "./GradeScaleEditor";
 import { DashboardIcon, InfoIcon, PencilIcon, PlusIcon, ReplaceIcon, TemplateIcon } from "./icons";
+import { ImportedExamSuggestion } from "../pdf/types";
+import { PdfImportAssistant } from "./PdfImportAssistant";
 import { Card, DismissibleCallout, Field, NumberInput, TextAreaField } from "./ui";
 
 export interface GuidedSectionDraft {
@@ -18,6 +20,7 @@ export interface GuidedSectionDraft {
 }
 
 export type GuidedBuilderTarget = "current" | "new";
+type GuidedBuilderSource = "manual" | "template" | "pdf";
 
 interface Props {
   groups: Array<Pick<StudentGroup, "id" | "subject" | "className">>;
@@ -43,6 +46,13 @@ interface Props {
     meta: ExamMeta;
     targetGroupId: string | null;
   }) => void;
+  onApplyPdfSuggestion: (config: {
+    suggestion: ImportedExamSuggestion;
+    target: GuidedBuilderTarget;
+    gradeScale: GradeScale;
+    meta: ExamMeta;
+    targetGroupId: string | null;
+  }) => void;
 }
 
 const getPartLabel = (index: number) => `Teil ${String.fromCharCode(65 + index)}`;
@@ -62,10 +72,17 @@ const createFallbackSections = () =>
     { title: "Teil C", weight: 25, description: "Dritter Kompetenzbereich." },
   ]);
 
-const stepLabels = (mode: "manual" | "template") =>
-  mode === "manual"
-    ? ["Startpunkt", "Fach", "Stufe", "Regelcheck", "Ziel", "Format", "Metadaten", "Notenschlüssel", "Aufbau", "Sektionen"]
-    : ["Startpunkt", "Fach", "Stufe", "Regelcheck", "Ziel", "Format", "Metadaten", "Notenschlüssel"];
+const stepLabels = (source: GuidedBuilderSource) => {
+  switch (source) {
+    case "template":
+      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Vorlage"];
+    case "pdf":
+      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "PDF-Import"];
+    case "manual":
+    default:
+      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Aufbau", "Sektionen"];
+  }
+};
 
 const normalizeSubject = (value: string) => value.trim().toLowerCase();
 
@@ -80,6 +97,7 @@ export const GuidedExamBuilder = ({
   initialMeta,
   onSelectTemplate,
   onApplyManualStructure,
+  onApplyPdfSuggestion,
 }: Props) => {
   const builderRef = useRef<HTMLDivElement | null>(null);
   const detectedInitialSubject =
@@ -87,7 +105,7 @@ export const GuidedExamBuilder = ({
   const [step, setStep] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>("new");
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
-  const [mode, setMode] = useState<"manual" | "template">("manual");
+  const [source, setSource] = useState<GuidedBuilderSource>("manual");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
   const [customSubject, setCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
@@ -132,8 +150,7 @@ export const GuidedExamBuilder = ({
     () => matchingTemplates.find((template) => template.id === selectedTemplateId) ?? null,
     [matchingTemplates, selectedTemplateId],
   );
-  const templatesEnabled = matchingTemplates.length > 0;
-  const activeStepLabels = stepLabels(mode);
+  const activeStepLabels = stepLabels(source);
 
   useEffect(() => {
     const preset = guidance.preset;
@@ -157,13 +174,6 @@ export const GuidedExamBuilder = ({
       ),
     );
   }, [schoolStage]);
-
-  useEffect(() => {
-    if (!templatesEnabled && mode === "template") {
-      setMode("manual");
-      if (step > 7) setStep(7);
-    }
-  }, [mode, step, templatesEnabled]);
 
   useEffect(() => {
     if (selectedTemplateId && !matchingTemplates.some((template) => template.id === selectedTemplateId)) {
@@ -304,6 +314,55 @@ export const GuidedExamBuilder = ({
 
         {step === 1 && (
           <div className="space-y-6">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <button type="button" className={choiceButtonClass(source === "manual")} onClick={() => setSource("manual")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <PencilIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>Manuell starten</strong>
+                  <br />
+                  Aufbau, Punkteverteilung und Sektionen selbst im Wizard festlegen.
+                </span>
+              </span>
+            </button>
+            <button type="button" className={choiceButtonClass(source === "template")} onClick={() => setSource("template")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <TemplateIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>Mit Vorlage starten</strong>
+                  <br />
+                  Nach Fach und Stufe passende Vorlagen im Wizard laden und übernehmen.
+                </span>
+              </span>
+            </button>
+            <button type="button" className={choiceButtonClass(source === "pdf")} onClick={() => setSource("pdf")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <InfoIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>PDF-Import nutzen</strong>
+                  <br />
+                  Aufgabenblatt oder Korrekturvorschlag einlesen und als Wizard-Zweig übernehmen.
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div className="flex justify-end">
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(2)}>
+              Weiter zu Fach
+            </button>
+          </div>
+        </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {subjectCards.map((subjectOption) => {
               const isCustom = subjectOption === "__custom__";
@@ -349,7 +408,7 @@ export const GuidedExamBuilder = ({
               type="button"
               className="button-primary w-full sm:w-auto"
               disabled={!resolvedSubject}
-              onClick={() => goToStep(2)}
+              onClick={() => goToStep(3)}
             >
               Weiter zu Stufenauswahl
             </button>
@@ -357,7 +416,7 @@ export const GuidedExamBuilder = ({
         </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-2">
             <button type="button" className={choiceButtonClass(schoolStage === "sek1")} onClick={() => setSchoolStage("sek1")}>
@@ -387,17 +446,17 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(1)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(2)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(3)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(4)}>
               Weiter zu Regelcheck
             </button>
           </div>
         </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-6">
           <div className="surface-muted rounded-3xl p-5">
             <p className="label">Rechercheprofil</p>
@@ -461,17 +520,17 @@ export const GuidedExamBuilder = ({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(2)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(3)}>
               Zurück
             </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(4)}>
+            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(5)}>
               Weiter zu Ziel
             </button>
           </div>
         </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <button type="button" className={choiceButtonClass(target === "new")} onClick={() => setTarget("new")}>
@@ -520,87 +579,16 @@ export const GuidedExamBuilder = ({
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(3)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(4)}>
               Zurück
             </button>
             <button
               type="button"
               className="button-primary w-full sm:w-auto"
               disabled={target === "new" && !targetGroupId}
-              onClick={() => goToStep(5)}
+              onClick={() => goToStep(6)}
             >
-              Weiter zu Format
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 5 && (
-          <div className="space-y-6">
-          {templatesEnabled ? (
-            <div className="space-y-6">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <button type="button" className={choiceButtonClass(mode === "manual")} onClick={() => setMode("manual")}>
-                  <span className="flex items-start gap-3">
-                    <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                      <PencilIcon className="h-5 w-5" />
-                    </span>
-                    <span>
-                      <strong>Manuell starten</strong>
-                      <br />
-                      Fachvorschläge anpassen, Punkteverteilung setzen und Sektionen frei ausbauen.
-                    </span>
-                  </span>
-                </button>
-                <button type="button" className={choiceButtonClass(mode === "template")} onClick={() => setMode("template")}>
-                  <span className="flex items-start gap-3">
-                    <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                      <TemplateIcon className="h-5 w-5" />
-                    </span>
-                    <span>
-                      <strong>Mit Vorlage starten</strong>
-                      <br />
-                      Passende Vorlagen für Fach, Stufe und in Sek II zusätzlich abiturorientierte Formate laden.
-                    </span>
-                  </span>
-                </button>
-              </div>
-
-              {mode === "template" && (
-                <>
-                  <DismissibleCallout resetKey={`template-inline-${resolvedSubject}-${schoolStage}`}>
-                    {matchingTemplates.length} Vorlage{matchingTemplates.length === 1 ? "" : "n"} für{" "}
-                    {resolvedSubject || "dieses Fach"} in {guidance.label} stehen direkt bereit. Metadaten und
-                    Notenschlüssel kannst du danach bei Bedarf weiter schärfen; beim Laden wird immer der aktuelle Stand
-                    übernommen.
-                  </DismissibleCallout>
-                  <div className="grid gap-4 xl:grid-cols-3">
-                    {matchingTemplates.map((template) => (
-                      <ExamTemplatePreviewCard
-                        key={template.id}
-                        template={template}
-                        actionLabel={selectedTemplateId === template.id ? "Vorlage gewählt" : "Vorlage auswählen"}
-                        selected={selectedTemplateId === template.id}
-                        onLoad={() => setSelectedTemplateId(template.id)}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}`} tone="info">
-              Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es im aktuellen Builder keine spezifische
-              Vorlage. Der Wizard führt deshalb direkt in den manuellen Aufbau mit den recherchierten Fachvorschlägen.
-            </DismissibleCallout>
-          )}
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(4)}>
-              Zurück
-            </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(6)}>
-              {mode === "template" ? "Vorlage später laden" : "Weiter zu Metadaten"}
+              Weiter zu Metadaten
             </button>
           </div>
         </div>
@@ -655,7 +643,7 @@ export const GuidedExamBuilder = ({
             }
           />
 
-          <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-${mode}`}>
+          <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-${source}`}>
             Der Notenschlüssel wird hier früh festgelegt, damit der anschließende Aufbau direkt zur gewählten
             Prüfungslogik passt.
           </DismissibleCallout>
@@ -664,39 +652,24 @@ export const GuidedExamBuilder = ({
             <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(6)}>
               Zurück
             </button>
-            {mode === "manual" ? (
+            {source === "manual" ? (
               <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
                 Weiter zu Aufbau
               </button>
+            ) : source === "template" ? (
+              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
+                Weiter zu Vorlagen
+              </button>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(5)}>
-                  Zurück zu Vorlagen
-                </button>
-                <button
-                  type="button"
-                  className="button-primary w-full sm:w-auto"
-                  disabled={!selectedTemplate || (target === "new" && !targetGroupId)}
-                  onClick={() =>
-                    selectedTemplate &&
-                    onSelectTemplate(
-                      selectedTemplate,
-                      target,
-                      gradeScale,
-                      metaDraft,
-                      target === "new" ? targetGroupId || null : null,
-                    )
-                  }
-                >
-                  Mit Vorlage in EWH-Editor
-                </button>
-              </div>
+              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
+                Weiter zu PDF-Import
+              </button>
             )}
           </div>
         </div>
         )}
 
-        {mode === "manual" && step === 8 && (
+        {source === "manual" && step === 8 && (
           <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Gesamtpunktzahl">
@@ -760,7 +733,7 @@ export const GuidedExamBuilder = ({
         </div>
         )}
 
-        {mode === "manual" && step === 9 && (
+        {source === "manual" && step === 9 && (
           <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="status-note text-sm leading-6">
@@ -856,6 +829,92 @@ export const GuidedExamBuilder = ({
                 In EWH-Editor übernehmen
               </button>
             </div>
+          </div>
+        </div>
+        )}
+
+        {source === "template" && step === 8 && (
+          <div className="space-y-6">
+          {matchingTemplates.length > 0 ? (
+            <>
+              <DismissibleCallout resetKey={`template-inline-${resolvedSubject}-${schoolStage}`}>
+                {matchingTemplates.length} Vorlage{matchingTemplates.length === 1 ? "" : "n"} für{" "}
+                {resolvedSubject || "dieses Fach"} in {guidance.label} stehen direkt bereit. Metadaten und
+                Notenschlüssel werden beim Laden aus dem Wizard übernommen.
+              </DismissibleCallout>
+              <div className="grid gap-4 xl:grid-cols-3">
+                {matchingTemplates.map((template) => (
+                  <ExamTemplatePreviewCard
+                    key={template.id}
+                    template={template}
+                    actionLabel={selectedTemplateId === template.id ? "Vorlage gewählt" : "Vorlage auswählen"}
+                    selected={selectedTemplateId === template.id}
+                    onLoad={() => setSelectedTemplateId(template.id)}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}`} tone="info">
+              Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es aktuell keine spezifische Vorlage.
+              Wechsle bei Bedarf über "Zurück" zum manuellen Aufbau oder PDF-Import.
+            </DismissibleCallout>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(7)}>
+              Zurück
+            </button>
+            <button
+              type="button"
+              className="button-primary w-full sm:w-auto"
+              disabled={!selectedTemplate || (target === "new" && !targetGroupId)}
+              onClick={() =>
+                selectedTemplate &&
+                onSelectTemplate(
+                  selectedTemplate,
+                  target,
+                  gradeScale,
+                  metaDraft,
+                  target === "new" ? targetGroupId || null : null,
+                )
+              }
+            >
+              Mit Vorlage in EWH-Editor
+            </button>
+          </div>
+        </div>
+        )}
+
+        {source === "pdf" && step === 8 && (
+          <div className="space-y-6">
+          <div className="surface-muted rounded-3xl p-5">
+            <h3 className="themed-strong text-base font-semibold">PDF als Wizard-Zweig übernehmen</h3>
+            <p className="status-note mt-2 text-sm leading-6">
+              Der PDF-Vorschlag landet nicht mehr direkt im Editor, sondern übernimmt Ziel, Metadaten und
+              Notenschlüssel aus diesem Wizard-Durchlauf.
+            </p>
+          </div>
+
+          <PdfImportAssistant
+            embedded
+            disabled={target === "new" && !targetGroupId}
+            applyLabel="Mit PDF-Vorschlag in EWH-Editor"
+            onApplySuggestion={(suggestion) =>
+              onApplyPdfSuggestion({
+                suggestion,
+                target,
+                gradeScale,
+                meta: metaDraft,
+                targetGroupId: target === "new" ? targetGroupId || null : null,
+              })
+            }
+          />
+
+          <div className="flex justify-start">
+            <button type="button" className="button-secondary" onClick={() => goToStep(7)}>
+              Zurück
+            </button>
           </div>
         </div>
         )}

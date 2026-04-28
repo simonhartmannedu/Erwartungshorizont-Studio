@@ -1,5 +1,6 @@
 import { Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentRecord } from "../types";
 import { clamp } from "./format";
+import { decryptText, encryptText } from "./crypto";
 
 const POINT_STEP = 0.5;
 
@@ -34,8 +35,11 @@ const emptyAssessment = (studentId: string, workspaceId: string | null = null): 
   workspaceId,
   studentId,
   taskScores: {},
+  encryptedTaskScores: null,
   teacherComment: "",
   signatureDataUrl: null,
+  encryptedTeacherComment: null,
+  encryptedSignatureDataUrl: null,
   updatedAt: new Date().toISOString(),
   printedAt: null,
 });
@@ -103,6 +107,7 @@ export const updateStudentScore = (
           ...assessment.taskScores,
           [taskId]: score,
         },
+        encryptedTaskScores: assessment.encryptedTaskScores ?? null,
         updatedAt: new Date().toISOString(),
       },
     },
@@ -142,6 +147,7 @@ export const scaleTaskScoresForStudents = (
         ...assessment.taskScores,
         [taskId]: scaledScore,
       },
+      encryptedTaskScores: assessment.encryptedTaskScores ?? null,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -172,6 +178,9 @@ export const updateTeacherComment = (
         ...assessment,
         workspaceId,
         teacherComment,
+        encryptedTaskScores: assessment.encryptedTaskScores ?? null,
+        encryptedTeacherComment: assessment.encryptedTeacherComment ?? null,
+        encryptedSignatureDataUrl: assessment.encryptedSignatureDataUrl ?? null,
         updatedAt: new Date().toISOString(),
       },
     },
@@ -196,6 +205,9 @@ export const updateStudentSignature = (
         ...assessment,
         workspaceId,
         signatureDataUrl,
+        encryptedTaskScores: assessment.encryptedTaskScores ?? null,
+        encryptedTeacherComment: assessment.encryptedTeacherComment ?? null,
+        encryptedSignatureDataUrl: assessment.encryptedSignatureDataUrl ?? null,
         updatedAt: new Date().toISOString(),
       },
     },
@@ -426,4 +438,154 @@ export const getStudentRecord = (database: StudentDatabase, studentId: string | 
     if (student) return student;
   }
   return null;
+};
+
+const getStudentGroupIdByStudentId = (database: StudentDatabase, studentId: string) =>
+  database.groups.find((group) => group.students.some((student) => student.id === studentId))?.id ?? null;
+
+export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, groupIds: string[]): StudentDatabase => {
+  if (groupIds.length === 0) return database;
+  const targetIds = new Set(groupIds);
+  let didChange = false;
+
+  const nextAssessments = Object.fromEntries(
+    Object.entries(database.assessments).map(([assessmentKey, assessment]) => {
+      const groupId = getStudentGroupIdByStudentId(database, assessment.studentId);
+      if (!groupId || !targetIds.has(groupId)) return [assessmentKey, assessment];
+      if (!assessment.teacherComment && !assessment.signatureDataUrl) return [assessmentKey, assessment];
+
+      didChange = true;
+      return [
+        assessmentKey,
+        {
+          ...assessment,
+          teacherComment: "",
+          taskScores: {},
+          signatureDataUrl: null,
+        },
+      ];
+    }),
+  );
+
+  return didChange ? { ...database, assessments: nextAssessments } : database;
+};
+
+export const hydrateSensitiveAssessmentsForGroup = async (
+  database: StudentDatabase,
+  groupId: string,
+  password: string,
+): Promise<StudentDatabase> => {
+  const group = getStudentGroup(database, groupId);
+  if (!group?.passwordVerifier) return database;
+
+  const targetStudentIds = new Set(group.students.map((student) => student.id));
+  let didChange = false;
+
+  const nextEntries = await Promise.all(
+    Object.entries(database.assessments).map(async ([assessmentKey, assessment]) => {
+      if (!targetStudentIds.has(assessment.studentId)) return [assessmentKey, assessment] as const;
+
+      let teacherComment = assessment.teacherComment;
+      let signatureDataUrl = assessment.signatureDataUrl ?? null;
+      let taskScores = assessment.taskScores;
+
+      if (Object.keys(taskScores).length === 0 && assessment.encryptedTaskScores) {
+        const parsedTaskScores = JSON.parse(await decryptText(assessment.encryptedTaskScores, password)) as Record<string, number>;
+        taskScores = parsedTaskScores;
+        didChange = true;
+      }
+
+      if (!teacherComment && assessment.encryptedTeacherComment) {
+        teacherComment = await decryptText(assessment.encryptedTeacherComment, password);
+        didChange = true;
+      }
+
+      if (!signatureDataUrl && assessment.encryptedSignatureDataUrl) {
+        signatureDataUrl = await decryptText(assessment.encryptedSignatureDataUrl, password);
+        didChange = true;
+      }
+
+      return [
+        assessmentKey,
+        {
+          ...assessment,
+          taskScores,
+          teacherComment,
+          signatureDataUrl,
+        },
+      ] as const;
+    }),
+  );
+
+  return didChange
+    ? { ...database, assessments: Object.fromEntries(nextEntries), updatedAt: database.updatedAt }
+    : database;
+};
+
+export const serializeStudentDatabaseForStorage = async (
+  database: StudentDatabase,
+  getUnlockedPassword: (groupId: string) => string | null,
+): Promise<StudentDatabase> => {
+  const studentToGroupId = new Map<string, string>();
+  database.groups.forEach((group) => {
+    group.students.forEach((student) => {
+      studentToGroupId.set(student.id, group.id);
+    });
+  });
+
+  const nextEntries = await Promise.all(
+    Object.entries(database.assessments).map(async ([assessmentKey, assessment]) => {
+      const groupId = studentToGroupId.get(assessment.studentId) ?? null;
+      const group = groupId ? getStudentGroup(database, groupId) : null;
+
+      if (!group?.passwordVerifier) {
+        return [assessmentKey, assessment] as const;
+      }
+
+      const unlockedPassword = getUnlockedPassword(group.id);
+      if (!unlockedPassword) {
+        if (!assessment.encryptedTaskScores && !assessment.encryptedTeacherComment && !assessment.encryptedSignatureDataUrl) {
+          return [assessmentKey, assessment] as const;
+        }
+
+        return [
+          assessmentKey,
+          {
+            ...assessment,
+            taskScores: {},
+            teacherComment: "",
+            signatureDataUrl: null,
+          },
+        ] as const;
+      }
+
+      const encryptedTaskScores = Object.keys(assessment.taskScores).length > 0
+        ? await encryptText(JSON.stringify(assessment.taskScores), unlockedPassword)
+        : null;
+      const encryptedTeacherComment = assessment.teacherComment
+        ? await encryptText(assessment.teacherComment, unlockedPassword)
+        : null;
+      const encryptedSignatureDataUrl = assessment.signatureDataUrl
+        ? await encryptText(assessment.signatureDataUrl, unlockedPassword)
+        : null;
+
+      return [
+        assessmentKey,
+        {
+          ...assessment,
+          taskScores: {},
+          encryptedTaskScores,
+          teacherComment: "",
+          signatureDataUrl: null,
+          encryptedTeacherComment,
+          encryptedSignatureDataUrl,
+        },
+      ] as const;
+    }),
+  );
+
+  return {
+    ...database,
+    assessments: Object.fromEntries(nextEntries),
+  };
 };

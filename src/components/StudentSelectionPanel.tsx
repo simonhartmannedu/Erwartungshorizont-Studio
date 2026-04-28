@@ -1,27 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { DraftWorkspace, Exam, SelectedStudentContext, StudentDatabase } from "../types";
+import { DraftWorkspace, Exam, StudentDatabase } from "../types";
 import { getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
-import { EyeIcon, EyeOffIcon, TrashIcon, UnlockIcon } from "./icons";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { Card, Field, IconButton } from "./ui";
+import { KeyIcon, LockIcon, UnlockIcon } from "./icons";
+import { Card, Field } from "./ui";
 
 interface Props {
   database: StudentDatabase;
   workspaces: DraftWorkspace[];
   activeExam: Exam;
   activeWorkspaceId: string;
-  selectedStudent: SelectedStudentContext | null;
   activeGroupId: string;
   activeStudentId: string;
   onSelectGroup: (groupId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onRemoveStudent: (groupId: string, studentId: string) => void;
   onToggleStudentAbsent: (groupId: string, studentId: string, isAbsent: boolean) => void;
-  onRevealStudentName: (groupId: string, studentId: string, passwordOverride?: string) => Promise<string | null>;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
-  onUnlockGroup: (groupId: string, password: string, options?: { silent?: boolean }) => Promise<boolean>;
   isSelectedGroupUnlocked: boolean;
+  activeGroupIsProtected: boolean;
+  securityActionLabel: string;
+  onToggleSecurity: () => void;
 }
 
 export const StudentSelectionPanel = ({
@@ -29,18 +27,17 @@ export const StudentSelectionPanel = ({
   workspaces,
   activeExam,
   activeWorkspaceId,
-  selectedStudent,
   activeGroupId,
   activeStudentId,
   onSelectGroup,
   onSelectWorkspace,
   onSelectStudent,
-  onRemoveStudent,
   onToggleStudentAbsent,
-  onRevealStudentName,
   onRevealGroupStudentNames,
-  onUnlockGroup,
   isSelectedGroupUnlocked,
+  activeGroupIsProtected,
+  securityActionLabel,
+  onToggleSecurity,
 }: Props) => {
   const getWorkspaceDisplayLabel = (workspace: DraftWorkspace) =>
     workspace.exam.meta.title.trim() || workspace.label;
@@ -54,28 +51,7 @@ export const StudentSelectionPanel = ({
         return "offen";
     }
   };
-  const [revealedName, setRevealedName] = useState<string | null>(null);
-  const [isRevealingName, setIsRevealingName] = useState(false);
   const [resolvedNamesByStudentId, setResolvedNamesByStudentId] = useState<Record<string, string>>({});
-  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [unlockPasswordInput, setUnlockPasswordInput] = useState("");
-  const [unlockDialogError, setUnlockDialogError] = useState("");
-
-  useEffect(() => {
-    setRevealedName(null);
-  }, [selectedStudent?.groupId, selectedStudent?.studentId]);
-
-  useEffect(() => {
-    if (!isSelectedGroupUnlocked) {
-      setRevealedName(null);
-    }
-  }, [isSelectedGroupUnlocked]);
-
-  useEffect(() => {
-    setUnlockDialogOpen(false);
-    setUnlockPasswordInput("");
-    setUnlockDialogError("");
-  }, [activeGroupId]);
 
   useEffect(() => {
     if (!activeGroupId || !isSelectedGroupUnlocked) {
@@ -118,43 +94,42 @@ export const StudentSelectionPanel = ({
     return fullName ? `${fullName} · ${alias}` : alias;
   };
 
-  const revealSelectedStudentName = async (passwordOverride?: string) => {
-    if (!activeGroup || !selectedStudentRecord) return;
-
-    setIsRevealingName(true);
-    try {
-      const fullName = await onRevealStudentName(activeGroup.id, selectedStudentRecord.id, passwordOverride);
-      if (fullName) {
-        setRevealedName(fullName);
-      }
-    } finally {
-      setIsRevealingName(false);
-    }
-  };
-
-  const handleRevealName = async () => {
-    if (!activeGroup || !selectedStudentRecord) return;
-
-    if (revealedName) {
-      setRevealedName(null);
-      return;
-    }
-
-    if (!isSelectedGroupUnlocked && activeGroup.passwordVerifier) {
-      setUnlockDialogError("");
-      setUnlockDialogOpen(true);
-      return;
-    }
-
-    await revealSelectedStudentName();
-  };
-
   return (
     <div className="space-y-6 no-print xl:sticky xl:top-6">
       <Card
-        title="Ausgewählte Schüler*in"
+        title="Auswahl"
         subtitle="Im Arbeitsbereich erscheinen Schülercodes. Klarnamen werden nur lokal entschlüsselt."
       >
+        {activeGroup ? (
+          <div className="surface-muted mb-4 rounded-3xl p-4">
+            <button
+              type="button"
+              className={`security-key-trigger ${isSelectedGroupUnlocked ? "is-unlocked" : "is-locked"}`}
+              onClick={onToggleSecurity}
+              disabled={!activeGroupIsProtected}
+              aria-label={securityActionLabel}
+            >
+              <span className="security-key-trigger-orb" aria-hidden="true">
+                <span className="security-key-trigger-ring security-key-trigger-ring-outer" />
+                <span className="security-key-trigger-ring security-key-trigger-ring-inner" />
+                <span className="security-key-trigger-key">
+                  <KeyIcon className="h-10 w-10 sm:h-12 sm:w-12" />
+                </span>
+                <span className="security-key-trigger-lock">
+                  {isSelectedGroupUnlocked ? <UnlockIcon className="h-6 w-6" /> : <LockIcon className="h-6 w-6" />}
+                </span>
+              </span>
+              <span className="security-key-trigger-copy">
+                <span className="security-key-trigger-kicker">Datenschutz</span>
+                <span className="security-key-trigger-title">{securityActionLabel}</span>
+                <span className="security-key-trigger-meta">
+                  {activeGroup.subject} · {activeGroup.className}
+                  {activeGroupIsProtected ? "" : " · ungeschützt"}
+                </span>
+              </span>
+            </button>
+          </div>
+        ) : null}
         {selectedStudentRecord && activeGroup ? (
           <div className="space-y-4">
             <Field label="Klassenarbeit">
@@ -229,47 +204,13 @@ export const StudentSelectionPanel = ({
                     />
                     Abwesend
                   </label>
-                  {revealedName && (
-                    <p className="mt-3 break-words text-sm font-medium" style={{ color: "var(--app-text-strong)" }}>
-                      {revealedName}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleRevealName();
-                    }}
-                    title={
-                      revealedName
-                        ? "Klarname ausblenden"
-                        : activeGroup.passwordVerifier && !isSelectedGroupUnlocked
-                          ? "Klarname anzeigen und Lerngruppe per Passwort entsperren"
-                          : "Klarname anzeigen"
-                    }
-                    className="button-primary w-full gap-2 px-3 py-2 text-xs sm:w-auto"
-                  >
-                    {revealedName ? (
-                      <EyeOffIcon />
-                    ) : activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
-                      <UnlockIcon />
-                    ) : (
-                      <EyeIcon />
-                    )}
-                    {isRevealingName ? "Prüft..." : revealedName ? "Klarname ausblenden" : "Klarname"}
-                  </button>
-                  <IconButton
-                    onClick={() => onRemoveStudent(activeGroup.id, selectedStudentRecord.id)}
-                    title="Schüler entfernen"
-                    variant="soft"
-                    className="w-full px-3 py-2 text-xs sm:w-auto"
-                  >
-                    <TrashIcon />
-                    Entfernen
-                  </IconButton>
                 </div>
               </div>
+              {activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
+                <p className="warning-note mt-3 text-xs leading-5">
+                  Bewertungsdaten und Klarnamen bleiben gesperrt, bis du die aktive Klasse oben über das Schlüsselmodul entsperrst.
+                </p>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -326,59 +267,6 @@ export const StudentSelectionPanel = ({
           </div>
         )}
       </Card>
-
-      <ConfirmDialog
-        open={unlockDialogOpen}
-        title="Klassenpasswort eingeben"
-        description="Für Klarnamen wird das Passwort der ausgewählten Klasse lokal abgefragt. Nach erfolgreicher Prüfung bleibt die Lerngruppe für diese Sitzung entsperrt."
-        onCancel={() => {
-          setUnlockDialogOpen(false);
-          setUnlockPasswordInput("");
-          setUnlockDialogError("");
-        }}
-        onConfirm={async () => {
-          if (!activeGroup) return;
-          const password = unlockPasswordInput.trim();
-          if (!password) {
-            setUnlockDialogError("Bitte gib das Klassenpasswort ein.");
-            return;
-          }
-
-          const unlocked = await onUnlockGroup(activeGroup.id, password, { silent: true });
-          if (!unlocked) {
-            setUnlockDialogError("Das Klassenpasswort ist falsch.");
-            return;
-          }
-
-          setUnlockDialogOpen(false);
-          setUnlockPasswordInput("");
-          setUnlockDialogError("");
-          await revealSelectedStudentName(password);
-        }}
-        confirmLabel="Entsperren"
-      >
-        <div className="dialog-preview rounded-2xl p-4">
-          <label className="block">
-            <span className="label">Passwort für {activeGroup?.subject} · {activeGroup?.className}</span>
-            <input
-              className="field"
-              type="password"
-              value={unlockPasswordInput}
-              onChange={(event) => {
-                setUnlockPasswordInput(event.target.value);
-                if (unlockDialogError) {
-                  setUnlockDialogError("");
-                }
-              }}
-            />
-          </label>
-          {unlockDialogError && (
-            <p className="mt-3 text-sm font-medium" style={{ color: "var(--app-danger)" }}>
-              {unlockDialogError}
-            </p>
-          )}
-        </div>
-      </ConfirmDialog>
     </div>
   );
 };
