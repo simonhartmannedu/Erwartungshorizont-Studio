@@ -233,6 +233,9 @@ type PendingImportPreview =
     };
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
+const DEMO_GROUP_ID = "demo-lerngruppe-8b";
+const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
+const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 
@@ -553,7 +556,90 @@ function App() {
   };
 
   const createInitialDraftBundle = () => createDraftBundle(normalizeExamStructure(createEmptyExam()));
-  const createDemoDraftBundle = () => createDraftBundle(normalizeExamStructure(cloneExam(sampleExam)), "Demo-Klassenarbeit");
+  const createDemoDraftBundle = () => {
+    const workspace = createDraftWorkspace(
+      normalizeExamStructure(cloneExam(sampleExam)),
+      "Demo-Klassenarbeit",
+      null,
+      DEMO_GROUP_ID,
+    );
+
+    return {
+      activeWorkspaceId: DEMO_WORKSPACE_ID,
+      workspaces: [
+        {
+          ...workspace,
+          id: DEMO_WORKSPACE_ID,
+          updatedAt: DEMO_TIMESTAMP,
+        },
+      ],
+    };
+  };
+  const createDemoStudentDatabase = (workspace: DraftWorkspace): StudentDatabase => {
+    const placeholderEncryptedName = {
+      ciphertext: "demo",
+      iv: "demo",
+      salt: "demo",
+    };
+    const students = Array.from({ length: 25 }, (_, index) => ({
+      id: `demo-student-${index + 1}`,
+      alias: `Student ${index + 1}`,
+      encryptedName: placeholderEncryptedName,
+      isAbsent: index === 24,
+      createdAt: DEMO_TIMESTAMP,
+    }));
+    const tasks = workspace.exam.sections.flatMap((section) => section.tasks);
+    const snapScore = (value: number, maxPoints: number) =>
+      Math.min(maxPoints, Math.max(0, Math.round(value * 2) / 2));
+    const assessments = Object.fromEntries(
+      students.slice(0, 23).map((student, studentIndex) => {
+        const scoredTasks = studentIndex === 22 ? tasks.slice(0, 4) : tasks;
+        const taskScores = Object.fromEntries(
+          scoredTasks.map((task, taskIndex) => {
+            const percentage = 0.52 + (((studentIndex + 1) * 7 + taskIndex * 5) % 43) / 100;
+            return [task.id, snapScore(task.maxPoints * percentage, task.maxPoints)];
+          }),
+        );
+
+        return [
+          `${workspace.id}::${student.id}`,
+          {
+            workspaceId: workspace.id,
+            studentId: student.id,
+            taskScores,
+            encryptedTaskScores: null,
+            teacherComment:
+              studentIndex === 22
+                ? "Demo-Kommentar: Diese Korrektur ist absichtlich nur teilweise ausgefüllt, damit der Status \"in Arbeit\" sichtbar wird."
+                : "Demo-Kommentar: {alias} zeigt nachvollziehbare Leistungen. Die Rückmeldung kann direkt angepasst, gedruckt oder exportiert werden.",
+            signatureDataUrl: null,
+            encryptedTeacherComment: null,
+            encryptedSignatureDataUrl: null,
+            updatedAt: DEMO_TIMESTAMP,
+            printedAt: null,
+          },
+        ];
+      }),
+    );
+
+    return {
+      version: 1,
+      groups: [
+        {
+          id: DEMO_GROUP_ID,
+          subject: "Englisch",
+          className: "8b Demo",
+          passwordVerifier: null,
+          defaultSignatureDataUrl: null,
+          students,
+          createdAt: DEMO_TIMESTAMP,
+          updatedAt: DEMO_TIMESTAMP,
+        },
+      ],
+      assessments,
+      updatedAt: DEMO_TIMESTAMP,
+    };
+  };
 
   const getSectionBlockBounds = (sections: Section[], sectionId: string) => {
     const currentIndex = sections.findIndex((section) => section.id === sectionId);
@@ -687,11 +773,19 @@ function App() {
         const shouldSeedDemoWorkspace =
           isDemoModeEnabled && !storedDraft && storedArchiveEntries.length === 0 && !hasStoredStudentData;
 
-        setDraftBundle(shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle());
+        const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
+        const nextStudentDatabase = shouldSeedDemoWorkspace
+          ? createDemoStudentDatabase(nextDraftBundle.workspaces[0])
+          : storedStudentDatabase;
+
+        setDraftBundle(nextDraftBundle);
         setArchiveEntries(storedArchiveEntries);
-        setStudentDatabase(storedStudentDatabase);
-        setActiveGroupId(storedStudentDatabase.groups[0]?.id ?? "");
-        setActiveStudentId(storedStudentDatabase.groups[0]?.students[0]?.id ?? "");
+        setStudentDatabase(nextStudentDatabase);
+        setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
+        setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
+        if (shouldSeedDemoWorkspace) {
+          setActiveTab("groups");
+        }
         setStorageError(null);
         setStorageReady(true);
       } catch (error) {
@@ -905,21 +999,21 @@ function App() {
   const resetDemoWorkspace = () => {
     const nextDraftBundle = createDemoDraftBundle();
     const nextArchiveEntries: ExpectationArchiveEntry[] = [];
-    const nextStudentDatabase = createEmptyStudentDatabase();
+    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
 
     setDraftBundle(nextDraftBundle);
     setArchiveEntries(nextArchiveEntries);
     void saveExpectationArchive(nextArchiveEntries);
     setStudentDatabase(nextStudentDatabase);
-    setActiveGroupId("");
-    setActiveStudentId("");
+    setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
+    setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
     setRestoreCheckpoint(null);
     setPendingImportPreview(null);
     setLastBackupAt(null);
     clearBackupComplete();
-    setActiveTab("builder");
+    setActiveTab("groups");
     pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
   };
 
