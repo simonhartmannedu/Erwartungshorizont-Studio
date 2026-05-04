@@ -235,9 +235,27 @@ type PendingImportPreview =
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
 const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
+const DEMO_SEED_VERSION = "student-demo-v1";
+const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
+
+const getStoredDemoSeedVersion = () => {
+  try {
+    return window.localStorage.getItem(DEMO_SEED_VERSION_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const markDemoSeedCurrent = () => {
+  try {
+    window.localStorage.setItem(DEMO_SEED_VERSION_KEY, DEMO_SEED_VERSION);
+  } catch {
+    // Demo seeding still works without the marker; it just cannot persist the upgrade flag.
+  }
+};
 
 const TabIcon = ({ id }: { id: TabId }) => {
   switch (id) {
@@ -768,18 +786,24 @@ function App() {
 
         if (cancelled) return;
 
-        const hasStoredStudentData =
-          storedStudentDatabase.groups.length > 0 || Object.keys(storedStudentDatabase.assessments).length > 0;
+        const hasCurrentDemoSeed = getStoredDemoSeedVersion() === DEMO_SEED_VERSION;
+        const hasDemoWorkspace = Boolean(storedDraft?.workspaces.some((workspace) => workspace.id === DEMO_WORKSPACE_ID));
+        const hasDemoGroup = storedStudentDatabase.groups.some((group) => group.id === DEMO_GROUP_ID);
         const shouldSeedDemoWorkspace =
-          isDemoModeEnabled && !storedDraft && storedArchiveEntries.length === 0 && !hasStoredStudentData;
+          isDemoModeEnabled && (!hasCurrentDemoSeed || !hasDemoWorkspace || !hasDemoGroup);
 
         const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
+        const nextArchiveEntries = shouldSeedDemoWorkspace ? [] : storedArchiveEntries;
         const nextStudentDatabase = shouldSeedDemoWorkspace
           ? createDemoStudentDatabase(nextDraftBundle.workspaces[0])
           : storedStudentDatabase;
 
+        if (shouldSeedDemoWorkspace) {
+          markDemoSeedCurrent();
+        }
+
         setDraftBundle(nextDraftBundle);
-        setArchiveEntries(storedArchiveEntries);
+        setArchiveEntries(nextArchiveEntries);
         setStudentDatabase(nextStudentDatabase);
         setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
         setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
@@ -1004,6 +1028,7 @@ function App() {
     setDraftBundle(nextDraftBundle);
     setArchiveEntries(nextArchiveEntries);
     void saveExpectationArchive(nextArchiveEntries);
+    markDemoSeedCurrent();
     setStudentDatabase(nextStudentDatabase);
     setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
     setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
