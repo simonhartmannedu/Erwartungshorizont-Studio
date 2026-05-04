@@ -163,6 +163,20 @@ export const EyeOffIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const FullscreenIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M8.5 4.5h-4v4M15.5 4.5h4v4M19.5 15.5v4h-4M4.5 15.5v4h4" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M9.5 4.5 4.5 9.5M14.5 4.5l5 5M19.5 14.5l-5 5M4.5 14.5l5 5" strokeLinecap="round" />
+  </svg>
+);
+
+export const FullscreenExitIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M9.5 4.5v5h-5M14.5 4.5v5h5M19.5 14.5h-5v5M4.5 14.5h5v5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M9.5 9.5 4.5 4.5M14.5 9.5l5-5M14.5 14.5l5 5M9.5 14.5l-5 5" strokeLinecap="round" />
+  </svg>
+);
+
 export const GroupIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <circle cx="9" cy="8.5" r="2.5" />

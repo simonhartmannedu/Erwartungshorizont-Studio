@@ -138,7 +138,7 @@ export const SectionEditor = ({
       >
         <div className="flex items-center gap-3 px-2 py-1">
           <span className="section-insert-line h-px flex-1" />
-          <span className="section-insert-chip rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] shadow-sm">
+          <span className="section-insert-chip inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold leading-none uppercase tracking-[0.18em] shadow-sm">
             Einfügen
           </span>
           <span className="section-insert-line h-px flex-1" />
@@ -327,7 +327,7 @@ export const SectionEditor = ({
       >
         <div className="flex items-center gap-3 px-2 py-1">
           <span className="section-insert-line h-px flex-1" />
-          <span className="section-insert-chip rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] shadow-sm">
+          <span className="section-insert-chip inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold leading-none uppercase tracking-[0.18em] shadow-sm">
             Einfügen
           </span>
           <span className="section-insert-line h-px flex-1" />
