@@ -125,6 +125,8 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   DashboardIcon,
+  FullscreenExitIcon,
+  FullscreenIcon,
   GroupIcon,
   SaveIcon,
   MoonIcon,
@@ -574,6 +576,8 @@ function App() {
   const studentDatabaseRef = useRef(studentDatabase);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false);
+  const appShellRef = useRef<HTMLDivElement | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string>("");
   const [activeStudentId, setActiveStudentId] = useState<string>("");
   const [storageReady, setStorageReady] = useState(false);
@@ -770,6 +774,30 @@ function App() {
     saveVisualTheme(visualTheme);
     document.documentElement.dataset.theme = visualTheme;
   }, [visualTheme]);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsAppFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    syncFullscreenState();
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    };
+  }, []);
+
+  const toggleAppFullscreen = () => {
+    if (!document.fullscreenEnabled) return;
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      return;
+    }
+
+    void (appShellRef.current ?? document.documentElement).requestFullscreen();
+  };
 
   const focusTabButton = (tabId: TabId) => {
     tabButtonRefs.current[tabId]?.focus();
@@ -2908,7 +2936,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+    <div ref={appShellRef} className="app-shell min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
       {confettiBurstKey > 0 ? (
         <CelebrationOverlay burstKey={confettiBurstKey} onComplete={() => setConfettiBurstKey(0)} />
       ) : null}
@@ -2952,6 +2980,17 @@ function App() {
             >
               {theme === "light" ? <MoonIcon /> : <SunIcon />}
               {theme === "light" ? "Dark Mode" : "Light Mode"}
+            </button>
+            <button
+              type="button"
+              className="button-secondary w-full gap-2 sm:w-auto sm:self-end"
+              onClick={toggleAppFullscreen}
+              disabled={!document.fullscreenEnabled}
+              title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+              aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+            >
+              {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              {isAppFullscreen ? "Vollbild aus" : "Vollbild"}
             </button>
           </div>
         </header>

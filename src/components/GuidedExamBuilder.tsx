@@ -245,7 +245,7 @@ export const GuidedExamBuilder = ({
     return (
       <span
         key={label}
-        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none ${
           isActive ? "button-primary" : isVisible ? "button-secondary" : "button-soft"
         }`}
       >

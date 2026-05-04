@@ -356,7 +356,7 @@ export const StudentRosterPanel = ({
             </Badge>
             {activeGroup && activeGroup.passwordVerifier && (
               <span
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isActiveGroupUnlocked ? "badge-emerald" : "badge-rose"}`}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold leading-none ${isActiveGroupUnlocked ? "badge-emerald" : "badge-rose"}`}
               >
                 <span
                   className={isActiveGroupUnlocked ? "badge-emerald h-2.5 w-2.5 rounded-full" : "badge-rose h-2.5 w-2.5 rounded-full"}
@@ -376,72 +376,13 @@ export const StudentRosterPanel = ({
           subtitle="Neue Klassen anlegen oder Listen importieren."
         >
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="surface-muted space-y-4 rounded-3xl p-4">
-              <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">Neue Lerngruppe</p>
-              <Field label="Fach">
-                <input className="field" placeholder="Fach, z. B. Englisch" value={subject} onChange={(event) => setSubject(event.target.value)} />
-              </Field>
-              <Field label="Klasse">
-                <input className="field" placeholder="Klasse, z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
-              </Field>
-              <Field as="div" label="Zugangsschutz">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    className={groupAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
-                    onClick={() => setGroupAccessMode("generated")}
-                  >
-                    Token generieren
-                  </button>
-                  <button
-                    type="button"
-                    className={groupAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
-                    onClick={() => setGroupAccessMode("manual")}
-                  >
-                    Eigenes Passwort
-                  </button>
-                </div>
-              </Field>
-              {groupAccessMode === "manual" ? (
-                <Field label="Klassenpasswort">
-                  <input
-                    className="field"
-                    type="password"
-                    placeholder="Klassenpasswort für Verschlüsselung"
-                    value={groupPassword}
-                    onChange={(event) => setGroupPassword(event.target.value)}
-                  />
-                </Field>
-              ) : (
-                <p className="status-note text-xs leading-5">
-                  Beim Anlegen wird automatisch ein starkes Security-Token erzeugt und direkt als Druckkarte angeboten.
-                </p>
-              )}
-              <button
-                type="button"
-                className="button-primary w-full gap-2"
-                onClick={async () => {
-                  if (!subject.trim() || !className.trim()) return;
-                  if (groupAccessMode === "manual" && !groupPassword.trim()) return;
-                  await onAddGroup(subject.trim(), className.trim(), {
-                    mode: groupAccessMode,
-                    password: groupAccessMode === "manual" ? groupPassword.trim() : undefined,
-                  });
-                  setSubject("");
-                  setClassName("");
-                  setGroupPassword("");
-                  setGroupAccessMode("generated");
-                }}
-              >
-                <PlusIcon />
-                Lerngruppe anlegen
-              </button>
-            </div>
-
             <div className="surface-elevated rounded-3xl border p-4">
-              <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">
-                Klassenimport
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">
+                  Klassenimport
+                </p>
+                <Badge tone="emerald">Empfohlen</Badge>
+              </div>
               <div className="mt-4 grid gap-3">
                 <input
                   className="field"
@@ -512,6 +453,68 @@ export const StudentRosterPanel = ({
               <p className="status-note mt-3 text-xs leading-5">
                 Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>.
               </p>
+            </div>
+
+            <div className="surface-elevated space-y-4 rounded-3xl border p-4">
+              <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">Manuelle Lerngruppe anlegen</p>
+              <Field label="Fach">
+                <input className="field" placeholder="Fach, z. B. Englisch" value={subject} onChange={(event) => setSubject(event.target.value)} />
+              </Field>
+              <Field label="Klasse">
+                <input className="field" placeholder="Klasse, z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
+              </Field>
+              <Field as="div" label="Zugangsschutz">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className={groupAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
+                    onClick={() => setGroupAccessMode("generated")}
+                  >
+                    Token generieren
+                  </button>
+                  <button
+                    type="button"
+                    className={groupAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
+                    onClick={() => setGroupAccessMode("manual")}
+                  >
+                    Eigenes Passwort
+                  </button>
+                </div>
+              </Field>
+              {groupAccessMode === "manual" ? (
+                <Field label="Klassenpasswort">
+                  <input
+                    className="field"
+                    type="password"
+                    placeholder="Klassenpasswort für Verschlüsselung"
+                    value={groupPassword}
+                    onChange={(event) => setGroupPassword(event.target.value)}
+                  />
+                </Field>
+              ) : (
+                <p className="status-note text-xs leading-5">
+                  Beim Anlegen wird automatisch ein starkes Security-Token erzeugt und direkt als Druckkarte angeboten.
+                </p>
+              )}
+              <button
+                type="button"
+                className="button-primary w-full gap-2"
+                onClick={async () => {
+                  if (!subject.trim() || !className.trim()) return;
+                  if (groupAccessMode === "manual" && !groupPassword.trim()) return;
+                  await onAddGroup(subject.trim(), className.trim(), {
+                    mode: groupAccessMode,
+                    password: groupAccessMode === "manual" ? groupPassword.trim() : undefined,
+                  });
+                  setSubject("");
+                  setClassName("");
+                  setGroupPassword("");
+                  setGroupAccessMode("generated");
+                }}
+              >
+                <PlusIcon />
+                Lerngruppe anlegen
+              </button>
             </div>
           </div>
         </Card>
@@ -682,11 +685,11 @@ export const StudentRosterPanel = ({
                                         <td className="px-4 py-3 align-top">{isUnlocked ? parsedName.firstName || "—" : "—"}</td>
                                         <td className="px-4 py-3 align-top">
                                           {student.isAbsent ? (
-                                            <span className="badge-amber inline-flex rounded-full px-3 py-1 text-xs font-semibold">abwesend</span>
+                                            <span className="badge-amber inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">abwesend</span>
                                           ) : isSelected ? (
-                                            <span className="badge-emerald inline-flex rounded-full px-3 py-1 text-xs font-semibold">ausgewählt</span>
+                                            <span className="badge-emerald inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">ausgewählt</span>
                                           ) : (
-                                            <span className="badge-slate inline-flex rounded-full px-3 py-1 text-xs font-semibold">aktiv</span>
+                                            <span className="badge-slate inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">aktiv</span>
                                           )}
                                         </td>
                                         <td className="px-4 py-3 align-top">
@@ -698,8 +701,8 @@ export const StudentRosterPanel = ({
                                                   ? "button-primary"
                                                   : "button-secondary"
                                               }`}
-                                              title="SuS-View öffnen"
-                                              aria-label={`SuS-View für ${student.alias} öffnen`}
+                                              title="Konferenzansicht öffnen"
+                                              aria-label={`Konferenzansicht für ${student.alias} öffnen`}
                                               aria-expanded={viewedStudent?.groupId === group.id && viewedStudent.studentId === student.id}
                                               onClick={() => openStudentPerformanceView(group.id, student.id)}
                                             >
@@ -754,6 +757,7 @@ export const StudentRosterPanel = ({
                                 group={group}
                                 student={viewedRecord}
                                 studentLabel={getStudentDisplayLabel(viewedRecord, namesByStudentId)}
+                                studentFullName={namesByStudentId?.[viewedRecord.id] ?? null}
                                 workspaces={workspaces}
                               />
                             </div>

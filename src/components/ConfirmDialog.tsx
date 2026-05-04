@@ -55,5 +55,5 @@ export const ConfirmDialog = ({
     return dialog;
   }
 
-  return createPortal(dialog, document.body);
+  return createPortal(dialog, document.fullscreenElement ?? document.body);
 };

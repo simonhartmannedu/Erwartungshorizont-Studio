@@ -1,7 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import { DraftWorkspace, StudentDatabase, StudentGroup, StudentRecord } from "../types";
 import { calculateExamSummary } from "../utils/calculations";
+import { resolveCommentTemplate } from "../utils/export";
 import { formatNumber } from "../utils/format";
 import { buildExamForStudent, getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
+import { FullscreenExitIcon, FullscreenIcon } from "./icons";
 import { Badge } from "./ui";
 
 type PerformanceStatus = "corrected" | "inProgress" | "uncorrected";
@@ -16,17 +19,18 @@ type PerformanceEntry = {
   achievedPoints: number;
   maxPoints: number;
   status: PerformanceStatus;
-  classAverage: number | null;
+  teacherComment: string;
+  groupAverage: number | null;
 };
 
 type CompetenceEntry = {
   id: string;
   label: string;
   percentage: number | null;
-  classAverage: number | null;
   achievedPoints: number;
   maxPoints: number;
   evidenceCount: number;
+  groupAverage: number | null;
 };
 
 interface Props {
@@ -34,6 +38,7 @@ interface Props {
   group: StudentGroup;
   student: StudentRecord;
   studentLabel: string;
+  studentFullName?: string | null;
   workspaces: DraftWorkspace[];
 }
 
@@ -52,12 +57,6 @@ const getWorkspaceDateInfo = (workspace: DraftWorkspace) => {
     label: Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("de-DE"),
     sortTime: Number.isNaN(date.getTime()) ? 0 : date.getTime(),
   };
-};
-
-const hasAnyTaskScore = (workspace: DraftWorkspace, database: StudentDatabase, studentId: string) => {
-  const taskIds = new Set(workspace.exam.sections.flatMap((section) => section.tasks.map((task) => task.id)));
-  const assessment = getStudentAssessment(database, studentId, workspace.id);
-  return Object.keys(assessment.taskScores).some((taskId) => taskIds.has(taskId));
 };
 
 const normalizeAreaKey = (value: string) =>
@@ -131,6 +130,30 @@ const getStudentAreaTotals = (
   return totals;
 };
 
+const getGroupAverage = (workspace: DraftWorkspace, database: StudentDatabase, group: StudentGroup) => {
+  const percentages = group.students
+    .filter((entry) => !entry.isAbsent)
+    .map((entry) => {
+      const assessment = getStudentAssessment(database, entry.id, workspace.id);
+      const hasScore = workspace.exam.sections.some((section) =>
+        section.tasks.some((task) => Object.prototype.hasOwnProperty.call(assessment.taskScores, task.id)),
+      );
+      if (!hasScore) return null;
+
+      const studentExam = buildExamForStudent(
+        workspace.exam,
+        database,
+        { groupId: group.id, studentId: entry.id },
+        workspace.id,
+      );
+      return calculateExamSummary(studentExam).finalPercentage;
+    })
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+  if (percentages.length === 0) return null;
+  return percentages.reduce((sum, value) => sum + value, 0) / percentages.length;
+};
+
 const buildCompetenceEntries = (
   workspaces: DraftWorkspace[],
   database: StudentDatabase,
@@ -139,46 +162,30 @@ const buildCompetenceEntries = (
 ): CompetenceEntry[] => {
   const areaDefinitions = getAreaDefinitions(workspaces, group.id);
   const studentTotals = getStudentAreaTotals(workspaces, database, group.id, student.id);
-  const classTotalsByStudent = group.students
+  const groupTotalsByStudent = group.students
     .filter((entry) => !entry.isAbsent)
     .map((entry) => getStudentAreaTotals(workspaces, database, group.id, entry.id));
 
   return areaDefinitions.map((area) => {
     const totals = studentTotals.get(area.id) ?? { achievedPoints: 0, maxPoints: 0, evidenceCount: 0 };
-    const classPercentages = classTotalsByStudent
-      .map((classTotals) => classTotals.get(area.id))
-      .filter((entry): entry is { achievedPoints: number; maxPoints: number; evidenceCount: number } => Boolean(entry && entry.maxPoints > 0))
+    const groupPercentages = groupTotalsByStudent
+      .map((entry) => entry.get(area.id))
+      .filter((entry): entry is { achievedPoints: number; maxPoints: number; evidenceCount: number } =>
+        Boolean(entry && entry.maxPoints > 0),
+      )
       .map((entry) => (entry.achievedPoints / entry.maxPoints) * 100);
 
     return {
       ...area,
       percentage: totals.maxPoints > 0 ? (totals.achievedPoints / totals.maxPoints) * 100 : null,
-      classAverage: classPercentages.length > 0
-        ? classPercentages.reduce((sum, value) => sum + value, 0) / classPercentages.length
-        : null,
       achievedPoints: totals.achievedPoints,
       maxPoints: totals.maxPoints,
       evidenceCount: totals.evidenceCount,
+      groupAverage: groupPercentages.length > 0
+        ? groupPercentages.reduce((sum, value) => sum + value, 0) / groupPercentages.length
+        : null,
     };
   });
-};
-
-const getClassAverage = (workspace: DraftWorkspace, database: StudentDatabase, group: StudentGroup) => {
-  const percentages = group.students
-    .filter((student) => !student.isAbsent && hasAnyTaskScore(workspace, database, student.id))
-    .map((student) => {
-      const studentExam = buildExamForStudent(
-        workspace.exam,
-        database,
-        { groupId: group.id, studentId: student.id },
-        workspace.id,
-      );
-      return calculateExamSummary(studentExam).finalPercentage;
-    })
-    .filter((value) => Number.isFinite(value));
-
-  if (percentages.length === 0) return null;
-  return percentages.reduce((sum, value) => sum + value, 0) / percentages.length;
 };
 
 const buildPerformanceEntries = (
@@ -186,6 +193,7 @@ const buildPerformanceEntries = (
   database: StudentDatabase,
   group: StudentGroup,
   student: StudentRecord,
+  studentFullName: string | null,
 ): PerformanceEntry[] =>
   workspaces
     .filter((workspace) => workspace.assignedGroupId === group.id)
@@ -211,7 +219,20 @@ const buildPerformanceEntries = (
         achievedPoints: summary.totalAchievedPoints,
         maxPoints: summary.totalMaxPoints,
         status,
-        classAverage: getClassAverage(workspace, database, group),
+        teacherComment: resolveCommentTemplate(assessment.teacherComment, {
+          alias: student.alias,
+          fullName: studentFullName,
+          subject: group.subject,
+          className: group.className,
+          examTitle: workspace.exam.meta.title,
+          examDate: workspace.exam.meta.examDate,
+          totalAchievedPoints: summary.totalAchievedPoints,
+          totalMaxPoints: summary.totalMaxPoints,
+          percentage: summary.finalPercentage,
+          gradeLabel: summary.grade.label,
+          gradeVerbalLabel: summary.grade.verbalLabel,
+        }).trim(),
+        groupAverage: getGroupAverage(workspace, database, group),
       };
     })
     .sort((left, right) => left.sortTime - right.sortTime);
@@ -258,9 +279,15 @@ const getShortAxisLabel = (value: string, index: number) => {
   return trimmed.length > 13 ? `${trimmed.slice(0, 12)}...` : trimmed;
 };
 
-const RadarGraph = ({ entries }: { entries: CompetenceEntry[] }) => {
+const RadarGraph = ({
+  entries,
+  showGroupComparison,
+}: {
+  entries: CompetenceEntry[];
+  showGroupComparison: boolean;
+}) => {
   const scoredEntries = entries.filter((entry) => entry.percentage !== null);
-  const averageEntries = entries.filter((entry) => entry.classAverage !== null);
+  const groupEntries = entries.filter((entry) => entry.groupAverage !== null);
 
   if (scoredEntries.length === 0) {
     return (
@@ -274,7 +301,7 @@ const RadarGraph = ({ entries }: { entries: CompetenceEntry[] }) => {
 
   return (
     <div className="student-performance-radar">
-      <svg viewBox="0 0 320 320" role="img" aria-label="Radar-Auswertung der Klausurleistungen">
+      <svg viewBox="0 0 320 320" role="img" aria-label="Individuelle Radar-Auswertung der Klausurleistungen">
         {gridLevels.map((level) => (
           <polygon
             key={level}
@@ -295,9 +322,9 @@ const RadarGraph = ({ entries }: { entries: CompetenceEntry[] }) => {
             />
           );
         })}
-        {averageEntries.length >= 3 ? (
+        {showGroupComparison && groupEntries.length >= 3 ? (
           <polygon
-            points={buildPoints(entries, (entry) => entry.classAverage ?? 0)}
+            points={buildPoints(entries, (entry) => entry.groupAverage ?? 0)}
             className="student-performance-radar-class"
           />
         ) : null}
@@ -331,8 +358,18 @@ const RadarGraph = ({ entries }: { entries: CompetenceEntry[] }) => {
   );
 };
 
-export const StudentPerformanceView = ({ database, group, student, studentLabel, workspaces }: Props) => {
-  const entries = buildPerformanceEntries(workspaces, database, group, student);
+export const StudentPerformanceView = ({
+  database,
+  group,
+  student,
+  studentLabel,
+  studentFullName = null,
+  workspaces,
+}: Props) => {
+  const [showGroupComparison, setShowGroupComparison] = useState(false);
+  const [isViewFullscreen, setIsViewFullscreen] = useState(false);
+  const viewRef = useRef<HTMLDivElement | null>(null);
+  const entries = buildPerformanceEntries(workspaces, database, group, student, studentFullName);
   const competenceEntries = buildCompetenceEntries(workspaces, database, group, student);
   const scoredCompetences = competenceEntries.filter((entry) => entry.percentage !== null);
   const scoredEntries = entries.filter((entry) => entry.status !== "uncorrected");
@@ -352,46 +389,117 @@ export const StudentPerformanceView = ({ database, group, student, studentLabel,
     (weakest, entry) => (!weakest || (entry.percentage ?? 101) < (weakest.percentage ?? 101) ? entry : weakest),
     null,
   );
+  const totalAchievedPoints = scoredEntries.reduce((sum, entry) => sum + entry.achievedPoints, 0);
+  const totalMaxPoints = scoredEntries.reduce((sum, entry) => sum + entry.maxPoints, 0);
+  const latestEntry = scoredEntries.reduce<PerformanceEntry | null>(
+    (latest, entry) => (!latest || entry.sortTime > latest.sortTime ? entry : latest),
+    null,
+  );
+  const fullscreenSupported = typeof document !== "undefined" && Boolean(document.fullscreenEnabled);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsViewFullscreen(document.fullscreenElement === viewRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    syncFullscreenState();
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    };
+  }, []);
+
+  const toggleViewFullscreen = () => {
+    if (!fullscreenSupported) return;
+
+    if (document.fullscreenElement === viewRef.current) {
+      void document.exitFullscreen();
+      return;
+    }
+
+    void viewRef.current?.requestFullscreen();
+  };
 
   return (
-    <div className="student-performance-view rounded-[28px] border p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div ref={viewRef} className="student-performance-view rounded-[28px] border p-4 sm:p-5">
+      <div className="student-performance-header flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="label">SuS-View</p>
+          <p className="label">Konferenzansicht</p>
           <h3 className="themed-strong text-lg font-semibold">{studentLabel}</h3>
           <p className="themed-muted mt-1 text-sm">
-            Radar nach den Aufgabenteil-Headern aus den zugewiesenen Klausuren im EWH-Editor.
+            Einzelansicht mit ausschließlich den Ergebnissen dieses Schülercodes.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge tone="slate">{entries.length} Klausuren</Badge>
           <Badge tone={scoredEntries.length > 0 ? "emerald" : "amber"}>{scoredEntries.length} mit Daten</Badge>
           <Badge tone={scoredCompetences.length > 0 ? "emerald" : "amber"}>{scoredCompetences.length} Bereiche</Badge>
+          <Badge tone={showGroupComparison ? "amber" : "emerald"}>
+            {showGroupComparison ? "Gruppenschnitt sichtbar" : "ohne Gruppendaten"}
+          </Badge>
+          <button
+            type="button"
+            className="button-secondary gap-2 px-3 py-2 text-xs"
+            onClick={toggleViewFullscreen}
+            disabled={!fullscreenSupported}
+            title={isViewFullscreen ? "Konferenzansicht verkleinern" : "Konferenzansicht im Vollbild öffnen"}
+            aria-label={isViewFullscreen ? "Konferenzansicht verkleinern" : "Konferenzansicht im Vollbild öffnen"}
+          >
+            {isViewFullscreen ? <FullscreenExitIcon className="h-4 w-4" /> : <FullscreenIcon className="h-4 w-4" />}
+            {isViewFullscreen ? "Vollbild aus" : "Vollbild"}
+          </button>
         </div>
       </div>
+      <div className="student-performance-compare surface-muted mt-4 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="themed-strong text-sm font-semibold">Vergleich einblenden</p>
+          <p className="themed-muted mt-1 text-xs leading-5">
+            Optionaler Gruppenschnitt für die aktive Lerngruppe. Standardmäßig bleibt die Ansicht individuell.
+          </p>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--app-text-strong)" }}>
+          <input
+            type="checkbox"
+            checked={showGroupComparison}
+            onChange={(event) => setShowGroupComparison(event.target.checked)}
+          />
+          Gruppenschnitt
+        </label>
+      </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
-        <div className="space-y-4">
+      <div className="student-performance-main mt-5 grid gap-5">
+        <div className="student-performance-details space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="surface-muted rounded-2xl p-3">
-              <p className="label">Ø Kompetenz</p>
-              <p className="themed-strong text-xl font-semibold">{scoredCompetences.length ? `${formatNumber(competenceAverage)} %` : "-"}</p>
+              <p className="label">Ø Ergebnis</p>
+              <p className="themed-strong text-xl font-semibold">{scoredEntries.length ? `${formatNumber(average)} %` : "-"}</p>
+              {latestEntry ? <p className="themed-muted mt-1 text-xs">Zuletzt: {latestEntry.label}</p> : null}
             </div>
             <div className="surface-muted rounded-2xl p-3">
-              <p className="label">Stärkster Bereich</p>
+              <p className="label">Gesamtpunkte</p>
+              <p className="themed-strong text-xl font-semibold">
+                {totalMaxPoints > 0 ? `${formatNumber(totalAchievedPoints)} / ${formatNumber(totalMaxPoints)}` : "-"}
+              </p>
+              {totalMaxPoints > 0 ? <p className="themed-muted mt-1 text-xs">{formatNumber(competenceAverage)} % Kompetenzschnitt</p> : null}
+            </div>
+            <div className="surface-muted rounded-2xl p-3">
+              <p className="label">Stärke</p>
               <p className="themed-strong text-sm font-semibold">{strongestCompetence ? strongestCompetence.label : "-"}</p>
               {strongestCompetence?.percentage != null ? <p className="themed-muted mt-1 text-sm">{formatNumber(strongestCompetence.percentage)} %</p> : null}
             </div>
-            <div className="surface-muted rounded-2xl p-3">
-              <p className="label">Schwächster Bereich</p>
+            <div className="surface-muted rounded-2xl p-3 sm:col-span-3 xl:col-span-1">
+              <p className="label">Nächster Fokus</p>
               <p className="themed-strong text-sm font-semibold">{weakestCompetence ? weakestCompetence.label : "-"}</p>
               {weakestCompetence?.percentage != null ? <p className="themed-muted mt-1 text-sm">{formatNumber(weakestCompetence.percentage)} %</p> : null}
             </div>
           </div>
 
           <div className="student-performance-legend flex flex-wrap gap-3 text-xs font-semibold">
-            <span><i className="student-performance-key student-performance-key-student" /> SuS</span>
-            <span><i className="student-performance-key student-performance-key-class" /> Klassenschnitt</span>
+            <span><i className="student-performance-key student-performance-key-student" /> Individuelles Ergebnis</span>
+            {showGroupComparison ? (
+              <span><i className="student-performance-key student-performance-key-class" /> Gruppenschnitt</span>
+            ) : null}
           </div>
 
           <div className="themed-table-shell overflow-hidden rounded-2xl border">
@@ -400,9 +508,9 @@ export const StudentPerformanceView = ({ database, group, student, studentLabel,
                 <thead className="themed-table-head">
                   <tr className="text-left text-xs uppercase tracking-[0.16em]">
                     <th className="px-4 py-3">Bereich</th>
-                    <th className="px-4 py-3 text-right">SuS</th>
-                    <th className="px-4 py-3 text-right">Klasse</th>
-                    <th className="px-4 py-3 text-right">Aufgaben</th>
+                    <th className="px-4 py-3 text-right">Ergebnis</th>
+                    {showGroupComparison ? <th className="px-4 py-3 text-right">Gruppe</th> : null}
+                    <th className="px-4 py-3 text-right">Belege</th>
                   </tr>
                 </thead>
                 <tbody className="themed-table-body">
@@ -423,9 +531,11 @@ export const StudentPerformanceView = ({ database, group, student, studentLabel,
                           </>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right align-top">
-                        {entry.classAverage === null ? "-" : `${formatNumber(entry.classAverage)} %`}
-                      </td>
+                      {showGroupComparison ? (
+                        <td className="px-4 py-3 text-right align-top">
+                          {entry.groupAverage === null ? "-" : `${formatNumber(entry.groupAverage)} %`}
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 text-right align-top">{entry.evidenceCount}</td>
                     </tr>
                   ))}
@@ -437,53 +547,66 @@ export const StudentPerformanceView = ({ database, group, student, studentLabel,
           <p className="themed-muted text-xs leading-5">
             Klausur-Ø: {scoredEntries.length ? `${formatNumber(average)} %` : "-"}.
             Die Bereichszuordnung nutzt die Abschnittsüberschriften der Klausuren, z. B. "Teil A: Leseverstehen".
+            {showGroupComparison
+              ? " Der Gruppenschnitt ist nur als Durchschnittswert der aktiven Lerngruppe eingeblendet."
+              : " Diese Ansicht enthält bewusst keine Vergleichswerte anderer Schüler:innen."}
           </p>
-
-          <div className="themed-table-shell overflow-hidden rounded-2xl border">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="themed-table-head">
-                  <tr className="text-left text-xs uppercase tracking-[0.16em]">
-                    <th className="px-4 py-3">Klausur</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">SuS</th>
-                    <th className="px-4 py-3 text-right">Klasse</th>
-                  </tr>
-                </thead>
-                <tbody className="themed-table-body">
-                  {entries.map((entry) => (
-                    <tr key={entry.workspaceId} className="themed-table-row">
-                      <td className="px-4 py-3 align-top">
-                        <p className="themed-strong font-semibold">{entry.label}</p>
-                        <p className="themed-muted mt-1 text-xs">{entry.dateLabel}</p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <Badge tone={getStatusTone(entry.status)}>{getStatusLabel(entry.status)}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right align-top">
-                        {entry.status === "uncorrected" ? (
-                          <span className="themed-muted">-</span>
-                        ) : (
-                          <>
-                            <p className="themed-strong font-semibold">{formatNumber(entry.percentage)} %</p>
-                            <p className="themed-muted mt-1 text-xs">
-                              {formatNumber(entry.achievedPoints)} / {formatNumber(entry.maxPoints)} P. · {entry.gradeDisplay}
-                            </p>
-                          </>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right align-top">
-                        {entry.classAverage === null ? "-" : `${formatNumber(entry.classAverage)} %`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
-        <RadarGraph entries={competenceEntries} />
+        <RadarGraph entries={competenceEntries} showGroupComparison={showGroupComparison} />
+
+        <div className="student-performance-history themed-table-shell overflow-hidden rounded-2xl border">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="themed-table-head">
+                <tr className="text-left text-xs uppercase tracking-[0.16em]">
+                  <th className="px-4 py-3">Klausur</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Ergebnis</th>
+                  {showGroupComparison ? <th className="px-4 py-3 text-right">Gruppe</th> : null}
+                  <th className="px-4 py-3">Kommentar</th>
+                </tr>
+              </thead>
+              <tbody className="themed-table-body">
+                {entries.map((entry) => (
+                  <tr key={entry.workspaceId} className="themed-table-row">
+                    <td className="px-4 py-3 align-top">
+                      <p className="themed-strong font-semibold">{entry.label}</p>
+                      <p className="themed-muted mt-1 text-xs">{entry.dateLabel}</p>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <Badge tone={getStatusTone(entry.status)}>{getStatusLabel(entry.status)}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      {entry.status === "uncorrected" ? (
+                        <span className="themed-muted">-</span>
+                      ) : (
+                        <>
+                          <p className="themed-strong font-semibold">{formatNumber(entry.percentage)} %</p>
+                          <p className="themed-muted mt-1 text-xs">
+                            {formatNumber(entry.achievedPoints)} / {formatNumber(entry.maxPoints)} P. · {entry.gradeDisplay}
+                          </p>
+                        </>
+                      )}
+                    </td>
+                    {showGroupComparison ? (
+                      <td className="px-4 py-3 text-right align-top">
+                        {entry.groupAverage === null ? "-" : `${formatNumber(entry.groupAverage)} %`}
+                      </td>
+                    ) : null}
+                    <td className="px-4 py-3 align-top">
+                      {entry.teacherComment ? (
+                        <p className="max-w-[32rem] whitespace-pre-wrap leading-6">{entry.teacherComment}</p>
+                      ) : (
+                        <span className="themed-muted">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

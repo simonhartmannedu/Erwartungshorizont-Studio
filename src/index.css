@@ -582,6 +582,23 @@
     color: var(--app-text);
   }
 
+  .app-shell {
+    background-color: var(--app-bg);
+    background-image: var(--app-bg-image);
+    color: var(--app-text);
+  }
+
+  .app-shell:fullscreen {
+    overflow: auto;
+    background-color: var(--app-bg);
+    background-image: var(--app-bg-image);
+  }
+
+  .app-shell:fullscreen::backdrop {
+    background-color: var(--app-bg);
+    background-image: var(--app-bg-image);
+  }
+
   input,
   textarea,
   select {
@@ -809,7 +826,7 @@
   }
 
   .hero-kicker {
-    @apply inline-flex rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em];
+    @apply inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold leading-none uppercase tracking-[0.22em];
     background: color-mix(in srgb, var(--app-secondary-hover) 82%, transparent);
     color: var(--app-label);
     box-shadow: var(--app-panel-shadow);
@@ -1278,6 +1295,85 @@
     color: var(--app-text);
   }
 
+  .student-performance-view:fullscreen {
+    display: flex;
+    height: 100vh;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 0;
+    background-color: var(--app-bg);
+    background-image:
+      radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--app-field-focus) 10%, transparent), transparent 34%),
+      var(--app-bg-image);
+  }
+
+  .student-performance-view:fullscreen::backdrop {
+    background-color: var(--app-bg);
+    background-image: var(--app-bg-image);
+  }
+
+  .student-performance-view:fullscreen .student-performance-header {
+    flex: 0 0 auto;
+  }
+
+  .student-performance-view:fullscreen .student-performance-header .themed-muted {
+    display: none;
+  }
+
+  .student-performance-view:fullscreen .student-performance-compare {
+    flex: 0 0 auto;
+    margin-top: 0.75rem;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .student-performance-view:fullscreen .student-performance-compare .themed-muted {
+    display: none;
+  }
+
+  .student-performance-main {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .student-performance-view:fullscreen .student-performance-main {
+    flex: 1 1 auto;
+    grid-template-areas:
+      "details"
+      "radar"
+      "history";
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+    margin-top: 0.75rem;
+    gap: 0.85rem;
+    align-items: stretch;
+  }
+
+  .student-performance-view:fullscreen .student-performance-details {
+    grid-area: details;
+    min-height: 0;
+  }
+
+  @media (min-width: 1280px) {
+    .student-performance-main {
+      grid-template-columns: minmax(0, 0.78fr) minmax(420px, 1.22fr);
+    }
+
+    .student-performance-history {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .student-performance-view:fullscreen .student-performance-main {
+      grid-template-areas:
+        "details radar"
+        "history radar";
+      grid-template-columns: minmax(0, 0.94fr) minmax(360px, 1.06fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+  }
+
   .student-performance-empty {
     border-color: var(--app-secondary-border);
     background: color-mix(in srgb, var(--app-secondary-hover) 72%, transparent);
@@ -1285,7 +1381,10 @@
   }
 
   .student-performance-radar {
-    min-height: 320px;
+    display: flex;
+    min-height: clamp(360px, 46vw, 620px);
+    align-items: center;
+    justify-content: center;
     border-radius: 1.5rem;
     border: 1px solid color-mix(in srgb, var(--app-field-focus) 14%, var(--app-border));
     background:
@@ -1294,11 +1393,33 @@
     padding: 0.75rem;
   }
 
+  .student-performance-view:fullscreen .student-performance-radar {
+    grid-area: radar;
+    min-height: 0;
+  }
+
   .student-performance-radar svg {
     display: block;
-    width: 100%;
-    height: min(58vw, 360px);
-    min-height: 300px;
+    width: min(100%, clamp(340px, 48vw, 660px));
+    height: auto;
+    aspect-ratio: 1;
+    max-height: calc(100vh - 13rem);
+  }
+
+  .student-performance-view:fullscreen .student-performance-radar svg {
+    width: min(100%, clamp(320px, 40vw, 560px));
+    max-height: min(100%, calc(100vh - 11rem));
+  }
+
+  .student-performance-view:fullscreen .student-performance-history {
+    grid-area: history;
+    min-height: 0;
+  }
+
+  .student-performance-view:fullscreen .student-performance-history th,
+  .student-performance-view:fullscreen .student-performance-history td {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   .student-performance-radar-grid {
@@ -2389,8 +2510,8 @@
   padding: 1rem 1.15rem;
   text-align: left;
   box-shadow:
-    0 10px 24px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 30%, transparent);
+    0 3px 8px color-mix(in srgb, var(--app-text-strong) 4%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -2403,8 +2524,8 @@
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--app-field-focus) 28%, var(--app-secondary-border-hover));
   box-shadow:
-    0 14px 30px color-mix(in srgb, var(--app-text-strong) 8%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 36%, transparent);
+    0 5px 12px color-mix(in srgb, var(--app-text-strong) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 30%, transparent);
 }
 
 .security-key-trigger:hover:not(:disabled) .security-key-trigger-key {
@@ -2429,7 +2550,7 @@
   outline: none;
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--app-field-ring) 92%, transparent),
-    0 10px 24px color-mix(in srgb, var(--app-text-strong) 7%, transparent);
+    0 3px 8px color-mix(in srgb, var(--app-text-strong) 4%, transparent);
 }
 
 .security-key-trigger:disabled {
@@ -2449,7 +2570,7 @@
     linear-gradient(160deg, color-mix(in srgb, var(--app-field-focus) 22%, white 78%), color-mix(in srgb, var(--app-panel-bg) 88%, var(--app-field-focus) 12%));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 50%, transparent),
-    0 10px 22px color-mix(in srgb, var(--app-field-focus) 15%, transparent);
+    0 4px 9px color-mix(in srgb, var(--app-field-focus) 8%, transparent);
   overflow: hidden;
 }
 
@@ -2487,7 +2608,7 @@
   border-radius: 9999px;
   background: color-mix(in srgb, var(--app-panel-bg) 88%, white 12%);
   color: var(--app-text-strong);
-  box-shadow: 0 5px 10px color-mix(in srgb, var(--app-text-strong) 8%, transparent);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--app-text-strong) 5%, transparent);
   animation: security-lock-bob 3.4s ease-in-out infinite;
   transition:
     color 180ms ease,
