@@ -14,7 +14,6 @@ interface Props {
   onSelectGroup: (groupId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onToggleStudentAbsent: (groupId: string, studentId: string, isAbsent: boolean) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   isSelectedGroupUnlocked: boolean;
   activeGroupIsProtected: boolean;
@@ -32,7 +31,6 @@ export const StudentSelectionPanel = ({
   onSelectGroup,
   onSelectWorkspace,
   onSelectStudent,
-  onToggleStudentAbsent,
   onRevealGroupStudentNames,
   isSelectedGroupUnlocked,
   activeGroupIsProtected,
@@ -86,9 +84,6 @@ export const StudentSelectionPanel = ({
       ),
     [activeExam, activeGroup?.students, activeWorkspaceId, database],
   );
-  const selectedStudentCorrectionStatus = selectedStudentRecord
-    ? studentCorrectionStatuses.get(selectedStudentRecord.id) ?? "uncorrected"
-    : "uncorrected";
   const getStudentDisplayLabel = (studentId: string, alias: string) => {
     const fullName = resolvedNamesByStudentId[studentId]?.trim();
     return fullName ? `${fullName} · ${alias}` : alias;
@@ -179,39 +174,11 @@ export const StudentSelectionPanel = ({
                 ))}
               </select>
             </Field>
-            <div className="surface-muted rounded-3xl p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="label">Auswahl</p>
-                  <p className="themed-strong text-lg font-semibold">
-                    {getStudentDisplayLabel(selectedStudentRecord.id, selectedStudentRecord.alias)}
-                  </p>
-                  <p className="themed-muted mt-1 text-sm">
-                    {activeGroup.subject} · {activeGroup.className}
-                  </p>
-                  <p className="mt-2 text-sm font-medium" style={{ color: "var(--app-text-strong)" }}>
-                    Status: {selectedStudentRecord.isAbsent ? "abwesend" : getCorrectionStatusLabel(selectedStudentCorrectionStatus)}
-                  </p>
-                  <label
-                    className="mt-3 flex items-center gap-2 text-sm"
-                    style={{ color: "var(--app-text-strong)" }}
-                    title="Abwesende Schüler werden in Statistiken und Korrekturquoten nicht berücksichtigt."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selectedStudentRecord.isAbsent)}
-                      onChange={(event) => onToggleStudentAbsent(activeGroup.id, selectedStudentRecord.id, event.target.checked)}
-                    />
-                    Abwesend
-                  </label>
-                </div>
-              </div>
-              {activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
-                <p className="warning-note mt-3 text-xs leading-5">
-                  Bewertungsdaten und Klarnamen bleiben gesperrt, bis du die aktive Klasse oben über das Schlüsselmodul entsperrst.
-                </p>
-              ) : null}
-            </div>
+            {activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
+              <p className="warning-note text-xs leading-5">
+                Bewertungsdaten und Klarnamen bleiben gesperrt, bis du die aktive Klasse oben über das Schlüsselmodul entsperrst.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-4">
