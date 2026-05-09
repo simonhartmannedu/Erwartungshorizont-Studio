@@ -110,6 +110,16 @@ import { SectionEditor } from "./components/SectionEditor";
 import { GradeScaleEditor } from "./components/GradeScaleEditor";
 import { SummaryPanel } from "./components/SummaryPanel";
 import { ClassOverviewPanel } from "./components/ClassOverviewPanel";
+import {
+  EDITOR_GRADE_RANGES_ANCHOR_ID,
+  EDITOR_GRADE_SCALE_ANCHOR_ID,
+  EDITOR_METADATA_ANCHOR_ID,
+  EDITOR_POINTS_ANCHOR_ID,
+  EDITOR_POINT_SCALING_ANCHOR_ID,
+  EDITOR_RESULT_ANCHOR_ID,
+  EditorToc,
+  getEditorSectionAnchorId,
+} from "./components/EditorToc";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -136,7 +146,6 @@ import {
 } from "./components/icons";
 import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
-import { playUiFeedback } from "./utils/feedback";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { ImportedExamSuggestion } from "./pdf/types";
 
@@ -161,6 +170,7 @@ type PendingTemplateLoad = {
   gradeScale: Exam["gradeScale"];
   meta: Exam["meta"];
   targetGroupId: string | null;
+  targetTotalPoints: number;
 };
 type PendingSectionTotalChange = {
   sectionId: string;
@@ -291,6 +301,8 @@ const visualThemeOptions: { value: VisualTheme; label: string }[] = [
   { value: "blaubeer-pommesbude", label: "Blaubeer-Pommesbude" },
   { value: "flieder-feierabend", label: "Flieder-Feierabend" },
   { value: "beamtensalon", label: "Beamtensalon" },
+  { value: "barrierefrei", label: "Barrierefrei" },
+  { value: "video-tutorial", label: "Video-Tutorial" },
 ];
 
 const orbitLedConfig: ReadonlyArray<{
@@ -765,14 +777,6 @@ function App() {
       pushNotice(notice.tone ?? "info", notice.title, notice.detail);
     }
   };
-
-  useEffect(() => {
-    if (!appNotice) return;
-
-    if (appNotice.tone === "success" || appNotice.tone === "warning" || appNotice.tone === "danger") {
-      playUiFeedback(appNotice.tone);
-    }
-  }, [appNotice]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1552,14 +1556,56 @@ function App() {
     },
   ) => {
     const normalizedExam = normalizeExamStructure(nextExam);
+    const assignedGroupId =
+      config.target === "new"
+        ? config.targetGroupId || activeGroupId || null
+        : activeGroupId || null;
 
     if (config.target === "current") {
-      setActiveWorkspaceExam(normalizedExam);
-      setActiveWorkspaceArchiveEntryId(null);
-      setActiveWorkspaceGroupId(activeGroupId || null);
+      const activeWorkspaceId = activeWorkspace?.id;
+      if (!activeWorkspaceId) return;
+
+      const nextBundle = {
+        ...draftBundle,
+        workspaces: draftBundle.workspaces.map((workspace) =>
+          workspace.id === activeWorkspaceId
+            ? {
+                ...workspace,
+                exam: normalizedExam,
+                activeArchiveEntryId: null,
+                assignedGroupId,
+                updatedAt: new Date().toISOString(),
+              }
+            : workspace,
+        ),
+      };
+      setDraftBundle(nextBundle);
+      void saveDraft(nextBundle);
+      lastVersionedExamByWorkspaceRef.current = {
+        ...lastVersionedExamByWorkspaceRef.current,
+        [activeWorkspaceId]: JSON.stringify(normalizedExam),
+      };
     } else {
-      const assignedGroupId = config.targetGroupId || activeGroupId || null;
-      addWorkspace(normalizedExam, { assignedGroupId });
+      const workspaceId = crypto.randomUUID();
+      const workspace = {
+        ...createDraftWorkspace(
+          normalizedExam,
+          createWorkspaceLabel(draftBundle.workspaces),
+          null,
+          assignedGroupId,
+        ),
+        id: workspaceId,
+      };
+      const nextBundle = {
+        activeWorkspaceId: workspace.id,
+        workspaces: [...draftBundle.workspaces, workspace],
+      };
+      setDraftBundle(nextBundle);
+      void saveDraft(nextBundle);
+      lastVersionedExamByWorkspaceRef.current = {
+        ...lastVersionedExamByWorkspaceRef.current,
+        [workspaceId]: JSON.stringify(normalizedExam),
+      };
       syncBuilderToGroup(assignedGroupId);
     }
 
@@ -1573,10 +1619,10 @@ function App() {
       "success",
       config.target === "current" ? config.currentTitle : config.newTitle,
       config.target === "current"
-        ? config.currentDetail
+        ? `${config.currentDetail} Der EWH wurde gespeichert und im Editor geöffnet.`
         : assignedGroup
-          ? config.newDetail.replace("{group}", `${assignedGroup.subject} · ${assignedGroup.className}`)
-          : config.newDetail.replace(" für {group}", ""),
+          ? `${config.newDetail.replace("{group}", `${assignedGroup.subject} · ${assignedGroup.className}`)} Der EWH wurde gespeichert und im Editor geöffnet.`
+          : `${config.newDetail.replace(" für {group}", "")} Der EWH wurde gespeichert und im Editor geöffnet.`,
     );
   };
 
@@ -1971,8 +2017,9 @@ function App() {
     gradeScale: Exam["gradeScale"],
     meta: Exam["meta"],
     targetGroupId: string | null,
+    targetTotalPoints: number = template.totalPoints,
   ) => {
-    const nextExam = normalizeExamStructure(
+    const templateExam = normalizeExamStructure(
       withExamMeta(
         {
           ...template.build(),
@@ -1981,6 +2028,7 @@ function App() {
         meta,
       ),
     );
+    const nextExam = normalizeExamStructure(scaleExamPoints(templateExam, targetTotalPoints, false));
     commitBuiltExam(nextExam, {
       target,
       targetGroupId,
@@ -3142,7 +3190,7 @@ function App() {
         ) : null}
 
         <div className="mb-6 no-print">
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-3 overflow-x-auto py-1">
             <div role="tablist" aria-label="Hauptbereiche" className="flex gap-3">
               {tabs.map((tab) => (
                 <button
@@ -3406,24 +3454,26 @@ function App() {
               className="space-y-6"
             >
             {activeTab === "builder" && (
-              <Card title="Metadaten" subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft.">
-                <ExamHeaderForm
-                  meta={exam.meta}
-                  disabled={!activeWorkspace}
-                  onChange={(key, value) =>
-                    setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
-                  }
-                />
-                {!activeWorkspace ? (
-                  <div className="surface-muted mt-4 rounded-2xl p-4">
-                    <p className="label">Noch kein EWH zugeordnet</p>
-                    <p className="themed-muted mt-2 text-sm leading-6">
-                      Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
-                      bis du einen EWH per Wizard anlegst oder eine Vorlage zuweist.
-                    </p>
-                  </div>
-                ) : null}
-              </Card>
+              <div id={EDITOR_METADATA_ANCHOR_ID} className="scroll-mt-24">
+                <Card title="Metadaten" subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft.">
+                  <ExamHeaderForm
+                    meta={exam.meta}
+                    disabled={!activeWorkspace}
+                    onChange={(key, value) =>
+                      setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
+                    }
+                  />
+                  {!activeWorkspace ? (
+                    <div className="surface-muted mt-4 rounded-2xl p-4">
+                      <p className="label">Noch kein EWH zugeordnet</p>
+                      <p className="themed-muted mt-2 text-sm leading-6">
+                        Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
+                        bis du einen EWH per Wizard anlegst oder eine Vorlage zuweist.
+                      </p>
+                    </div>
+                  ) : null}
+                </Card>
+              </div>
             )}
             </div>
 
@@ -3465,14 +3515,15 @@ function App() {
                     weight: section.weight,
                     description: section.description,
                   }))}
-                  onSelectTemplate={(template, target, gradeScale, meta, targetGroupId) => {
-                    setTemplateToLoad({
+                  onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
+                    applyTemplate(
                       template,
                       target,
                       gradeScale,
-                      meta: { ...meta },
+                      { ...meta },
                       targetGroupId,
-                    });
+                      targetTotalPoints,
+                    );
                   }}
                   onApplyManualStructure={applyGuidedBuilderStructure}
                   onApplyPdfSuggestion={applyImportedExamSuggestion}
@@ -3485,7 +3536,7 @@ function App() {
             {activeTab === "builder" && (
               <>
                 {activeWorkspace ? (
-                  <>
+                  <div id={EDITOR_POINTS_ANCHOR_ID} className="scroll-mt-24 space-y-6">
                     <Card
                       title="Punkte und Note"
                       subtitle="Skaliere bei Bedarf die Gesamtpunktzahl und passe darunter den Notenschlüssel an. Die Gesamtnote wird weiterhin direkt über die erreichten Gesamtpunkte berechnet."
@@ -3503,9 +3554,9 @@ function App() {
                     >
                       {!pointsAndGradeSectionCollapsed && (
                         <>
-                          <section aria-labelledby="point-scaling-heading">
+                          <section aria-labelledby={EDITOR_POINT_SCALING_ANCHOR_ID}>
                             <div className="mb-4">
-                              <h3 id="point-scaling-heading" className="subsection-title text-lg font-semibold">
+                              <h3 id={EDITOR_POINT_SCALING_ANCHOR_ID} className="scroll-mt-24 subsection-title text-lg font-semibold">
                                 Gesamtpunktzahl skalieren
                               </h3>
                               <p className="subsection-copy mt-1 text-sm leading-6">
@@ -3525,10 +3576,10 @@ function App() {
                             <hr className="section-divider w-[90%]" />
                           </div>
 
-                          <section aria-labelledby="grade-scale-heading">
+                          <section aria-labelledby={EDITOR_GRADE_SCALE_ANCHOR_ID}>
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                               <div>
-                                <h3 id="grade-scale-heading" className="subsection-title text-lg font-semibold">
+                                <h3 id={EDITOR_GRADE_SCALE_ANCHOR_ID} className="scroll-mt-24 subsection-title text-lg font-semibold">
                                   Notenschlüssel bearbeiten
                                 </h3>
                                 <p className="subsection-copy mt-1 text-sm leading-6">
@@ -3563,12 +3614,14 @@ function App() {
                             <hr className="section-divider w-[90%]" />
                           </div>
 
-                          <GradeScaleRangeSection
-                            exam={displayExam}
-                            totalMaxPoints={summary.totalMaxPoints}
-                            title="Notenbereiche"
-                            subtitle="Ausgeschriebene Punktespannen je Note auf Basis der aktuellen Gesamtpunktzahl."
-                          />
+                          <div id={EDITOR_GRADE_RANGES_ANCHOR_ID} className="scroll-mt-24">
+                            <GradeScaleRangeSection
+                              exam={displayExam}
+                              totalMaxPoints={summary.totalMaxPoints}
+                              title="Notenbereiche"
+                              subtitle="Ausgeschriebene Punktespannen je Note auf Basis der aktuellen Gesamtpunktzahl."
+                            />
+                          </div>
                         </>
                       )}
                     </Card>
@@ -3590,7 +3643,7 @@ function App() {
                         }
                       />
                     )}
-                  </>
+                  </div>
                 ) : (
                   <Card
                     title="Punkte und Note"
@@ -3623,6 +3676,35 @@ function App() {
                   </Card>
                 )}
 
+                {activeWorkspace ? (
+                  <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-3xl border px-4 py-3 surface-muted">
+                    <div>
+                      <p className="label">Abschnitte</p>
+                      <p className="themed-muted text-sm">
+                        {displayExam.sections.length} Bereiche · {displayExam.sections.reduce((sum, section) => sum + section.tasks.length, 0)} Unteraufgaben
+                      </p>
+                    </div>
+                    <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1">
+                      <button
+                        type="button"
+                        className="button-secondary gap-2 px-3 py-2 text-xs"
+                        onClick={() => setCollapsedSectionIds(displayExam.sections.map((section) => section.id))}
+                      >
+                        <ChevronRightIcon className="h-4 w-4" />
+                        Alle zuklappen
+                      </button>
+                      <button
+                        type="button"
+                        className="button-secondary gap-2 px-3 py-2 text-xs"
+                        onClick={() => setCollapsedSectionIds([])}
+                      >
+                        <ChevronDownIcon className="h-4 w-4" />
+                        Alle aufklappen
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 {activeWorkspace && displayExam.sections.map((section, index) => {
                   const nextSection = displayExam.sections[index + 1];
                   const isLinkedLead = isLinkedSectionLeader(displayExam.sections, index);
@@ -3632,72 +3714,78 @@ function App() {
                   }
 
                   const renderSectionEditor = (entry: typeof section, entryIndex: number) => (
-                    <SectionEditor
+                    <div
                       key={entry.id}
-                      section={entry}
-                      index={entryIndex}
-                      targetPointsFromWeight={sectionPointTargets.get(entry.id) ?? null}
-                      draggable
-                      isDragging={draggedSectionId === entry.id}
-                      collapsed={collapsedSectionIds.includes(entry.id)}
-                      dropIndicatorPosition={sectionDropIndicator?.targetSectionId === entry.id ? sectionDropIndicator.position : null}
-                      onDragStart={() => {
-                        setDraggedSectionId(entry.id);
-                        setSectionDropIndicator(null);
-                      }}
-                      onDragEnd={() => {
-                        setDraggedSectionId(null);
-                        setSectionDropIndicator(null);
-                      }}
-                      onDragOver={handleDragOverSection}
-                      onDrop={handleDropSection}
-                      onChange={(patch) => updateSection(entry.id, patch)}
-                      onWeightChange={(value) => rebalanceSectionWeight(entry.id, value)}
-                      onTotalPointsChange={(value) => requestSectionTotalChange(entry.id, value)}
-                      onToggleCollapse={() =>
-                        setCollapsedSectionIds((current) =>
-                          current.includes(entry.id)
-                            ? current.filter((id) => id !== entry.id)
-                            : [...current, entry.id],
-                        )
-                      }
-                      onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
-                      scoresLocked={assessmentLocked}
-                      onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
-                      onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
-                      onDuplicate={() => duplicateSection(entry.id)}
-                      onMove={(direction) => moveSection(entry.id, direction)}
-                      linkedSectionTitle={
-                        (() => {
-                          const partnerIndex = getLinkedSectionPartnerIndex(displayExam.sections, entryIndex);
-                          return partnerIndex === -1 ? null : displayExam.sections[partnerIndex]?.title ?? null;
-                        })()
-                      }
-                      linkTargetTitle={
-                        displayExam.sections[entryIndex + 1] && !displayExam.sections[entryIndex + 1]?.linkedSectionId
-                          ? displayExam.sections[entryIndex + 1]?.title ?? null
-                          : displayExam.sections[entryIndex - 1] && !displayExam.sections[entryIndex - 1]?.linkedSectionId
-                            ? displayExam.sections[entryIndex - 1]?.title ?? null
-                            : null
-                      }
-                      onToggleLink={() => toggleSectionLink(entry.id)}
-                      onDeleteTask={(taskId) =>
-                        updateSection(entry.id, {
-                          tasks: exam.sections[entryIndex].tasks.filter((task) => task.id !== taskId),
-                        })
-                      }
-                      onDuplicateTask={(taskId) => duplicateTask(entry.id, taskId)}
-                      onMoveTask={(taskId, direction) => {
-                        const taskIndex = exam.sections[entryIndex].tasks.findIndex((task) => task.id === taskId);
-                        updateSection(entry.id, {
-                          tasks: reorder(
-                            exam.sections[entryIndex].tasks,
-                            taskIndex,
-                            direction === "up" ? taskIndex - 1 : taskIndex + 1,
-                          ),
-                        });
-                      }}
-                    />
+                      id={getEditorSectionAnchorId(entry.id)}
+                      data-editor-anchor={getEditorSectionAnchorId(entry.id)}
+                      className="scroll-mt-24"
+                    >
+                      <SectionEditor
+                        section={entry}
+                        index={entryIndex}
+                        targetPointsFromWeight={sectionPointTargets.get(entry.id) ?? null}
+                        draggable
+                        isDragging={draggedSectionId === entry.id}
+                        collapsed={collapsedSectionIds.includes(entry.id)}
+                        dropIndicatorPosition={sectionDropIndicator?.targetSectionId === entry.id ? sectionDropIndicator.position : null}
+                        onDragStart={() => {
+                          setDraggedSectionId(entry.id);
+                          setSectionDropIndicator(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedSectionId(null);
+                          setSectionDropIndicator(null);
+                        }}
+                        onDragOver={handleDragOverSection}
+                        onDrop={handleDropSection}
+                        onChange={(patch) => updateSection(entry.id, patch)}
+                        onWeightChange={(value) => rebalanceSectionWeight(entry.id, value)}
+                        onTotalPointsChange={(value) => requestSectionTotalChange(entry.id, value)}
+                        onToggleCollapse={() =>
+                          setCollapsedSectionIds((current) =>
+                            current.includes(entry.id)
+                              ? current.filter((id) => id !== entry.id)
+                              : [...current, entry.id],
+                          )
+                        }
+                        onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
+                        scoresLocked={assessmentLocked}
+                        onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
+                        onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
+                        onDuplicate={() => duplicateSection(entry.id)}
+                        onMove={(direction) => moveSection(entry.id, direction)}
+                        linkedSectionTitle={
+                          (() => {
+                            const partnerIndex = getLinkedSectionPartnerIndex(displayExam.sections, entryIndex);
+                            return partnerIndex === -1 ? null : displayExam.sections[partnerIndex]?.title ?? null;
+                          })()
+                        }
+                        linkTargetTitle={
+                          displayExam.sections[entryIndex + 1] && !displayExam.sections[entryIndex + 1]?.linkedSectionId
+                            ? displayExam.sections[entryIndex + 1]?.title ?? null
+                            : displayExam.sections[entryIndex - 1] && !displayExam.sections[entryIndex - 1]?.linkedSectionId
+                              ? displayExam.sections[entryIndex - 1]?.title ?? null
+                              : null
+                        }
+                        onToggleLink={() => toggleSectionLink(entry.id)}
+                        onDeleteTask={(taskId) =>
+                          updateSection(entry.id, {
+                            tasks: exam.sections[entryIndex].tasks.filter((task) => task.id !== taskId),
+                          })
+                        }
+                        onDuplicateTask={(taskId) => duplicateTask(entry.id, taskId)}
+                        onMoveTask={(taskId, direction) => {
+                          const taskIndex = exam.sections[entryIndex].tasks.findIndex((task) => task.id === taskId);
+                          updateSection(entry.id, {
+                            tasks: reorder(
+                              exam.sections[entryIndex].tasks,
+                              taskIndex,
+                              direction === "up" ? taskIndex - 1 : taskIndex + 1,
+                            ),
+                          });
+                        }}
+                      />
+                    </div>
                   );
 
                   if (!isLinkedLead) {
@@ -3747,28 +3835,30 @@ function App() {
                       <hr className="section-divider w-[90%]" />
                     </div>
 
-                    <Card
-                      title="Ergebnis und Abschlussbereich"
-                      subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
-                    >
-                      <ReportSummarySection
-                        exam={displayExam}
-                        summary={summary}
-                        teacherComment={activeAssessment?.teacherComment ?? ""}
-                        commentPreview={resolvedTeacherCommentPreview}
-                        signatureDataUrl={activeSignatureDataUrl}
-                        onTeacherCommentChange={
-                          activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
-                            ? handleTeacherCommentChange
-                            : undefined
-                        }
-                        onSignatureChange={
-                          activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
-                            ? handleSignatureChange
-                            : undefined
-                        }
-                      />
-                    </Card>
+                    <div id={EDITOR_RESULT_ANCHOR_ID} className="scroll-mt-24">
+                      <Card
+                        title="Ergebnis und Abschlussbereich"
+                        subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
+                      >
+                        <ReportSummarySection
+                          exam={displayExam}
+                          summary={summary}
+                          teacherComment={activeAssessment?.teacherComment ?? ""}
+                          commentPreview={resolvedTeacherCommentPreview}
+                          signatureDataUrl={activeSignatureDataUrl}
+                          onTeacherCommentChange={
+                            activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                              ? handleTeacherCommentChange
+                              : undefined
+                          }
+                          onSignatureChange={
+                            activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                              ? handleSignatureChange
+                              : undefined
+                          }
+                        />
+                      </Card>
+                    </div>
                   </>
                 ) : null}
               </>
@@ -3845,6 +3935,12 @@ function App() {
               locked={assessmentLocked}
               correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
             />
+            {activeTab === "builder" && activeWorkspace ? (
+              <EditorToc
+                sections={displayExam.sections}
+                showPointSubsections={!pointsAndGradeSectionCollapsed}
+              />
+            ) : null}
             {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
           </aside>
         </div>
@@ -4019,6 +4115,7 @@ function App() {
             templateToLoad.gradeScale,
             templateToLoad.meta,
             templateToLoad.targetGroupId,
+            templateToLoad.targetTotalPoints,
           )
         }
         onSaveAndConfirm={() => {
@@ -4030,6 +4127,7 @@ function App() {
               templateToLoad.gradeScale,
               templateToLoad.meta,
               templateToLoad.targetGroupId,
+              templateToLoad.targetTotalPoints,
             );
           }
         }}

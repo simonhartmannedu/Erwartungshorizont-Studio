@@ -6,6 +6,7 @@ import { getSectionRecommendation } from "../utils/sectionWeights";
 import { getWritingLanguageMetrics } from "../utils/writing";
 import { ChevronDownIcon, ChevronRightIcon, DragIcon, DuplicateIcon, LinkIcon, TrashIcon, UnlinkIcon } from "./icons";
 import { Badge, Card, DismissibleCallout, Field, IconButton, NumberInput, TextAreaField } from "./ui";
+import { getEditorTaskAnchorId } from "./EditorToc";
 import { TaskTable } from "./TaskTable";
 
 const SECTION_TONES = {
@@ -310,6 +311,7 @@ export const SectionEditor = ({
         <TaskTable
           tasks={section.tasks}
           scoresLocked={scoresLocked}
+          getTaskAnchorId={(task) => getEditorTaskAnchorId(section.id, task.id)}
           onChange={onTaskChange}
           onAdd={onAddTask}
           onDelete={onDeleteTask}

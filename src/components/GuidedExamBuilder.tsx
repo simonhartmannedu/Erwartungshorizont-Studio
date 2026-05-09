@@ -37,6 +37,7 @@ interface Props {
     gradeScale: GradeScale,
     meta: ExamMeta,
     targetGroupId: string | null,
+    targetTotalPoints: number,
   ) => void;
   onApplyManualStructure: (config: {
     totalPoints: number;
@@ -75,7 +76,7 @@ const createFallbackSections = () =>
 const stepLabels = (source: GuidedBuilderSource) => {
   switch (source) {
     case "template":
-      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Vorlage"];
+      return ["Vorlage wählen", "Rahmendaten", "Speichern & öffnen"];
     case "pdf":
       return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "PDF-Import"];
     case "manual":
@@ -105,7 +106,7 @@ export const GuidedExamBuilder = ({
   const [step, setStep] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>("new");
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
-  const [source, setSource] = useState<GuidedBuilderSource>("manual");
+  const [source, setSource] = useState<GuidedBuilderSource>("template");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
   const [customSubject, setCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
@@ -150,7 +151,9 @@ export const GuidedExamBuilder = ({
     () => matchingTemplates.find((template) => template.id === selectedTemplateId) ?? null,
     [matchingTemplates, selectedTemplateId],
   );
+  const recommendedTemplate = selectedTemplate ?? matchingTemplates[0] ?? null;
   const activeStepLabels = stepLabels(source);
+  const activeProgressIndex = source === "template" ? (step >= 8 ? 2 : step >= 6 ? 1 : 0) : step;
 
   useEffect(() => {
     const preset = guidance.preset;
@@ -180,6 +183,24 @@ export const GuidedExamBuilder = ({
       setSelectedTemplateId(null);
     }
   }, [matchingTemplates, selectedTemplateId]);
+
+  useEffect(() => {
+    if (source !== "template" || !recommendedTemplate) return;
+    setTotalPoints(recommendedTemplate.totalPoints);
+    setGradeScale((current) =>
+      applyNotengeneratorGradeScale(
+        current,
+        recommendedTemplate.totalPoints,
+        {
+          thresholdPercent: schoolStage === "sek1" ? 50 : 45,
+          accumulationMode: "middle",
+          useHalfPoints: false,
+          showTendency: true,
+          recommendedStage: schoolStage,
+        },
+      ),
+    );
+  }, [recommendedTemplate, schoolStage, source]);
 
   useEffect(() => {
     setMetaDraft({ ...initialMeta });
@@ -219,6 +240,24 @@ export const GuidedExamBuilder = ({
     setSectionDrafts(buildSectionDrafts(guidance.preset.sections));
   };
 
+  const updateTotalPoints = (value: number) => {
+    const nextTotal = Math.max(1, Math.round(value * 2) / 2);
+    setTotalPoints(nextTotal);
+    setGradeScale((current) =>
+      applyNotengeneratorGradeScale(
+        current,
+        nextTotal,
+        {
+          thresholdPercent: schoolStage === "sek1" ? 50 : 45,
+          accumulationMode: "middle",
+          useHalfPoints: false,
+          showTendency: true,
+          recommendedStage: schoolStage,
+        },
+      ),
+    );
+  };
+
   const choiceButtonClass = (active: boolean) =>
     `${active ? "button-primary" : "button-secondary"} w-full justify-start p-4 text-left`;
 
@@ -240,8 +279,8 @@ export const GuidedExamBuilder = ({
   };
 
   const renderStepBadge = (label: string, index: number) => {
-    const isActive = step === index;
-    const isVisible = index <= step;
+    const isActive = activeProgressIndex === index;
+    const isVisible = index <= activeProgressIndex;
     return (
       <span
         key={label}
@@ -258,56 +297,184 @@ export const GuidedExamBuilder = ({
 
   return (
     <div ref={builderRef}>
-      <Card
-        title="EWH-Builder"
-        subtitle="Geführter Einstieg mit Fachwahl, NRW-Regelcheck und anschließendem Aufbau im EWH-Editor."
-        headerLayout="stacked"
-      >
+      <Card>
+        <div className="builder-visual-header mb-6" aria-label="Erwartungshorizont-Wizard">
+          <div className="builder-launch-orbit builder-visual-orbit" aria-hidden="true">
+            <div className="builder-launch-ring builder-launch-ring-primary" />
+            <div className="builder-launch-ring builder-launch-ring-secondary" />
+            <div className="builder-launch-ring builder-launch-ring-tertiary" />
+            <div className="builder-launch-point builder-launch-point-a" />
+            <div className="builder-launch-point builder-launch-point-b" />
+            <div className="builder-launch-point builder-launch-point-c" />
+            <div className="builder-launch-core">
+              <span className="builder-launch-core-text">EWH</span>
+            </div>
+          </div>
+        </div>
         <div className="mb-6 flex flex-wrap gap-2">
           {activeStepLabels.map((label, index) => renderStepBadge(label, index))}
         </div>
 
         {step === 0 && (
           <div className="space-y-6">
-          <section className="builder-launch-shell">
-            <div className="builder-launch-grid">
-              <button type="button" className="builder-launch-orbit-button" onClick={() => goToStep(1)}>
-                <div className="builder-launch-orbit" aria-hidden="true">
-                  <div className="builder-launch-ring builder-launch-ring-primary" />
-                  <div className="builder-launch-ring builder-launch-ring-secondary" />
-                  <div className="builder-launch-ring builder-launch-ring-tertiary" />
-                  <div className="builder-launch-point builder-launch-point-a" />
-                  <div className="builder-launch-point builder-launch-point-b" />
-                  <div className="builder-launch-point builder-launch-point-c" />
-                  <div className="builder-launch-core">
-                    <span className="builder-launch-core-text">EWH</span>
-                  </div>
-                </div>
-              </button>
-
-              <div className="builder-launch-copy">
-                <p className="builder-launch-kicker">Wizard-Startpunkt</p>
-                <h3 className="builder-launch-title">Erwartungshorizont mit NRW-Regelcheck vorbereiten</h3>
-                <p className="builder-launch-text">
-                  Der Builder startet mit Fach und Schulstufe, zieht daraus die recherchierten NRW-Regeln für Sek I
-                  oder Sek II und führt dich danach Schritt für Schritt in den bestehenden Aufbau.
+          <section className="surface-muted rounded-3xl p-5">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div>
+                <p className="label">Schnellstart</p>
+                <h3 className="themed-strong mt-2 text-xl font-semibold">Vorlage wählen, speichern, im Editor weiterarbeiten</h3>
+                <p className="status-note mt-3 text-sm leading-6">
+                  Der Regelcheck bleibt als Hintergrundhilfe erhalten. Der primäre Weg ist jetzt: Fach und Stufe
+                  wählen, passende Vorlage übernehmen und den Erwartungshorizont anschließend im Editor anpassen.
                 </p>
-                <div className="builder-launch-status" role="status" aria-live="polite">
-                  <span className="builder-launch-status-dot" />
-                  Stand der Quellenrecherche: 19.04.2026
-                </div>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button type="button" className="button-primary" onClick={() => goToStep(1)}>
-                    Startpunkt öffnen
-                  </button>
-                </div>
+              </div>
+              <div className="space-y-3">
+                <Field label="Fach">
+                  <select
+                    className="field"
+                    value={selectedSubject}
+                    onChange={(event) => setSelectedSubject(event.target.value)}
+                  >
+                    {subjectCards.map((subjectOption) => (
+                      <option key={subjectOption} value={subjectOption}>
+                        {subjectOption === "__custom__" ? "Eigenes Fach" : subjectOption}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {selectedSubject === "__custom__" && (
+                  <Field label="Eigenes Fach">
+                    <input
+                      className="field"
+                      placeholder="z. B. Physik, Politik, Biologie"
+                      value={customSubject}
+                      onChange={(event) => setCustomSubject(event.target.value)}
+                    />
+                  </Field>
+                )}
+                <Field label="Stufe">
+                  <select
+                    className="field"
+                    value={schoolStage}
+                    onChange={(event) => setSchoolStage(event.target.value as BuilderSchoolStage)}
+                  >
+                    <option value="sek1">Sekundarstufe I</option>
+                    <option value="sek2">Sekundarstufe II</option>
+                  </select>
+                </Field>
+                <Field
+                  label="Zielpunktzahl"
+                  hint="Die Vorlage wird proportional auf diese Punktzahl skaliert und kann später im Editor weiter angepasst werden."
+                >
+                  <NumberInput
+                    className="field"
+                    value={totalPoints}
+                    min={1}
+                    step={0.5}
+                    onCommit={updateTotalPoints}
+                  />
+                </Field>
               </div>
             </div>
           </section>
 
-          <DismissibleCallout resetKey={step}>
-            Recherchierte Rechts- und Hinweislage basiert auf den offiziellen NRW-Seiten aus BASS und
-            Standardsicherung. Schulinterne Fachkonferenz- und Schulkonferenzbeschlüsse bleiben zusätzlich verbindlich.
+          <div className="grid gap-4 md:grid-cols-2">
+            <button type="button" className={choiceButtonClass(target === "new")} onClick={() => setTarget("new")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <PlusIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>Neue Klassenarbeit</strong>
+                  <br />
+                  Erstellt einen neuen Workspace und öffnet ihn direkt im EWH-Editor.
+                </span>
+              </span>
+            </button>
+            <button type="button" className={choiceButtonClass(target === "current")} onClick={() => setTarget("current")}>
+              <span className="flex items-start gap-3">
+                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
+                  <ReplaceIcon className="h-5 w-5" />
+                </span>
+                <span>
+                  <strong>Aktuelle ersetzen</strong>
+                  <br />
+                  Übernimmt die Vorlage in die gerade geöffnete Klassenarbeit.
+                </span>
+              </span>
+            </button>
+          </div>
+
+          {target === "new" && (
+            groups.length > 0 ? (
+              <Field label="Lerngruppe">
+                <select className="field" value={targetGroupId} onChange={(event) => setTargetGroupId(event.target.value)}>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.subject} · {group.className}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <DismissibleCallout tone="warning" resetKey="guided-builder-no-groups-quick">
+                Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden.
+              </DismissibleCallout>
+            )
+          )}
+
+          {matchingTemplates.length > 0 ? (
+            <div className="grid gap-4 xl:grid-cols-3">
+              {matchingTemplates.slice(0, 6).map((template, index) => {
+                const isSelected = selectedTemplateId ? selectedTemplateId === template.id : index === 0;
+                return (
+                  <ExamTemplatePreviewCard
+                    key={template.id}
+                    template={template}
+                    actionLabel={isSelected ? "Gewählte Vorlage" : "Vorlage auswählen"}
+                    selected={isSelected}
+                    onLoad={() => setSelectedTemplateId(template.id)}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-quick`} tone="info">
+              Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es aktuell keine spezifische Vorlage.
+              Du kannst stattdessen den manuellen Aufbau oder den PDF-Import öffnen.
+            </DismissibleCallout>
+          )}
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <button type="button" className="button-secondary" onClick={() => goToStep(6)}>
+                Details vorher anpassen
+              </button>
+              <button type="button" className="button-secondary" onClick={() => goToStep(1)}>
+                Manuellen Aufbau oder PDF wählen
+              </button>
+            </div>
+            <button
+              type="button"
+              className="button-primary w-full lg:w-auto"
+              disabled={!recommendedTemplate || !resolvedSubject || (target === "new" && !targetGroupId)}
+              onClick={() =>
+                recommendedTemplate &&
+                onSelectTemplate(
+                  recommendedTemplate,
+                  target,
+                  gradeScale,
+                  metaDraft,
+                  target === "new" ? targetGroupId || null : null,
+                  totalPoints,
+                )
+              }
+            >
+              Fertigstellen, speichern und im EWH-Editor öffnen
+            </button>
+          </div>
+
+          <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-rules-note`}>
+            Kurzfassung aus dem Regelcheck: {guidance.planningBullets[0] ?? guidance.stageSummary}
           </DismissibleCallout>
         </div>
         )}
@@ -615,7 +782,7 @@ export const GuidedExamBuilder = ({
           />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(5)}>
+            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(source === "template" ? 0 : 5)}>
               Zurück
             </button>
             <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(7)}>
@@ -843,15 +1010,18 @@ export const GuidedExamBuilder = ({
                 Notenschlüssel werden beim Laden aus dem Wizard übernommen.
               </DismissibleCallout>
               <div className="grid gap-4 xl:grid-cols-3">
-                {matchingTemplates.map((template) => (
-                  <ExamTemplatePreviewCard
-                    key={template.id}
-                    template={template}
-                    actionLabel={selectedTemplateId === template.id ? "Vorlage gewählt" : "Vorlage auswählen"}
-                    selected={selectedTemplateId === template.id}
-                    onLoad={() => setSelectedTemplateId(template.id)}
-                  />
-                ))}
+                {matchingTemplates.map((template, index) => {
+                  const isSelected = selectedTemplateId ? selectedTemplateId === template.id : index === 0;
+                  return (
+                    <ExamTemplatePreviewCard
+                      key={template.id}
+                      template={template}
+                      actionLabel={isSelected ? "Vorlage gewählt" : "Vorlage auswählen"}
+                      selected={isSelected}
+                      onLoad={() => setSelectedTemplateId(template.id)}
+                    />
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -868,19 +1038,20 @@ export const GuidedExamBuilder = ({
             <button
               type="button"
               className="button-primary w-full sm:w-auto"
-              disabled={!selectedTemplate || (target === "new" && !targetGroupId)}
+              disabled={!recommendedTemplate || (target === "new" && !targetGroupId)}
               onClick={() =>
-                selectedTemplate &&
+                recommendedTemplate &&
                 onSelectTemplate(
-                  selectedTemplate,
+                  recommendedTemplate,
                   target,
                   gradeScale,
                   metaDraft,
                   target === "new" ? targetGroupId || null : null,
+                  totalPoints,
                 )
               }
             >
-              Mit Vorlage in EWH-Editor
+              Fertigstellen, speichern und im EWH-Editor öffnen
             </button>
           </div>
         </div>
