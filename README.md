@@ -6,6 +6,8 @@ It is designed for teachers who need a practical workflow around exams: build th
 
 Current status: working Vite/React application with local persistence, encrypted student data, guided EWH creation, class correction workflows, archive reuse, PDF/CSV/backup exports, and a static demo mode. It is a personal, source-available tool rather than a polished multi-user product.
 
+Probably 70% Vibe Coded.
+
 ![Erwartungshorizont-Studio screenshot](erwartungshorizontstudio.png)
 
 ## Documentation
