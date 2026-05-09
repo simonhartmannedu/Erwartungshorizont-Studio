@@ -83,7 +83,6 @@ import {
   scrubSensitiveAssessmentsForGroups,
   scaleTaskScoresForStudents,
   setStudentOrderInGroup,
-  updateStudentAbsentStatus,
   updateGroupDefaultSignature,
   updateStudentScore,
   updateStudentSignature,
@@ -2310,10 +2309,6 @@ function App() {
     });
   };
 
-  const handleToggleStudentAbsent = (groupId: string, studentId: string, isAbsent: boolean) => {
-    setStudentDatabase((current) => updateStudentAbsentStatus(current, groupId, studentId, isAbsent));
-  };
-
   const handleRemoveGroup = (groupId: string) => {
     setStudentDatabase((current) => removeStudentGroup(current, groupId));
     setDraftBundle((current) => ({
@@ -3396,7 +3391,6 @@ function App() {
                 setActiveTab("builder");
               }}
               onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
-              onToggleStudentAbsent={handleToggleStudentAbsent}
               onRevealGroupStudentNames={handleRevealGroupStudentNames}
               isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
               activeGroupIsProtected={activeGroupIsProtected}
