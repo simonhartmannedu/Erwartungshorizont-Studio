@@ -5,6 +5,7 @@ import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
 interface Props {
   tasks: Task[];
   scoresLocked?: boolean;
+  getTaskAnchorId?: (task: Task) => string;
   onChange: (taskId: string, patch: Partial<Task>) => void;
   onAdd: () => void;
   onDelete: (taskId: string) => void;
@@ -15,6 +16,7 @@ interface Props {
 export const TaskTable = ({
   tasks,
   scoresLocked = false,
+  getTaskAnchorId,
   onChange,
   onAdd,
   onDelete,
@@ -24,7 +26,11 @@ export const TaskTable = ({
   <div className="space-y-4">
     <div className="space-y-3 md:hidden">
       {tasks.map((task, index) => (
-        <div key={task.id} className="surface-elevated rounded-3xl border p-4">
+        <div
+          key={task.id}
+          data-editor-anchor={getTaskAnchorId?.(task)}
+          className="surface-elevated scroll-mt-24 rounded-3xl border p-4"
+        >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="label !mb-1">Unteraufgabe</p>
@@ -110,7 +116,11 @@ export const TaskTable = ({
             </thead>
             <tbody className="themed-table-body">
               {tasks.map((task) => (
-                <tr key={task.id} className="themed-table-row align-top">
+                <tr
+                  key={task.id}
+                  data-editor-anchor={getTaskAnchorId?.(task)}
+                  className="themed-table-row scroll-mt-24 align-top"
+                >
                   <td className="px-3 py-3">
                     <div className="space-y-2">
                       <p className="themed-muted text-[11px] font-semibold uppercase tracking-[0.16em]">

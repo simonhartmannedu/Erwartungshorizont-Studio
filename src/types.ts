@@ -11,7 +11,9 @@ export type VisualTheme =
   | "waldmeister-schorle"
   | "blaubeer-pommesbude"
   | "flieder-feierabend"
-  | "beamtensalon";
+  | "beamtensalon"
+  | "barrierefrei"
+  | "video-tutorial";
 
 export interface ExamMeta {
   schoolYear: string;

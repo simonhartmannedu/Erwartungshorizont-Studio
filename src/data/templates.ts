@@ -119,6 +119,7 @@ export interface ExamTemplateDefinition {
   subject: string;
   schoolStage: BuilderSchoolStage;
   focus: TemplateFocus;
+  totalPoints: number;
   title: string;
   shortLabel: string;
   description: string;
@@ -136,6 +137,7 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
   subject: blueprint.subject,
   schoolStage: blueprint.schoolStage,
   focus: blueprint.focus,
+  totalPoints: blueprint.totalPoints,
   title: blueprint.title,
   shortLabel: blueprint.shortLabel,
   description: blueprint.description,
@@ -794,21 +796,21 @@ const sek2Blueprints: TemplateBlueprint[] = [
     focus: "general",
     title: "Englisch Sek II · Klausur",
     shortLabel: "E Sek II",
-    description: "GOSt-Vorlage mit Input, Writing Task, Language Performance und Transfer.",
-    pedagogicalHint: "Die Struktur funktioniert für klassische Oberstufenklausuren ebenso wie für klausurähnliche Vorabiturformate.",
+    description: "GOSt-Vorlage mit abiturorientierter 150-Punkte-Struktur für Q-Phase-Klausuren vor Q2.2.",
+    pedagogicalHint: "Die Struktur folgt der Standardsicherung-Logik für Q-Phase-Englisch: Hörverstehen plus Schreiben/Leseverstehen ergibt 150 Punkte. EF und schulinterne Klausuren können niedriger skaliert werden.",
     metaTitle: "Englisch-Klausur GOSt",
     unit: "Input, writing task and language performance",
     notes:
       "GOSt-Vorlage Englisch. Inputteil kann als reading, listening oder mediation angelegt werden; language performance bleibt getrennt sichtbar.",
     gradeLevel: "Q1",
     course: "GK",
-    totalPoints: 120,
+    totalPoints: 150,
     sections: [
       {
-        title: "Teil A: Rezeption und Input",
-        points: 30,
-        description: "Reading, listening oder mediation als materialgebundene Basis.",
-        note: "Für Hörverstehen oder Sprachmittlung nur Titel und Aufgabenhinweis anpassen.",
+        title: "Teil A: Hörverstehen / Input",
+        points: 40,
+        description: "Hörverstehen oder materialgebundener Rezeptionsauftakt.",
+        note: "Für Klausuren ohne Hörverstehen kann dieser Block im Editor umbenannt oder niedriger gewichtet werden.",
         tasks: [
           {
             title: "Comprehension",
@@ -823,9 +825,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         ],
       },
       {
-        title: "Teil B: Writing Task",
-        points: 40,
-        description: "Operatorengeleitete Textproduktion auf Oberstufenniveau.",
+        title: "Teil B: Schreiben / Leseverstehen · Inhalt",
+        points: 44,
+        description: "Inhaltliche Leistung der operatorengeleiteten Textarbeit.",
         note: "Geeignet für comment, article, speech, analysis, re-creation oder mediation product.",
         tasks: [
           {
@@ -846,8 +848,8 @@ const sek2Blueprints: TemplateBlueprint[] = [
         ],
       },
       {
-        title: "Teil C: Language Performance",
-        points: 30,
+        title: "Teil C: Darstellungsleistung / Sprache",
+        points: 66,
         description: "Range, accuracy, register and cohesion separately assess.",
         note: "Der Sprachblock sollte nicht im Inhaltsblock aufgehen.",
         tasks: [
@@ -865,24 +867,6 @@ const sek2Blueprints: TemplateBlueprint[] = [
             title: "Cohesion and style",
             description: "Assess linking, flow and stylistic control of the text.",
             expectation: "The text is coherent, readable and stylistically controlled.",
-          },
-        ],
-      },
-      {
-        title: "Teil D: Transfer / Reflection",
-        points: 20,
-        description: "Comment, contextual transfer or reflective continuation.",
-        note: "Kann auch zur Vorabiturstruktur oder zu materialgestütztem Transfer passen.",
-        tasks: [
-          {
-            title: "Contextual transfer",
-            description: "Relate the material or task outcome to a broader context.",
-            expectation: "The transfer is purposeful and grounded in the material.",
-          },
-          {
-            title: "Reflection",
-            description: "Develop a clear and justified final position or reflection.",
-            expectation: "Reflection is relevant, differentiated and task-focused.",
           },
         ],
       },
@@ -1301,80 +1285,90 @@ const abiturBlueprints: TemplateBlueprint[] = [
     focus: "abitur",
     title: "Englisch Abitur · Vorabitur / Abi-ready",
     shortLabel: "E Abi",
-    description: "Abiturnahe Englischvorlage mit reading/listening input, writing task, language performance und reflection.",
-    pedagogicalHint: "Gedacht für Q2, Vorabitur und klausurnahe Abiturvorbereitung mit klar getrenntem Language-Performance-Block.",
+    description: "Abiturnahe Englischvorlage mit Hörverstehen, Sprachmittlung und Schreiben/Leseverstehen nach 200-Punkte-Logik.",
+    pedagogicalHint: "Gedacht für Q2.2, Vorabitur und Klausuren unter Abiturbedingungen: 40 Punkte Hörverstehen, 50 Punkte Sprachmittlung, 110 Punkte Schreiben/Leseverstehen.",
     metaTitle: "Englisch-Vorabitur / Abiturtraining",
     unit: "Abiturorientierter Input und writing task",
     notes:
-      "Abiturorientierte Englisch-Vorlage. Inputteil kann reading, listening oder mediation sein; Bewertungsraster an die aktuelle Aufgabenart anpassen.",
+      "Abiturorientierte Englisch-Vorlage nach Standardsicherung NRW ab Abitur 2025: Hörverstehen 40 BE, Sprachmittlung 50 BE, Schreiben/Leseverstehen integriert 110 BE. Für EF oder frühere Q-Phase bei Bedarf skalieren.",
     gradeLevel: "Q2",
     course: "GK / LK",
-    totalPoints: 120,
+    totalPoints: 200,
     sections: [
       {
-        title: "Teil A: Input and analysis",
-        points: 30,
-        description: "Abiturtypischer Inputteil mit analytischem Zugriff.",
-        note: "Bei Hörverstehen oder Mediation Titel und Hinweise entsprechend umbenennen.",
-        tasks: [
-          {
-            title: "Comprehension and selection",
-            description: "Relevant ideas and information from the source identify and select.",
-            expectation: "The selected information is accurate and task-related.",
-          },
-          {
-            title: "Analytical reading/listening",
-            description: "Message, perspective or strategy of the source analyse.",
-            expectation: "The analysis remains focused, text-based and conceptually clear.",
-          },
-        ],
-      },
-      {
-        title: "Teil B: Writing task",
+        title: "Teil A: Hörverstehen",
         points: 40,
-        description: "Abiturnahe Textproduktion nach operatorengeleiteter Aufgabenstellung.",
-        note: "Für comment, speech, article, analysis, re-creation oder mediation product geeignet.",
+        description: "Isolierter Klausurteil Hörverstehen.",
+        note: "Im Abitur und in Q2.2-Klausuren unter Abiturbedingungen zuerst bearbeiten und einsammeln.",
         tasks: [
           {
-            title: "Content and line of argument",
-            description: "Develop a clear and fully task-related response.",
-            expectation: "The response addresses the operator and all task aspects convincingly.",
+            title: "Listening comprehension",
+            description: "Global and detailed information from audio material identify.",
+            expectation: "Answers show accurate understanding of the listening material.",
           },
           {
-            title: "Text construction",
-            description: "Build a coherent text with functional paragraphing and progression.",
-            expectation: "The text remains consistently structured and reader-oriented.",
+            title: "Listening tasks",
+            description: "Complete closed, semi-open or short-answer tasks as required.",
+            expectation: "Responses are precise, evidence-based and task-related.",
           },
         ],
       },
       {
-        title: "Teil C: Language performance",
-        points: 30,
-        description: "Accuracy, range, register and cohesion as explicit assessment area.",
-        note: "Dieser Block ist für abi-nahe Transparenz besonders wichtig.",
+        title: "Teil B: Sprachmittlung",
+        points: 50,
+        description: "Isolierter Klausurteil Sprachmittlung.",
+        note: "Im Abitur ab 2025 mit 20 Punkten Inhalt und 30 Punkten Darstellungsleistung/sprachliche Leistung.",
         tasks: [
           {
-            title: "Accuracy and range",
-            description: "Assess grammatical control and lexical range on Oberstufenniveau.",
-            expectation: "The text shows secure language control with differentiated expression.",
+            title: "Mediation content",
+            description: "Select and transfer relevant information for the target situation.",
+            expectation: "The mediation product is accurate, purposeful and audience-oriented.",
           },
           {
-            title: "Register and style",
-            description: "Assess suitability of style, register and cohesion for the task.",
-            expectation: "Language choices support audience, purpose and readability.",
+            title: "Mediation language",
+            description: "Use appropriate register, structure and language for the target text.",
+            expectation: "Language and text construction support the communicative task.",
           },
         ],
       },
       {
-        title: "Teil D: Reflection / transfer",
-        points: 20,
-        description: "Contextual reflection or transfer in an abiturtypischer final part.",
-        note: "Kann auch die abschließende Evaluation oder Weiterführung tragen.",
+        title: "Teil C: Schreiben / Leseverstehen · Inhalt",
+        points: 44,
+        description: "Inhaltliche Leistung im integrierten Schreiben/Leseverstehen.",
+        note: "Die drei Teilaufgaben können je nach konkreter Aufgabenstellung unterschiedlich verteilt werden.",
         tasks: [
           {
-            title: "Reflection",
-            description: "Develop a differentiated final reflection or context-based transfer.",
-            expectation: "The reflection extends the task meaningfully and stays well reasoned.",
+            title: "Comprehension",
+            description: "Summarise or select central aspects of the source text.",
+            expectation: "The response secures source understanding accurately and concisely.",
+          },
+          {
+            title: "Analysis",
+            description: "Analyse message, perspective, strategy or language of the source.",
+            expectation: "The analysis is text-based, coherent and conceptually precise.",
+          },
+          {
+            title: "Evaluation / re-creation",
+            description: "Develop an evaluative, creative or context-based final task.",
+            expectation: "The final response is differentiated, task-related and well reasoned.",
+          },
+        ],
+      },
+      {
+        title: "Teil D: Darstellungsleistung / Sprache",
+        points: 66,
+        description: "Sprachliche Leistung im integrierten Schreiben/Leseverstehen.",
+        note: "Standardsicherung weist diesen Bereich mit 66 Punkten aus.",
+        tasks: [
+          {
+            title: "Communicative text design",
+            description: "Assess audience orientation, text type, structure and coherence.",
+            expectation: "The text is coherent, purposeful and functionally structured.",
+          },
+          {
+            title: "Range and accuracy",
+            description: "Assess vocabulary, grammar, sentence structure and orthography.",
+            expectation: "Language is accurate, differentiated and appropriate to the task.",
           },
         ],
       },

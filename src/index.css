@@ -575,6 +575,142 @@
     --app-selection-text: #ffffff;
   }
 
+  :root[data-theme="barrierefrei"] {
+    --app-bg: #ffffff;
+    --app-bg-image: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%);
+    --app-text: #111827;
+    --app-text-strong: #000000;
+    --app-text-muted: #374151;
+    --app-border: rgba(0, 0, 0, 0.18);
+    --app-border-default: #6b7280;
+    --app-panel-bg: #ffffff;
+    --app-panel-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    --app-field-bg: #ffffff;
+    --app-field-border: #4b5563;
+    --app-field-focus: #005fcc;
+    --app-field-ring: rgba(0, 95, 204, 0.4);
+    --app-label: #1f2937;
+    --app-primary-bg: #000000;
+    --app-primary-text: #ffffff;
+    --app-primary-hover: #1f2937;
+    --app-primary-border-hover: #005fcc;
+    --app-primary-ring: rgba(0, 95, 204, 0.48);
+    --app-secondary-bg: #ffffff;
+    --app-secondary-text: #000000;
+    --app-secondary-border: #4b5563;
+    --app-secondary-hover: #eef2ff;
+    --app-secondary-border-hover: #005fcc;
+    --app-secondary-ring: rgba(0, 95, 204, 0.34);
+    --app-soft-bg: #fff7cc;
+    --app-soft-text: #4a3500;
+    --app-soft-hover: #ffe780;
+    --app-soft-ring: rgba(180, 120, 0, 0.34);
+    --app-selection-bg: #ffdf45;
+    --app-selection-text: #000000;
+  }
+
+  :root.dark[data-theme="barrierefrei"] {
+    --app-bg: #000000;
+    --app-bg-image: linear-gradient(180deg, #000000 0%, #111111 100%);
+    --app-text: #f3f4f6;
+    --app-text-strong: #ffffff;
+    --app-text-muted: #d1d5db;
+    --app-border: rgba(255, 255, 255, 0.28);
+    --app-border-default: #9ca3af;
+    --app-panel-bg: #0b0b0b;
+    --app-panel-shadow: 0 8px 22px rgba(0, 0, 0, 0.72);
+    --app-field-bg: #000000;
+    --app-field-border: #d1d5db;
+    --app-field-focus: #75b8ff;
+    --app-field-ring: rgba(117, 184, 255, 0.38);
+    --app-label: #e5e7eb;
+    --app-primary-bg: #ffffff;
+    --app-primary-text: #000000;
+    --app-primary-hover: #e5e7eb;
+    --app-primary-border-hover: #75b8ff;
+    --app-primary-ring: rgba(117, 184, 255, 0.4);
+    --app-secondary-bg: #111111;
+    --app-secondary-text: #ffffff;
+    --app-secondary-border: #d1d5db;
+    --app-secondary-hover: #1f2937;
+    --app-secondary-border-hover: #75b8ff;
+    --app-secondary-ring: rgba(117, 184, 255, 0.3);
+    --app-soft-bg: #ffe45c;
+    --app-soft-text: #151000;
+    --app-soft-hover: #fff08f;
+    --app-soft-ring: rgba(255, 228, 92, 0.34);
+    --app-selection-bg: #75b8ff;
+    --app-selection-text: #000000;
+  }
+
+  :root[data-theme="video-tutorial"] {
+    --app-bg: #f5f7fb;
+    --app-bg-image: linear-gradient(180deg, #ffffff 0%, #eef3fb 100%);
+    --app-text: #243042;
+    --app-text-strong: #0b1220;
+    --app-text-muted: #536171;
+    --app-border: rgba(11, 18, 32, 0.08);
+    --app-border-default: #d5dde8;
+    --app-panel-bg: rgba(255, 255, 255, 0.98);
+    --app-panel-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+    --app-field-bg: #ffffff;
+    --app-field-border: #c5cfdd;
+    --app-field-focus: #2563eb;
+    --app-field-ring: rgba(37, 99, 235, 0.22);
+    --app-label: #536171;
+    --app-primary-bg: #1d4ed8;
+    --app-primary-text: #ffffff;
+    --app-primary-hover: #1e40af;
+    --app-primary-border-hover: #60a5fa;
+    --app-primary-ring: rgba(37, 99, 235, 0.26);
+    --app-secondary-bg: #ffffff;
+    --app-secondary-text: #1f2937;
+    --app-secondary-border: #c5cfdd;
+    --app-secondary-hover: #eef4ff;
+    --app-secondary-border-hover: #93b4f4;
+    --app-secondary-ring: rgba(37, 99, 235, 0.16);
+    --app-soft-bg: #e6f6f1;
+    --app-soft-text: #006a55;
+    --app-soft-hover: #d6f0e9;
+    --app-soft-ring: rgba(0, 106, 85, 0.18);
+    --app-selection-bg: #bfdbfe;
+    --app-selection-text: #0b1220;
+  }
+
+  :root.dark[data-theme="video-tutorial"] {
+    --app-bg: #0f172a;
+    --app-bg-image: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+    --app-text: #e5edf7;
+    --app-text-strong: #ffffff;
+    --app-text-muted: #bac7d8;
+    --app-border: rgba(226, 232, 240, 0.16);
+    --app-border-default: #475569;
+    --app-panel-bg: rgba(17, 24, 39, 0.98);
+    --app-panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --app-field-bg: #0b1120;
+    --app-field-border: #64748b;
+    --app-field-focus: #93c5fd;
+    --app-field-ring: rgba(147, 197, 253, 0.24);
+    --app-label: #bac7d8;
+    --app-primary-bg: #93c5fd;
+    --app-primary-text: #08111f;
+    --app-primary-hover: #bfdbfe;
+    --app-primary-border-hover: #60a5fa;
+    --app-primary-ring: rgba(147, 197, 253, 0.28);
+    --app-secondary-bg: #111827;
+    --app-secondary-text: #e5edf7;
+    --app-secondary-border: #64748b;
+    --app-secondary-hover: #1e293b;
+    --app-secondary-border-hover: #93c5fd;
+    --app-secondary-ring: rgba(147, 197, 253, 0.18);
+    --app-soft-bg: rgba(45, 212, 191, 0.16);
+    --app-soft-text: #99f6e4;
+    --app-soft-hover: rgba(45, 212, 191, 0.24);
+    --app-soft-ring: rgba(45, 212, 191, 0.2);
+    --app-selection-bg: rgba(147, 197, 253, 0.38);
+    --app-selection-text: #ffffff;
+  }
+
   body {
     @apply min-h-screen font-sans antialiased transition-colors;
     background-color: var(--app-bg);
@@ -613,7 +749,7 @@
 
 @layer components {
   .panel {
-    @apply rounded-3xl border backdrop-blur-xl transition-[border-color,box-shadow,transform] duration-200 ease-out;
+    @apply rounded-3xl border backdrop-blur-xl transition-[border-color,box-shadow] duration-200 ease-out;
     border-color: var(--app-border);
     background: var(--app-panel-bg);
     box-shadow: var(--app-panel-shadow);
@@ -624,7 +760,6 @@
     box-shadow:
       0 18px 44px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
       0 0 0 1px color-mix(in srgb, var(--app-field-focus) 5%, transparent);
-    transform: translateY(-0.5px);
   }
 
   .field {
@@ -938,6 +1073,103 @@
   .control-cluster {
     border-color: var(--app-secondary-border);
     background: color-mix(in srgb, var(--app-secondary-hover) 82%, transparent);
+  }
+
+  .editor-toc {
+    position: relative;
+    max-height: min(34rem, calc(100vh - 14rem));
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .editor-toc::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--app-field-focus) 8%, transparent),
+      transparent 42%
+    );
+  }
+
+  .editor-toc > * {
+    position: relative;
+  }
+
+  .editor-toc-icon {
+    background: color-mix(in srgb, var(--app-soft-bg) 86%, transparent);
+    color: var(--app-soft-text);
+  }
+
+  .editor-toc ul {
+    border-color: var(--app-secondary-border);
+  }
+
+  .editor-toc-link {
+    @apply relative flex min-w-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-150 ease-out focus:outline-none;
+    color: var(--app-text-muted);
+  }
+
+  .editor-toc-number {
+    @apply shrink-0 text-right text-[11px] font-semibold tabular-nums;
+    min-width: 1.45rem;
+    color: var(--app-label);
+  }
+
+  .editor-toc-meta {
+    margin-top: 0.12rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--app-label);
+  }
+
+  .editor-toc-link:hover,
+  .editor-toc-link:focus-visible {
+    background: color-mix(in srgb, var(--app-secondary-hover) 88%, transparent);
+    color: var(--app-text-strong);
+    transform: translateX(2px);
+  }
+
+  .editor-toc-link:focus-visible {
+    box-shadow: 0 0 0 2px var(--app-secondary-ring);
+  }
+
+  .editor-toc-link-active {
+    background: color-mix(in srgb, var(--app-field-focus) 14%, var(--app-secondary-bg));
+    color: var(--app-text-strong);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 26%, transparent);
+  }
+
+  .editor-toc-link-active .editor-toc-number {
+    color: var(--app-soft-text);
+  }
+
+  .editor-toc-link-active::before {
+    content: "";
+    position: absolute;
+    left: 0.45rem;
+    top: 50%;
+    height: 1rem;
+    width: 0.2rem;
+    border-radius: 999px;
+    background: var(--app-field-focus);
+    transform: translateY(-50%);
+  }
+
+  .editor-toc-link-child {
+    @apply py-1.5 pl-3 text-xs;
+  }
+
+  .editor-toc-link-child .editor-toc-number {
+    min-width: 2rem;
+    font-size: 0.68rem;
+  }
+
+  .editor-toc-link-child .editor-toc-meta {
+    font-size: 0.64rem;
   }
 
   .section-insert-line {
@@ -1277,13 +1509,11 @@
     background: color-mix(in srgb, var(--app-secondary-bg) 96%, transparent);
     color: var(--app-text);
     transition:
-      transform 160ms ease-out,
       box-shadow 160ms ease-out,
       border-color 160ms ease-out;
   }
 
   .template-preview-item:hover {
-    transform: translateY(-1px);
     box-shadow: 0 12px 26px color-mix(in srgb, var(--app-text-strong) 8%, transparent);
   }
 
@@ -2323,6 +2553,26 @@
       color-mix(in srgb, var(--app-secondary-hover) 80%, transparent) 100%
     );
   box-shadow: var(--app-panel-shadow);
+}
+
+.builder-visual-header {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.builder-visual-orbit {
+  width: min(168px, 46vw);
+}
+
+.builder-visual-orbit .builder-launch-point {
+  width: 0.55rem;
+  height: 0.55rem;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-field-focus) 10%, transparent);
+}
+
+.builder-visual-orbit .builder-launch-core-text {
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
 }
 
 .builder-launch-grid {
