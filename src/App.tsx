@@ -246,9 +246,37 @@ type PendingImportPreview =
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
 const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
-const DEMO_SEED_VERSION = "student-demo-v2";
+const DEMO_GROUP_PASSWORD = "demo";
+const DEMO_SEED_VERSION = "student-demo-v3";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
+const DEMO_STUDENT_NAMES = [
+  "Berger, Lina",
+  "Schneider, Noah",
+  "Kaya, Elif",
+  "Mertens, Jonas",
+  "Nguyen, Minh",
+  "Hoffmann, Clara",
+  "Yilmaz, Arda",
+  "Weber, Sophie",
+  "Fischer, Ben",
+  "Klein, Mia",
+  "Wagner, Leon",
+  "Roth, Emma",
+  "Becker, Paul",
+  "Schulz, Hanna",
+  "Neumann, Felix",
+  "Ali, Samira",
+  "Krause, Tim",
+  "Bauer, Marie",
+  "Wolf, Elias",
+  "Jansen, Lotta",
+  "Koch, Anton",
+  "Peters, Mila",
+  "Hartmann, Oskar",
+  "Lehmann, Amelie",
+  "Simon, Theo",
+];
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 const shouldForceDemoSeed = runtimeQuery.get("resetDemo") === "1" || runtimeQuery.get("freshDemo") === "1";
@@ -607,19 +635,16 @@ function App() {
       ],
     };
   };
-  const createDemoStudentDatabase = (workspace: DraftWorkspace): StudentDatabase => {
-    const placeholderEncryptedName = {
-      ciphertext: "demo",
-      iv: "demo",
-      salt: "demo",
-    };
-    const students = Array.from({ length: 25 }, (_, index) => ({
-      id: `demo-student-${index + 1}`,
-      alias: `Student ${index + 1}`,
-      encryptedName: placeholderEncryptedName,
-      isAbsent: index === 24,
-      createdAt: DEMO_TIMESTAMP,
-    }));
+  const createDemoStudentDatabase = async (workspace: DraftWorkspace): Promise<StudentDatabase> => {
+    const students = await Promise.all(
+      DEMO_STUDENT_NAMES.map(async (fullName, index) => ({
+        id: `demo-student-${index + 1}`,
+        alias: `Student ${index + 1}`,
+        encryptedName: await encryptText(fullName, DEMO_GROUP_PASSWORD),
+        isAbsent: index === DEMO_STUDENT_NAMES.length - 1,
+        createdAt: DEMO_TIMESTAMP,
+      })),
+    );
     const tasks = workspace.exam.sections.flatMap((section) => section.tasks);
     const snapScore = (value: number, maxPoints: number) =>
       Math.min(maxPoints, Math.max(0, Math.round(value * 2) / 2));
@@ -654,14 +679,14 @@ function App() {
       }),
     );
 
-    return {
+    const database: StudentDatabase = {
       version: 1,
       groups: [
         {
           id: DEMO_GROUP_ID,
           subject: "Englisch",
           className: "8b Demo",
-          passwordVerifier: null,
+          passwordVerifier: await createPasswordVerifier(DEMO_GROUP_ID, DEMO_GROUP_PASSWORD),
           defaultSignatureDataUrl: null,
           students,
           createdAt: DEMO_TIMESTAMP,
@@ -671,6 +696,10 @@ function App() {
       assessments,
       updatedAt: DEMO_TIMESTAMP,
     };
+
+    return encryptAndScrubSensitiveAssessmentsForGroups(database, {
+      [DEMO_GROUP_ID]: DEMO_GROUP_PASSWORD,
+    });
   };
 
   const getSectionBlockBounds = (sections: Section[], sectionId: string) => {
@@ -828,7 +857,7 @@ function App() {
         const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
         const nextArchiveEntries = shouldSeedDemoWorkspace ? [] : storedArchiveEntries;
         const nextStudentDatabase = shouldSeedDemoWorkspace
-          ? createDemoStudentDatabase(nextDraftBundle.workspaces[0])
+          ? await createDemoStudentDatabase(nextDraftBundle.workspaces[0])
           : storedStudentDatabase;
 
         if (shouldSeedDemoWorkspace) {
@@ -1054,26 +1083,35 @@ function App() {
     lastBackupAt,
   });
 
-  const resetDemoWorkspace = () => {
-    const nextDraftBundle = createDemoDraftBundle();
-    const nextArchiveEntries: ExpectationArchiveEntry[] = [];
-    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
+  const resetDemoWorkspace = async () => {
+    try {
+      const nextDraftBundle = createDemoDraftBundle();
+      const nextArchiveEntries: ExpectationArchiveEntry[] = [];
+      const nextStudentDatabase = await createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
 
-    setDraftBundle(nextDraftBundle);
-    setArchiveEntries(nextArchiveEntries);
-    void saveExpectationArchive(nextArchiveEntries);
-    markDemoSeedCurrent();
-    setStudentDatabase(nextStudentDatabase);
-    setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
-    setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
-    unlockedGroupPasswordsRef.current = {};
-    setUnlockedGroupIds([]);
-    setRestoreCheckpoint(null);
-    setPendingImportPreview(null);
-    setLastBackupAt(null);
-    clearBackupComplete();
-    setActiveTab("groups");
-    pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
+      setDraftBundle(nextDraftBundle);
+      setArchiveEntries(nextArchiveEntries);
+      void saveExpectationArchive(nextArchiveEntries);
+      markDemoSeedCurrent();
+      setStudentDatabase(nextStudentDatabase);
+      setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
+      setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
+      unlockedGroupPasswordsRef.current = {};
+      setUnlockedGroupIds([]);
+      setRestoreCheckpoint(null);
+      setPendingImportPreview(null);
+      setLastBackupAt(null);
+      clearBackupComplete();
+      setActiveTab("groups");
+      pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
+    } catch (error) {
+      console.error("Failed to reset demo data", error);
+      pushNotice(
+        "danger",
+        "Demo-Daten konnten nicht geladen werden",
+        "Die verschlüsselten Beispieldaten konnten nicht neu erstellt werden. Bitte lade die Seite erneut.",
+      );
+    }
   };
 
   const applyImportedState = (
@@ -3206,8 +3244,12 @@ function App() {
                 Diese GitHub-Pages-Demo lädt beim ersten Aufruf eine lokale Beispiel-Klassenarbeit. Alle Änderungen
                 bleiben nur in diesem Browser.
               </p>
+              <p>
+                Die Beispiel-Lerngruppe startet verschlüsselt. Zum Testen der Entschlüsselung lautet das
+                Klassenpasswort <strong>demo</strong>.
+              </p>
               <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className="button-secondary" onClick={resetDemoWorkspace}>
+                <button type="button" className="button-secondary" onClick={() => void resetDemoWorkspace()}>
                   Demo-Daten zurücksetzen
                 </button>
               </div>
