@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { ExamTemplateDefinition } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
-import { ExamMeta, GradeScale, StudentGroup } from "../types";
+import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
 import { formatNumber } from "../utils/format";
 import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
 import { ExamHeaderForm } from "./ExamHeaderForm";
-import { ExamTemplatePreviewCard } from "./ExamTemplatePreviewCard";
-import { GradeScaleEditor } from "./GradeScaleEditor";
-import { DashboardIcon, InfoIcon, PencilIcon, PlusIcon, ReplaceIcon, TemplateIcon } from "./icons";
+import {
+  DashboardIcon,
+  InfoIcon,
+  PencilIcon,
+  PlusIcon,
+  ReplaceIcon,
+  TemplateIcon,
+  UploadIcon,
+} from "./icons";
 import { ImportedExamSuggestion } from "../pdf/types";
 import { PdfImportAssistant } from "./PdfImportAssistant";
 import { Card, DismissibleCallout, Field, NumberInput, TextAreaField } from "./ui";
@@ -20,7 +26,24 @@ export interface GuidedSectionDraft {
 }
 
 export type GuidedBuilderTarget = "current" | "new";
-type GuidedBuilderSource = "manual" | "template" | "pdf";
+
+type DecisionMode = "templates" | "pdf" | "manual";
+type StageFilter = BuilderSchoolStage | "all";
+type FocusFilter = ExamTemplateDefinition["focus"] | "all";
+type SubjectThemeKey = "deutsch" | "englisch" | "mathematik" | "geschichte" | "chemie" | "informatik" | "default";
+type SubjectIconName = "book" | "speech" | "calculator" | "history" | "flask" | "code" | "template";
+
+interface SubjectTheme {
+  key: SubjectThemeKey;
+  icon: SubjectIconName;
+  pastel: string;
+  accent: string;
+}
+
+interface WeightedItem<T> {
+  value: T;
+  basePoints: number;
+}
 
 interface Props {
   groups: Array<Pick<StudentGroup, "id" | "subject" | "className">>;
@@ -73,19 +96,240 @@ const createFallbackSections = () =>
     { title: "Teil C", weight: 25, description: "Dritter Kompetenzbereich." },
   ]);
 
-const stepLabels = (source: GuidedBuilderSource) => {
-  switch (source) {
+const normalizeText = (value: string) => value.trim().toLowerCase();
+const POINT_STEP = 0.5;
+
+const stageLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sek I" : "Sek II");
+
+const focusLabel = (focus: ExamTemplateDefinition["focus"]) => (focus === "abitur" ? "Abitur" : "Standard");
+
+const stageLongLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sekundarstufe I" : "Sekundarstufe II");
+
+const SUBJECT_THEMES: Record<SubjectThemeKey, SubjectTheme> = {
+  deutsch: {
+    key: "deutsch",
+    icon: "book",
+    pastel: "#FADADD",
+    accent: "#C75C6A",
+  },
+  englisch: {
+    key: "englisch",
+    icon: "speech",
+    pastel: "#D9EAFE",
+    accent: "#3B73C8",
+  },
+  mathematik: {
+    key: "mathematik",
+    icon: "calculator",
+    pastel: "#DEE7FF",
+    accent: "#4F63C6",
+  },
+  geschichte: {
+    key: "geschichte",
+    icon: "history",
+    pastel: "#FCE8B2",
+    accent: "#B7791F",
+  },
+  chemie: {
+    key: "chemie",
+    icon: "flask",
+    pastel: "#D7F3E3",
+    accent: "#2F8F62",
+  },
+  informatik: {
+    key: "informatik",
+    icon: "code",
+    pastel: "#E8DDFB",
+    accent: "#7657C8",
+  },
+  default: {
+    key: "default",
+    icon: "template",
+    pastel: "#E5E7EB",
+    accent: "#64748B",
+  },
+};
+
+const getSubjectTheme = (subject: string) => {
+  const normalized = normalizeText(subject);
+  if (normalized.includes("deutsch")) return SUBJECT_THEMES.deutsch;
+  if (normalized.includes("englisch") || normalized.includes("english")) return SUBJECT_THEMES.englisch;
+  if (normalized.includes("mathematik") || normalized.includes("math")) return SUBJECT_THEMES.mathematik;
+  if (normalized.includes("geschichte") || normalized.includes("history")) return SUBJECT_THEMES.geschichte;
+  if (normalized.includes("chemie") || normalized.includes("science")) return SUBJECT_THEMES.chemie;
+  if (normalized.includes("informatik") || normalized.includes("computer")) return SUBJECT_THEMES.informatik;
+  return SUBJECT_THEMES.default;
+};
+
+const getSubjectThemeStyle = (theme: SubjectTheme) => ({
+  "--template-subject-pastel": theme.pastel,
+  "--template-subject-accent": theme.accent,
+} as CSSProperties);
+
+const sumPoints = (points: number[]) => Math.round(points.reduce((sum, point) => sum + point, 0) * 100) / 100;
+
+const snapPoint = (value: number) => Math.max(POINT_STEP, Math.round(value / POINT_STEP) * POINT_STEP);
+
+const getTemplateDefaultSectionPoints = (template: ExamTemplateDefinition) =>
+  template.previewSections.map((section) => snapPoint(section.points));
+
+const largestRemainderAllocation = <T,>(
+  items: WeightedItem<T>[],
+  targetTotal: number,
+): Array<{ value: T; allocated: number }> => {
+  const safeUnits = Math.max(0, Math.round(targetTotal / POINT_STEP));
+  const baseTotal = items.reduce((sum, item) => sum + item.basePoints, 0);
+
+  if (items.length === 0) return [];
+  if (baseTotal <= 0) {
+    const evenBase = Math.floor(safeUnits / items.length);
+    let remainder = safeUnits - evenBase * items.length;
+    return items.map((item) => {
+      const allocated = evenBase + (remainder > 0 ? 1 : 0);
+      remainder = Math.max(0, remainder - 1);
+      return { value: item.value, allocated: Math.max(POINT_STEP, allocated * POINT_STEP) };
+    });
+  }
+
+  const scaled = items.map((item) => {
+    const exact = (item.basePoints / baseTotal) * safeUnits;
+    const floor = Math.floor(exact);
+    return { item: item.value, floor, remainder: exact - floor };
+  });
+  let remaining = safeUnits - scaled.reduce((sum, item) => sum + item.floor, 0);
+  scaled
+    .sort((a, b) => b.remainder - a.remainder)
+    .forEach((entry) => {
+      if (remaining <= 0) return;
+      entry.floor += 1;
+      remaining -= 1;
+    });
+
+  return scaled.map((entry) => ({ value: entry.item, allocated: Math.max(POINT_STEP, entry.floor * POINT_STEP) }));
+};
+
+const redistributePoints = (points: number[], targetTotal: number) =>
+  largestRemainderAllocation(
+    points.map((point, index) => ({ value: index, basePoints: point })),
+    targetTotal,
+  )
+    .sort((a, b) => a.value - b.value)
+    .map((entry) => entry.allocated);
+
+const adjustTasksToSectionPoints = (tasks: Task[], targetPoints: number) =>
+  largestRemainderAllocation(
+    tasks.map((task) => ({ value: task, basePoints: task.maxPoints })),
+    targetPoints,
+  ).map(({ value: task, allocated }) => ({
+    ...task,
+    maxPoints: allocated,
+    achievedPoints: Math.min(task.achievedPoints, allocated),
+  }));
+
+const adjustExamToSectionPoints = (exam: Exam, sectionPoints: number[]): Exam => {
+  const total = sumPoints(sectionPoints);
+  const sections: Section[] = exam.sections.map((section, index) => {
+    const sectionTarget = sectionPoints[index] ?? section.tasks.reduce((sum, task) => sum + task.maxPoints, 0);
+    return {
+      ...section,
+      weight: total > 0 ? Math.round((sectionTarget / total) * 10000) / 100 : section.weight,
+      maxPointsOverride: null,
+      tasks: adjustTasksToSectionPoints(section.tasks, sectionTarget),
+    };
+  });
+
+  return {
+    ...exam,
+    sections,
+  };
+};
+
+const createAdjustedTemplate = (template: ExamTemplateDefinition, sectionPoints: number[]): ExamTemplateDefinition => ({
+  ...template,
+  totalPoints: sumPoints(sectionPoints),
+  previewSections: template.previewSections.map((section, index) => ({
+    ...section,
+    points: sectionPoints[index] ?? section.points,
+  })),
+  build: () => adjustExamToSectionPoints(template.build(), sectionPoints),
+});
+
+const SubjectThemeIcon = ({ icon }: { icon: SubjectIconName }) => {
+  const iconClass = "h-5 w-5";
+
+  switch (icon) {
+    case "book":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M5.5 5.5h6A2.5 2.5 0 0 1 14 8v11a2.5 2.5 0 0 0-2.5-2.5h-6Z" strokeLinejoin="round" />
+          <path d="M18.5 5.5h-4A2.5 2.5 0 0 0 12 8v11a2.5 2.5 0 0 1 2.5-2.5h4Z" strokeLinejoin="round" />
+          <path d="M8 9h2.5M8 12h2.5M15 9h1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case "speech":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M5 6.5h14v8.5H9l-4 3.5Z" strokeLinejoin="round" />
+          <path d="M8.5 10h7M8.5 13h4" strokeLinecap="round" />
+        </svg>
+      );
+    case "calculator":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="6" y="4" width="12" height="16" rx="2" />
+          <path d="M8.5 7h7M9 11h.1M12 11h.1M15 11h.1M9 14h.1M12 14h.1M15 14h.1M9 17h3.1M15 17h.1" strokeLinecap="round" />
+        </svg>
+      );
+    case "history":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M4.5 10.5 12 6l7.5 4.5Z" strokeLinejoin="round" />
+          <path d="M6.5 10.5v6M10 10.5v6M14 10.5v6M17.5 10.5v6M5 18.5h14" strokeLinecap="round" />
+        </svg>
+      );
+    case "flask":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M9 4.5h6M10 4.5v5.2l-4.4 7.2A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.7-3.1L14 9.7V4.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M8.2 15h7.6M10 18h4" strokeLinecap="round" />
+        </svg>
+      );
+    case "code":
+      return (
+        <svg viewBox="0 0 24 24" className={iconClass} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="m9 8-4 4 4 4M15 8l4 4-4 4M13 6.5 11 17.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
     case "template":
-      return ["Vorlage wählen", "Rahmendaten", "Speichern & öffnen"];
-    case "pdf":
-      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "PDF-Import"];
-    case "manual":
     default:
-      return ["Startpunkt", "Quelle", "Fach", "Stufe", "Regelcheck", "Ziel", "Metadaten", "Notenschlüssel", "Aufbau", "Sektionen"];
+      return <TemplateIcon className={iconClass} />;
   }
 };
 
-const normalizeSubject = (value: string) => value.trim().toLowerCase();
+const gradeScaleFor = (current: GradeScale, totalPoints: number, stage: BuilderSchoolStage) =>
+  applyNotengeneratorGradeScale(current, Math.max(1, Math.round(totalPoints * 2) / 2), {
+    thresholdPercent: stage === "sek1" ? 50 : 45,
+    accumulationMode: "middle",
+    useHalfPoints: false,
+    showTendency: true,
+    recommendedStage: stage,
+  });
+
+const getTemplateSearchText = (template: ExamTemplateDefinition) =>
+  [
+    template.title,
+    template.shortLabel,
+    template.subject,
+    stageLabel(template.schoolStage),
+    stageLongLabel(template.schoolStage),
+    focusLabel(template.focus),
+    `${template.totalPoints} Punkte`,
+    template.description,
+    template.pedagogicalHint,
+    ...template.previewSections.flatMap((section) => [section.title, `${section.points} Punkte`, ...section.tasks]),
+  ]
+    .join(" ")
+    .toLowerCase();
 
 export const GuidedExamBuilder = ({
   groups,
@@ -100,107 +344,113 @@ export const GuidedExamBuilder = ({
   onApplyManualStructure,
   onApplyPdfSuggestion,
 }: Props) => {
-  const builderRef = useRef<HTMLDivElement | null>(null);
+  const metaEditorRef = useRef<HTMLElement | null>(null);
   const detectedInitialSubject =
-    BUILDER_SUBJECT_OPTIONS.find((option) => normalizeSubject(option) === normalizeSubject(initialSubject)) ?? null;
-  const [step, setStep] = useState(0);
+    BUILDER_SUBJECT_OPTIONS.find((option) => normalizeText(option) === normalizeText(initialSubject)) ?? null;
+  const initialTemplateId =
+    templates.find((template) => normalizeText(template.subject) === normalizeText(initialSubject))?.id ??
+    templates[0]?.id ??
+    null;
+
+  const [mode, setMode] = useState<DecisionMode>("templates");
+  const [query, setQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [focusFilter, setFocusFilter] = useState<FocusFilter>("all");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
+  const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
   const [target, setTarget] = useState<GuidedBuilderTarget>("new");
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
-  const [source, setSource] = useState<GuidedBuilderSource>("template");
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
-  const [customSubject, setCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
-  const [schoolStage, setSchoolStage] = useState<BuilderSchoolStage>("sek1");
+  const [showMetaSettings, setShowMetaSettings] = useState(false);
+  const [manualSubject, setManualSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
+  const [manualCustomSubject, setManualCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
+  const [manualStage, setManualStage] = useState<BuilderSchoolStage>("sek1");
   const [totalPoints, setTotalPoints] = useState(Math.max(1, Math.round(initialTotalPoints || 60)));
   const [gradeScale, setGradeScale] = useState<GradeScale>(() =>
-    applyNotengeneratorGradeScale(
-      initialGradeScale,
-      Math.max(1, Math.round(initialTotalPoints || 60)),
-      {
-        thresholdPercent: 50,
-        accumulationMode: "middle",
-        useHalfPoints: false,
-        showTendency: true,
-        recommendedStage: "sek1",
-      },
-    ),
+    gradeScaleFor(initialGradeScale, Math.max(1, Math.round(initialTotalPoints || 60)), "sek1"),
   );
-  const [sectionCount, setSectionCount] = useState(Math.max(1, initialSections.length || 3));
   const [sectionDrafts, setSectionDrafts] = useState<GuidedSectionDraft[]>(
     initialSections.length > 0 ? initialSections : createFallbackSections(),
   );
-  const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({
-    ...initialMeta,
-  }));
+  const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({ ...initialMeta }));
 
-  const resolvedSubject = selectedSubject === "__custom__" ? customSubject.trim() : selectedSubject;
-  const guidance = useMemo(
-    () => getBuilderGuidance(resolvedSubject || "Eigenes Fach", schoolStage),
-    [resolvedSubject, schoolStage],
-  );
-  const matchingTemplates = useMemo(
+  const availableSubjects = useMemo(
     () =>
-      templates.filter(
-        (template) =>
-          normalizeSubject(template.subject) === normalizeSubject(resolvedSubject) &&
-          template.schoolStage === schoolStage,
+      Array.from(new Set([...BUILDER_SUBJECT_OPTIONS, ...templates.map((template) => template.subject)])).sort((a, b) =>
+        a.localeCompare(b, "de"),
       ),
-    [resolvedSubject, schoolStage, templates],
+    [templates],
   );
+
+  const scoredTemplates = useMemo(() => {
+    const normalizedQuery = normalizeText(query);
+    const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
+
+    return templates
+      .map((template, index) => {
+        const searchText = getTemplateSearchText(template);
+        const titleText = `${template.title} ${template.shortLabel}`.toLowerCase();
+        const previewText = template.previewSections
+          .flatMap((section) => [section.title, ...section.tasks])
+          .join(" ")
+          .toLowerCase();
+        const queryMatches = queryTokens.every((token) => searchText.includes(token));
+        const subjectMatches = subjectFilter === "all" || template.subject === subjectFilter;
+        const stageMatches = stageFilter === "all" || template.schoolStage === stageFilter;
+        const focusMatches = focusFilter === "all" || template.focus === focusFilter;
+        const initialSubjectBonus = normalizeText(template.subject) === normalizeText(initialSubject) ? 8 : 0;
+        const score =
+          queryTokens.reduce((sum, token) => {
+            if (titleText.includes(token)) return sum + 12;
+            if (normalizeText(template.subject).includes(token)) return sum + 9;
+            if (previewText.includes(token)) return sum + 6;
+            if (searchText.includes(token)) return sum + 3;
+            return sum;
+          }, 0) +
+          initialSubjectBonus +
+          (template.focus === "abitur" ? 1 : 0);
+
+        return {
+          template,
+          index,
+          visible: queryMatches && subjectMatches && stageMatches && focusMatches,
+          score,
+        };
+      })
+      .filter((entry) => entry.visible)
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map((entry) => entry.template);
+  }, [focusFilter, initialSubject, query, stageFilter, subjectFilter, templates]);
+
   const selectedTemplate = useMemo(
-    () => matchingTemplates.find((template) => template.id === selectedTemplateId) ?? null,
-    [matchingTemplates, selectedTemplateId],
+    () => scoredTemplates.find((template) => template.id === selectedTemplateId) ?? scoredTemplates[0] ?? null,
+    [scoredTemplates, selectedTemplateId],
   );
-  const recommendedTemplate = selectedTemplate ?? matchingTemplates[0] ?? null;
-  const activeStepLabels = stepLabels(source);
-  const activeProgressIndex = source === "template" ? (step >= 8 ? 2 : step >= 6 ? 1 : 0) : step;
+  const selectedTemplatePoints = useMemo(() => {
+    if (!selectedTemplate) return [];
+    const draft = templatePointDrafts[selectedTemplate.id];
+    if (draft?.length === selectedTemplate.previewSections.length) return draft;
+    return getTemplateDefaultSectionPoints(selectedTemplate);
+  }, [selectedTemplate, templatePointDrafts]);
+  const selectedTemplateTotalPoints = selectedTemplate ? sumPoints(selectedTemplatePoints) : 0;
+  const adjustedSelectedTemplate = useMemo(
+    () => (selectedTemplate ? createAdjustedTemplate(selectedTemplate, selectedTemplatePoints) : null),
+    [selectedTemplate, selectedTemplatePoints],
+  );
 
-  useEffect(() => {
-    const preset = guidance.preset;
-    setTotalPoints(preset.totalPoints);
-    setSectionCount(preset.sections.length);
-    setSectionDrafts(buildSectionDrafts(preset.sections));
-  }, [guidance]);
-
-  useEffect(() => {
-    setGradeScale((current) =>
-      applyNotengeneratorGradeScale(
-        current,
-        totalPoints,
-        {
-          thresholdPercent: schoolStage === "sek1" ? 50 : 45,
-          accumulationMode: "middle",
-          useHalfPoints: false,
-          showTendency: true,
-          recommendedStage: schoolStage,
-        },
-      ),
-    );
-  }, [schoolStage]);
-
-  useEffect(() => {
-    if (selectedTemplateId && !matchingTemplates.some((template) => template.id === selectedTemplateId)) {
-      setSelectedTemplateId(null);
-    }
-  }, [matchingTemplates, selectedTemplateId]);
-
-  useEffect(() => {
-    if (source !== "template" || !recommendedTemplate) return;
-    setTotalPoints(recommendedTemplate.totalPoints);
-    setGradeScale((current) =>
-      applyNotengeneratorGradeScale(
-        current,
-        recommendedTemplate.totalPoints,
-        {
-          thresholdPercent: schoolStage === "sek1" ? 50 : 45,
-          accumulationMode: "middle",
-          useHalfPoints: false,
-          showTendency: true,
-          recommendedStage: schoolStage,
-        },
-      ),
-    );
-  }, [recommendedTemplate, schoolStage, source]);
+  const manualResolvedSubject = manualSubject === "__custom__" ? manualCustomSubject.trim() : manualSubject;
+  const manualGuidance = useMemo(
+    () => getBuilderGuidance(manualResolvedSubject || "Eigenes Fach", manualStage),
+    [manualResolvedSubject, manualStage],
+  );
+  const activeScaleStage = selectedTemplate?.schoolStage ?? manualStage;
+  const weightSum = useMemo(
+    () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.weight, 0) * 100) / 100,
+    [sectionDrafts],
+  );
+  const difference = Math.round((100 - weightSum) * 100) / 100;
+  const hasEmptyTitles = sectionDrafts.some((section) => !section.title.trim());
+  const canCreate = target === "current" || Boolean(targetGroupId);
 
   useEffect(() => {
     setMetaDraft({ ...initialMeta });
@@ -214,862 +464,469 @@ export const GuidedExamBuilder = ({
     });
   }, [activeGroupId, groups]);
 
-  const weightSum = useMemo(
-    () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.weight, 0) * 100) / 100,
-    [sectionDrafts],
-  );
-  const difference = Math.round((100 - weightSum) * 100) / 100;
-  const hasEmptyTitles = sectionDrafts.some((section) => !section.title.trim());
+  useEffect(() => {
+    if (scoredTemplates.length === 0) {
+      setSelectedTemplateId(null);
+      return;
+    }
 
-  const syncDraftsToCount = (count: number) => {
-    setSectionDrafts((current) => {
-      if (count <= current.length) return current.slice(0, count);
-      const remainder = Array.from({ length: count - current.length }, (_, index) => ({
-        id: crypto.randomUUID(),
-        title: getPartLabel(current.length + index),
-        weight: 0,
-        description: "",
-      }));
-      return [...current, ...remainder];
-    });
-  };
+    if (!selectedTemplateId || !scoredTemplates.some((template) => template.id === selectedTemplateId)) {
+      setSelectedTemplateId(scoredTemplates[0].id);
+    }
+  }, [scoredTemplates, selectedTemplateId]);
 
-  const applyPresetStructure = () => {
-    setTotalPoints(guidance.preset.totalPoints);
-    setSectionCount(guidance.preset.sections.length);
-    setSectionDrafts(buildSectionDrafts(guidance.preset.sections));
-  };
+  useEffect(() => {
+    if (mode !== "templates" || !selectedTemplate) return;
+    setTotalPoints(selectedTemplateTotalPoints);
+    setGradeScale((current) => gradeScaleFor(current, selectedTemplateTotalPoints, selectedTemplate.schoolStage));
+  }, [mode, selectedTemplate?.id, selectedTemplateTotalPoints]);
+
+  useEffect(() => {
+    if (mode !== "manual") return;
+    setTotalPoints(manualGuidance.preset.totalPoints);
+    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections));
+    setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
+  }, [manualGuidance, manualStage, mode]);
 
   const updateTotalPoints = (value: number) => {
     const nextTotal = Math.max(1, Math.round(value * 2) / 2);
+    if (mode === "templates" && selectedTemplate) {
+      const nextPoints = redistributePoints(selectedTemplatePoints, nextTotal);
+      setTemplatePointDrafts((current) => ({
+        ...current,
+        [selectedTemplate.id]: nextPoints,
+      }));
+    }
     setTotalPoints(nextTotal);
-    setGradeScale((current) =>
-      applyNotengeneratorGradeScale(
-        current,
-        nextTotal,
-        {
-          thresholdPercent: schoolStage === "sek1" ? 50 : 45,
-          accumulationMode: "middle",
-          useHalfPoints: false,
-          showTendency: true,
-          recommendedStage: schoolStage,
-        },
-      ),
-    );
+    setGradeScale((current) => gradeScaleFor(current, nextTotal, activeScaleStage));
   };
 
-  const choiceButtonClass = (active: boolean) =>
-    `${active ? "button-primary" : "button-secondary"} w-full justify-start p-4 text-left`;
+  const selectTemplate = (template: ExamTemplateDefinition) => {
+    const nextPoints = templatePointDrafts[template.id] ?? getTemplateDefaultSectionPoints(template);
+    setSelectedTemplateId(template.id);
+    setTotalPoints(sumPoints(nextPoints));
+    setGradeScale((current) => gradeScaleFor(current, sumPoints(nextPoints), template.schoolStage));
+  };
 
-  const goToStep = (nextStep: number) => {
-    setStep((current) => {
-      if (nextStep !== current) {
-        window.requestAnimationFrame(() => {
-          const builderTop = builderRef.current?.getBoundingClientRect().top;
-          if (builderTop === undefined) return;
+  const updateTemplateSectionPoint = (sectionIndex: number, value: number) => {
+    if (!selectedTemplate) return;
 
-          window.scrollTo({
-            top: Math.max(0, window.scrollY + builderTop - 24),
-            behavior: "smooth",
-          });
+    const currentPoints = selectedTemplatePoints.length
+      ? selectedTemplatePoints
+      : getTemplateDefaultSectionPoints(selectedTemplate);
+    const nextPoints = currentPoints.map((point, index) => (index === sectionIndex ? snapPoint(value) : point));
+    const nextTotal = sumPoints(nextPoints);
+
+    setTemplatePointDrafts((current) => ({
+      ...current,
+      [selectedTemplate.id]: nextPoints,
+    }));
+    setTotalPoints(nextTotal);
+    setGradeScale((current) => gradeScaleFor(current, nextTotal, selectedTemplate.schoolStage));
+  };
+
+  const resetFilters = () => {
+    setQuery("");
+    setSubjectFilter("all");
+    setStageFilter("all");
+    setFocusFilter("all");
+  };
+
+  const applyManualPreset = () => {
+    setTotalPoints(manualGuidance.preset.totalPoints);
+    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections));
+    setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
+  };
+
+  const openMetaSettings = () => {
+    setShowMetaSettings(true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        metaEditorRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
         });
-      }
-      return nextStep;
+      });
     });
   };
 
-  const renderStepBadge = (label: string, index: number) => {
-    const isActive = activeProgressIndex === index;
-    const isVisible = index <= activeProgressIndex;
+  const renderModeButton = (nextMode: DecisionMode, label: string, description: string) => {
+    const active = mode === nextMode;
+    const Icon = nextMode === "templates" ? TemplateIcon : nextMode === "pdf" ? UploadIcon : PencilIcon;
     return (
-      <span
-        key={label}
-        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none ${
-          isActive ? "button-primary" : isVisible ? "button-secondary" : "button-soft"
-        }`}
+      <button
+        type="button"
+        className={`template-mode-button ${active ? "template-mode-button-active" : ""}`}
+        onClick={() => setMode(nextMode)}
+        aria-pressed={active}
       >
-        {index + 1}. {label}
-      </span>
+        <Icon className="h-5 w-5" />
+        <span>
+          <strong>{label}</strong>
+          <small>{description}</small>
+        </span>
+      </button>
     );
   };
 
-  const subjectCards = [...BUILDER_SUBJECT_OPTIONS, "__custom__" as const];
+  const renderTargetControls = () => (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          className={`${target === "new" ? "button-primary" : "button-secondary"} w-full justify-start gap-2 p-3 text-left`}
+          onClick={() => setTarget("new")}
+        >
+          <PlusIcon />
+          Neue Klassenarbeit
+        </button>
+        <button
+          type="button"
+          className={`${target === "current" ? "button-primary" : "button-secondary"} w-full justify-start gap-2 p-3 text-left`}
+          onClick={() => setTarget("current")}
+        >
+          <ReplaceIcon />
+          Aktuelle ersetzen
+        </button>
+      </div>
+      {target === "new" &&
+        (groups.length > 0 ? (
+          <Field label="Lerngruppe">
+            <select className="field" value={targetGroupId} onChange={(event) => setTargetGroupId(event.target.value)}>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.subject} · {group.className}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <DismissibleCallout tone="warning" resetKey="template-decision-no-groups">
+            Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden.
+          </DismissibleCallout>
+        ))}
+    </div>
+  );
+
+  const renderMetaSummary = () => (
+    <div className="template-meta-summary">
+      <div>
+        <span>Titel</span>
+        <strong>{metaDraft.title.trim() || "Ohne Titel"}</strong>
+      </div>
+      <div>
+        <span>Kurs</span>
+        <strong>{metaDraft.course.trim() || "-"}</strong>
+      </div>
+      <div>
+        <span>Datum</span>
+        <strong>{metaDraft.examDate || "-"}</strong>
+      </div>
+      <button
+        type="button"
+        className="button-secondary w-full"
+        onClick={() => {
+          if (showMetaSettings) {
+            setShowMetaSettings(false);
+            return;
+          }
+          openMetaSettings();
+        }}
+      >
+        {showMetaSettings ? "Rahmendaten ausblenden" : "Rahmendaten bearbeiten"}
+      </button>
+    </div>
+  );
+
+  const renderMetaEditor = () =>
+    showMetaSettings ? (
+      <section ref={metaEditorRef} className="template-meta-editor">
+        <div className="template-meta-editor-header">
+          <div>
+            <p className="label">Rahmendaten</p>
+            <h3 className="themed-strong text-lg font-semibold">Klassenarbeit vor dem Öffnen beschriften</h3>
+            <p className="themed-muted mt-1 text-sm leading-6">
+              Diese Angaben werden direkt in den neuen Erwartungshorizont übernommen.
+            </p>
+          </div>
+          <button type="button" className="button-soft px-3 py-2 text-xs" onClick={() => setShowMetaSettings(false)}>
+            Schließen
+          </button>
+        </div>
+        <ExamHeaderForm
+          meta={metaDraft}
+          onChange={(key, value) => {
+            setMetaDraft((current) => ({
+              ...current,
+              [key]: value,
+            }));
+          }}
+        />
+      </section>
+    ) : null;
+
+  const renderTemplateCard = (template: ExamTemplateDefinition, index: number) => {
+    const selected = selectedTemplate?.id === template.id;
+    const subjectTheme = getSubjectTheme(template.subject);
+    return (
+      <button
+        key={template.id}
+        type="button"
+        className={`template-result-card ${selected ? "template-result-card-selected" : ""}`}
+        style={getSubjectThemeStyle(subjectTheme)}
+        onClick={() => selectTemplate(template)}
+        aria-pressed={selected}
+      >
+        <span className="template-subject-mark" aria-hidden="true">
+          <SubjectThemeIcon icon={subjectTheme.icon} />
+        </span>
+        <span className="flex flex-wrap gap-2">
+          {index === 0 && <span className="template-badge template-badge-strong">Beste Auswahl</span>}
+          <span className="template-badge template-subject-badge">{template.subject}</span>
+          <span className="template-badge">{stageLabel(template.schoolStage)}</span>
+          <span className="template-badge">{focusLabel(template.focus)}</span>
+          <span className="template-badge">{formatNumber(template.totalPoints)} P.</span>
+        </span>
+        <span className="block">
+          <span className="template-result-title">{template.title}</span>
+          <span className="template-result-copy">{template.description}</span>
+        </span>
+        <span className="template-result-sections">
+          {template.previewSections.slice(0, 3).map((section) => (
+            <span key={section.title}>
+              <strong>{section.title}</strong>
+              <small>{section.points} P.</small>
+            </span>
+          ))}
+        </span>
+      </button>
+    );
+  };
 
   return (
-    <div ref={builderRef}>
-      <Card>
-        <div className="builder-visual-header mb-6" aria-label="Erwartungshorizont-Wizard">
-          <div className="builder-launch-orbit builder-visual-orbit" aria-hidden="true">
-            <div className="builder-launch-ring builder-launch-ring-primary" />
-            <div className="builder-launch-ring builder-launch-ring-secondary" />
-            <div className="builder-launch-ring builder-launch-ring-tertiary" />
-            <div className="builder-launch-point builder-launch-point-a" />
-            <div className="builder-launch-point builder-launch-point-b" />
-            <div className="builder-launch-point builder-launch-point-c" />
-            <div className="builder-launch-core">
-              <span className="builder-launch-core-text">EWH</span>
-            </div>
-          </div>
+    <Card className="template-decision-shell">
+      <div className="template-decision-header">
+        <div>
+          <p className="label">Schnellentscheidung</p>
+          <h2 className="themed-strong mt-2 text-2xl font-semibold">Vorlage finden, prüfen, öffnen</h2>
+          <p className="themed-muted mt-2 max-w-3xl text-sm leading-6">
+            Suche direkt nach Fach, Stufe, Punkteumfang oder Prüfungsformat. Die passende Struktur landet sofort im
+            EWH-Editor und kann dort weiter angepasst werden.
+          </p>
         </div>
-        <div className="mb-6 flex flex-wrap gap-2">
-          {activeStepLabels.map((label, index) => renderStepBadge(label, index))}
+        <div className="template-decision-count">
+          <strong>{templates.length}</strong>
+          <span>Vorlagen</span>
         </div>
+      </div>
 
-        {step === 0 && (
-          <div className="space-y-6">
-          <section className="surface-muted rounded-3xl p-5">
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div>
-                <p className="label">Schnellstart</p>
-                <h3 className="themed-strong mt-2 text-xl font-semibold">Vorlage wählen, speichern, im Editor weiterarbeiten</h3>
-                <p className="status-note mt-3 text-sm leading-6">
-                  Der Regelcheck bleibt als Hintergrundhilfe erhalten. Der primäre Weg ist jetzt: Fach und Stufe
-                  wählen, passende Vorlage übernehmen und den Erwartungshorizont anschließend im Editor anpassen.
-                </p>
-              </div>
-              <div className="space-y-3">
-                <Field label="Fach">
-                  <select
-                    className="field"
-                    value={selectedSubject}
-                    onChange={(event) => setSelectedSubject(event.target.value)}
-                  >
-                    {subjectCards.map((subjectOption) => (
-                      <option key={subjectOption} value={subjectOption}>
-                        {subjectOption === "__custom__" ? "Eigenes Fach" : subjectOption}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {selectedSubject === "__custom__" && (
-                  <Field label="Eigenes Fach">
-                    <input
-                      className="field"
-                      placeholder="z. B. Physik, Politik, Biologie"
-                      value={customSubject}
-                      onChange={(event) => setCustomSubject(event.target.value)}
-                    />
-                  </Field>
-                )}
-                <Field label="Stufe">
-                  <select
-                    className="field"
-                    value={schoolStage}
-                    onChange={(event) => setSchoolStage(event.target.value as BuilderSchoolStage)}
-                  >
-                    <option value="sek1">Sekundarstufe I</option>
-                    <option value="sek2">Sekundarstufe II</option>
-                  </select>
-                </Field>
-                <Field
-                  label="Zielpunktzahl"
-                  hint="Die Vorlage wird proportional auf diese Punktzahl skaliert und kann später im Editor weiter angepasst werden."
-                >
-                  <NumberInput
-                    className="field"
-                    value={totalPoints}
-                    min={1}
-                    step={0.5}
-                    onCommit={updateTotalPoints}
-                  />
-                </Field>
-              </div>
-            </div>
-          </section>
+      <div className="template-mode-tabs">
+        {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
+        {renderModeButton("pdf", "PDF", "Aus Material starten")}
+        {renderModeButton("manual", "Leere Struktur", "Kurz selbst aufbauen")}
+      </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <button type="button" className={choiceButtonClass(target === "new")} onClick={() => setTarget("new")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <PlusIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Neue Klassenarbeit</strong>
-                  <br />
-                  Erstellt einen neuen Workspace und öffnet ihn direkt im EWH-Editor.
-                </span>
-              </span>
-            </button>
-            <button type="button" className={choiceButtonClass(target === "current")} onClick={() => setTarget("current")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <ReplaceIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Aktuelle ersetzen</strong>
-                  <br />
-                  Übernimmt die Vorlage in die gerade geöffnete Klassenarbeit.
-                </span>
-              </span>
-            </button>
-          </div>
-
-          {target === "new" && (
-            groups.length > 0 ? (
-              <Field label="Lerngruppe">
-                <select className="field" value={targetGroupId} onChange={(event) => setTargetGroupId(event.target.value)}>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.subject} · {group.className}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <DismissibleCallout tone="warning" resetKey="guided-builder-no-groups-quick">
-                Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden.
-              </DismissibleCallout>
-            )
-          )}
-
-          {matchingTemplates.length > 0 ? (
-            <div className="grid gap-4 xl:grid-cols-3">
-              {matchingTemplates.slice(0, 6).map((template, index) => {
-                const isSelected = selectedTemplateId ? selectedTemplateId === template.id : index === 0;
-                return (
-                  <ExamTemplatePreviewCard
-                    key={template.id}
-                    template={template}
-                    actionLabel={isSelected ? "Gewählte Vorlage" : "Vorlage auswählen"}
-                    selected={isSelected}
-                    onLoad={() => setSelectedTemplateId(template.id)}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-quick`} tone="info">
-              Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es aktuell keine spezifische Vorlage.
-              Du kannst stattdessen den manuellen Aufbau oder den PDF-Import öffnen.
-            </DismissibleCallout>
-          )}
-
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="button-secondary" onClick={() => goToStep(6)}>
-                Details vorher anpassen
-              </button>
-              <button type="button" className="button-secondary" onClick={() => goToStep(1)}>
-                Manuellen Aufbau oder PDF wählen
-              </button>
-            </div>
-            <button
-              type="button"
-              className="button-primary w-full lg:w-auto"
-              disabled={!recommendedTemplate || !resolvedSubject || (target === "new" && !targetGroupId)}
-              onClick={() =>
-                recommendedTemplate &&
-                onSelectTemplate(
-                  recommendedTemplate,
-                  target,
-                  gradeScale,
-                  metaDraft,
-                  target === "new" ? targetGroupId || null : null,
-                  totalPoints,
-                )
-              }
-            >
-              Fertigstellen, speichern und im EWH-Editor öffnen
-            </button>
-          </div>
-
-          <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-rules-note`}>
-            Kurzfassung aus dem Regelcheck: {guidance.planningBullets[0] ?? guidance.stageSummary}
-          </DismissibleCallout>
-        </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <button type="button" className={choiceButtonClass(source === "manual")} onClick={() => setSource("manual")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <PencilIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Manuell starten</strong>
-                  <br />
-                  Aufbau, Punkteverteilung und Sektionen selbst im Wizard festlegen.
-                </span>
-              </span>
-            </button>
-            <button type="button" className={choiceButtonClass(source === "template")} onClick={() => setSource("template")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <TemplateIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Mit Vorlage starten</strong>
-                  <br />
-                  Nach Fach und Stufe passende Vorlagen im Wizard laden und übernehmen.
-                </span>
-              </span>
-            </button>
-            <button type="button" className={choiceButtonClass(source === "pdf")} onClick={() => setSource("pdf")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <InfoIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>PDF-Import nutzen</strong>
-                  <br />
-                  Aufgabenblatt oder Korrekturvorschlag einlesen und als Wizard-Zweig übernehmen.
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <div className="flex justify-end">
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(2)}>
-              Weiter zu Fach
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {subjectCards.map((subjectOption) => {
-              const isCustom = subjectOption === "__custom__";
-              const label = isCustom ? "Eigenes Fach" : subjectOption;
-              const active = isCustom ? selectedSubject === "__custom__" : selectedSubject === subjectOption;
-              return (
-                <button
-                  key={subjectOption}
-                  type="button"
-                  className={choiceButtonClass(active)}
-                  onClick={() => setSelectedSubject(subjectOption)}
-                >
-                  <span className="flex items-start gap-3">
-                    <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                      {isCustom ? <InfoIcon className="h-5 w-5" /> : <TemplateIcon className="h-5 w-5" />}
-                    </span>
-                    <span>
-                      <strong>{label}</strong>
-                      <br />
-                      {isCustom
-                        ? "Allgemeine NRW-Regeln laden und den Builder fachindividuell anpassen."
-                        : getBuilderGuidance(subjectOption, "sek1").stageSummary}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedSubject === "__custom__" && (
-            <Field label="Eigenes Fach">
+      {mode === "templates" && (
+        <div className="template-decision-layout">
+          <section className="template-search-panel">
+            <div className="template-search-box">
+              <TemplateIcon className="h-5 w-5" />
               <input
-                className="field"
-                placeholder="z. B. Physik, Politik, Biologie"
-                value={customSubject}
-                onChange={(event) => setCustomSubject(event.target.value)}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Fach, Kompetenz, Punkte oder Format suchen..."
+                aria-label="Vorlagen durchsuchen"
               />
-            </Field>
-          )}
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="button-primary w-full sm:w-auto"
-              disabled={!resolvedSubject}
-              onClick={() => goToStep(3)}
-            >
-              Weiter zu Stufenauswahl
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <button type="button" className={choiceButtonClass(schoolStage === "sek1")} onClick={() => setSchoolStage("sek1")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <PlusIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Sekundarstufe I</strong>
-                  <br />
-                  Klassenarbeiten, Belastungsregeln, mündliche Ersatzformate und ZP10-Kontext.
-                </span>
-              </span>
-            </button>
-            <button type="button" className={choiceButtonClass(schoolStage === "sek2")} onClick={() => setSchoolStage("sek2")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <DashboardIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Sekundarstufe II</strong>
-                  <br />
-                  EF/Q-Phase, Klausuren, Facharbeit, Kommunikationsprüfung und Abiturvorbereitung.
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(2)}>
-              Zurück
-            </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(4)}>
-              Weiter zu Regelcheck
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-6">
-          <div className="surface-muted rounded-3xl p-5">
-            <p className="label">Rechercheprofil</p>
-            <h3 className="themed-strong mt-2 text-xl font-semibold">
-              {resolvedSubject || "Eigenes Fach"} · {guidance.label}
-            </h3>
-            <p className="status-note mt-3 text-sm leading-6">{guidance.stageSummary}</p>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            <div className="surface-muted rounded-3xl p-5">
-              <h4 className="themed-strong text-base font-semibold">Rechtlicher Rahmen</h4>
-              <ul className="status-note mt-3 space-y-2 text-sm leading-6">
-                {guidance.legalBullets.map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
+              {(query || subjectFilter !== "all" || stageFilter !== "all" || focusFilter !== "all") && (
+                <button type="button" onClick={resetFilters}>
+                  Zurücksetzen
+                </button>
+              )}
             </div>
-            <div className="surface-muted rounded-3xl p-5">
-              <h4 className="themed-strong text-base font-semibold">Fachspezifische Hinweise</h4>
-              <ul className="status-note mt-3 space-y-2 text-sm leading-6">
-                {guidance.subjectBullets.map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="surface-muted rounded-3xl p-5">
-              <h4 className="themed-strong text-base font-semibold">Builder-Empfehlung</h4>
-              <ul className="status-note mt-3 space-y-2 text-sm leading-6">
-                {guidance.planningBullets.map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
 
-          <DismissibleCallout tone="warning" resetKey={`${resolvedSubject}-${schoolStage}`}>
-            {guidance.caution}
-          </DismissibleCallout>
-
-          <div className="surface-muted rounded-3xl p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="themed-strong text-base font-semibold">Quellen</h4>
-                <p className="status-note mt-1 text-sm">Offizielle NRW-Seiten, auf die sich dieser Wizard-Schritt stützt.</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {guidance.sources.map((source) => (
-                <a
-                  key={`${source.label}-${source.url}`}
-                  className="button-secondary"
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {source.label}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(3)}>
-              Zurück
-            </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(5)}>
-              Weiter zu Ziel
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 5 && (
-          <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <button type="button" className={choiceButtonClass(target === "new")} onClick={() => setTarget("new")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <PlusIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Als neue Klassenarbeit anlegen</strong>
-                  <br />
-                  Der Builder erstellt einen neuen Workspace mit eigener Pill.
-                </span>
-              </span>
-            </button>
-            <button type="button" className={choiceButtonClass(target === "current")} onClick={() => setTarget("current")}>
-              <span className="flex items-start gap-3">
-                <span className="rounded-2xl bg-white/20 p-2.5 ring-1 ring-current/15">
-                  <ReplaceIcon className="h-5 w-5" />
-                </span>
-                <span>
-                  <strong>Aktuelle Klassenarbeit ersetzen</strong>
-                  <br />
-                  Die Struktur wird direkt in die aktuell geöffnete Klassenarbeit übernommen.
-                </span>
-              </span>
-            </button>
-          </div>
-
-          {target === "new" && (
-            groups.length > 0 ? (
-              <Field label="Lerngruppe für die neue Klassenarbeit">
-                <select className="field" value={targetGroupId} onChange={(event) => setTargetGroupId(event.target.value)}>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.subject} · {group.className}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <DismissibleCallout tone="warning" resetKey="guided-builder-no-groups">
-                Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden, damit der EWH direkt korrekt
-                zugeordnet werden kann.
-              </DismissibleCallout>
-            )
-          )}
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(4)}>
-              Zurück
-            </button>
-            <button
-              type="button"
-              className="button-primary w-full sm:w-auto"
-              disabled={target === "new" && !targetGroupId}
-              onClick={() => goToStep(6)}
-            >
-              Weiter zu Metadaten
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 6 && (
-          <div className="space-y-6">
-          <div className="surface-muted rounded-3xl p-5">
-            <h3 className="themed-strong text-base font-semibold">Rahmendaten der Arbeit festlegen</h3>
-            <p className="status-note mt-2 text-sm leading-6">
-              Titel, Datum, Kurs und Hinweise gehören in den Erstellungsfluss, damit Vorlage und anschließender
-              Editor direkt mit dem richtigen Kontext starten.
-            </p>
-          </div>
-
-          <ExamHeaderForm
-            meta={metaDraft}
-            onChange={(key, value) => {
-              setMetaDraft((current) => ({
-                ...current,
-                [key]: value,
-              }));
-            }}
-          />
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(source === "template" ? 0 : 5)}>
-              Zurück
-            </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(7)}>
-              Weiter zu Notenschlüssel
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 7 && (
-          <div className="space-y-6">
-          <GradeScaleEditor
-            scale={gradeScale}
-            totalMaxPoints={totalPoints}
-            recommendedStage={schoolStage}
-            onChange={setGradeScale}
-            onTotalMaxPointsChange={setTotalPoints}
-            onBandChange={(bandId, lowerBound, verbalLabel) =>
-              setGradeScale((current) => ({
-                ...current,
-                bands: current.bands.map((band) =>
-                  band.id === bandId ? { ...band, lowerBound, verbalLabel } : band,
-                ),
-              }))
-            }
-          />
-
-          <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}-${source}`}>
-            Der Notenschlüssel wird hier früh festgelegt, damit der anschließende Aufbau direkt zur gewählten
-            Prüfungslogik passt.
-          </DismissibleCallout>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(6)}>
-              Zurück
-            </button>
-            {source === "manual" ? (
-              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
-                Weiter zu Aufbau
-              </button>
-            ) : source === "template" ? (
-              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
-                Weiter zu Vorlagen
-              </button>
-            ) : (
-              <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(8)}>
-                Weiter zu PDF-Import
-              </button>
-            )}
-          </div>
-        </div>
-        )}
-
-        {source === "manual" && step === 8 && (
-          <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Gesamtpunktzahl">
-              <div className="relative">
-                <span className="icon-muted pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
-                  <DashboardIcon className="h-4 w-4" />
-                </span>
-                <NumberInput
-                  className="field !pl-10"
-                  value={totalPoints}
-                  min={1}
-                  onCommit={(value) => setTotalPoints(Math.max(1, value))}
-                />
-              </div>
-            </Field>
-            <Field label="Anzahl Sektionen">
-              <div className="relative">
-                <span className="icon-muted pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
-                  <TemplateIcon className="h-4 w-4" />
-                </span>
-                <NumberInput
-                  className="field !pl-10"
-                  value={sectionCount}
-                  min={1}
-                  onCommit={(value) => {
-                    const nextCount = Math.max(1, Math.round(value));
-                    setSectionCount(nextCount);
-                    syncDraftsToCount(nextCount);
-                  }}
-                />
-              </div>
-            </Field>
-          </div>
-
-          <div className="surface-muted rounded-3xl p-5">
-            <h4 className="themed-strong text-base font-semibold">Builder-Grundlage</h4>
-            <p className="status-note mt-2 text-sm leading-6">
-              {resolvedSubject || "Eigenes Fach"} · {guidance.label} · {formatNumber(guidance.preset.totalPoints)} Punkte
-            </p>
-            <p className="status-note mt-3 text-sm leading-6">
-              Die hier vorbelegte Grundstruktur wird aus Fach und Stufe abgeleitet und kann im nächsten Schritt
-              vollständig überschrieben oder verfeinert werden.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {guidance.preset.sections.map((section, index) => (
-                <span key={`${section.title}-${index}`} className="button-soft">
-                  {section.title} · {formatNumber(section.weight)} %
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(7)}>
-              Zurück
-            </button>
-            <button type="button" className="button-primary w-full sm:w-auto" onClick={() => goToStep(9)}>
-              Weiter zu Sektionen
-            </button>
-          </div>
-        </div>
-        )}
-
-        {source === "manual" && step === 9 && (
-          <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="status-note text-sm leading-6">
-              Summe der Gewichtungen: <strong>{formatNumber(weightSum)}</strong> / 100 %
-            </p>
-            {difference !== 0 && (
-              <p className="warning-note text-xs">
-                Noch {difference > 0 ? formatNumber(difference) : formatNumber(Math.abs(difference))} %{" "}
-                {difference > 0 ? "zu verteilen" : "zu viel vergeben"}.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {sectionDrafts.map((section, index) => (
-              <div key={section.id} className="surface-muted rounded-3xl p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="themed-strong text-sm font-semibold">{getPartLabel(index)}</p>
-                  <span className="label">{formatNumber((totalPoints * section.weight) / 100)} Punkte</span>
-                </div>
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_140px]">
-                  <Field label="Titel">
-                    <input
-                      className="field"
-                      value={section.title}
-                      onChange={(event) =>
-                        setSectionDrafts((current) =>
-                          current.map((entry) =>
-                            entry.id === section.id ? { ...entry, title: event.target.value } : entry,
-                          ),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Gewichtung in %">
-                    <NumberInput
-                      className="field"
-                      value={section.weight}
-                      min={0}
-                      onCommit={(value) =>
-                        setSectionDrafts((current) =>
-                          current.map((entry) => (entry.id === section.id ? { ...entry, weight: value } : entry)),
-                        )
-                      }
-                    />
-                  </Field>
-                </div>
-                <p className="status-note mt-3 text-xs leading-5">
-                  Maximaler Anteil: {formatNumber(section.weight)} % von {formatNumber(totalPoints)} Punkten ={" "}
-                  {formatNumber((totalPoints * section.weight) / 100)} Punkte.
-                </p>
-                <Field label="Beschreibung">
-                  <TextAreaField
-                    className="mt-3 min-h-24"
-                    value={section.description}
-                    showListTransform
-                    onValueChange={(value) =>
-                      setSectionDrafts((current) =>
-                        current.map((entry) =>
-                          entry.id === section.id ? { ...entry, description: value } : entry,
-                        ),
-                      )
-                    }
-                  />
-                </Field>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap justify-between gap-3">
-            <button type="button" className="button-secondary" onClick={() => goToStep(8)}>
-              Zurück
-            </button>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="button-secondary" onClick={applyPresetStructure}>
-                Standardstruktur zurücksetzen
-              </button>
+            <div className="template-filter-row" aria-label="Fachfilter">
               <button
                 type="button"
-                className="button-primary"
-                disabled={(target === "new" && !targetGroupId) || difference !== 0 || hasEmptyTitles}
-                onClick={() =>
-                  onApplyManualStructure({
-                    totalPoints,
-                    gradeScale,
-                    sections: sectionDrafts,
-                    target,
-                    meta: metaDraft,
-                    targetGroupId: target === "new" ? targetGroupId || null : null,
-                  })
-                }
+                className={`template-filter-chip ${subjectFilter === "all" ? "template-filter-chip-active" : ""}`}
+                onClick={() => setSubjectFilter("all")}
               >
-                In EWH-Editor übernehmen
+                Alle Fächer
               </button>
+              {availableSubjects.map((subject) => (
+                <button
+                  key={subject}
+                  type="button"
+                  className={`template-filter-chip ${subjectFilter === subject ? "template-filter-chip-active" : ""}`}
+                  onClick={() => setSubjectFilter(subject)}
+                >
+                  {subject}
+                </button>
+              ))}
             </div>
-          </div>
-        </div>
-        )}
 
-        {source === "template" && step === 8 && (
-          <div className="space-y-6">
-          {matchingTemplates.length > 0 ? (
-            <>
-              <DismissibleCallout resetKey={`template-inline-${resolvedSubject}-${schoolStage}`}>
-                {matchingTemplates.length} Vorlage{matchingTemplates.length === 1 ? "" : "n"} für{" "}
-                {resolvedSubject || "dieses Fach"} in {guidance.label} stehen direkt bereit. Metadaten und
-                Notenschlüssel werden beim Laden aus dem Wizard übernommen.
-              </DismissibleCallout>
-              <div className="grid gap-4 xl:grid-cols-3">
-                {matchingTemplates.map((template, index) => {
-                  const isSelected = selectedTemplateId ? selectedTemplateId === template.id : index === 0;
-                  return (
-                    <ExamTemplatePreviewCard
-                      key={template.id}
-                      template={template}
-                      actionLabel={isSelected ? "Vorlage gewählt" : "Vorlage auswählen"}
-                      selected={isSelected}
-                      onLoad={() => setSelectedTemplateId(template.id)}
-                    />
-                  );
-                })}
+            <div className="template-filter-row" aria-label="Stufen und Formatfilter">
+              {[
+                ["all", "Alle Stufen"],
+                ["sek1", "Sek I"],
+                ["sek2", "Sek II"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`template-filter-chip ${stageFilter === value ? "template-filter-chip-active" : ""}`}
+                  onClick={() => setStageFilter(value as StageFilter)}
+                >
+                  {label}
+                </button>
+              ))}
+              {[
+                ["all", "Alle Formate"],
+                ["general", "Standard"],
+                ["abitur", "Abitur"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`template-filter-chip ${focusFilter === value ? "template-filter-chip-active" : ""}`}
+                  onClick={() => setFocusFilter(value as FocusFilter)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="themed-muted text-sm">
+                {scoredTemplates.length} Treffer{query ? ` für "${query}"` : ""}
+              </p>
+            </div>
+
+            {scoredTemplates.length > 0 ? (
+              <div className="template-result-grid">
+                {scoredTemplates.map((template, index) => renderTemplateCard(template, index))}
               </div>
-            </>
-          ) : (
-            <DismissibleCallout resetKey={`${resolvedSubject}-${schoolStage}`} tone="info">
-              Für {resolvedSubject || "dieses Fach"} in {guidance.label} gibt es aktuell keine spezifische Vorlage.
-              Wechsle bei Bedarf über "Zurück" zum manuellen Aufbau oder PDF-Import.
-            </DismissibleCallout>
-          )}
+            ) : (
+              <div className="template-empty-state">
+                <InfoIcon className="h-6 w-6" />
+                <div>
+                  <h3 className="themed-strong text-base font-semibold">Keine passende Vorlage gefunden</h3>
+                  <p className="themed-muted mt-1 text-sm leading-6">
+                    Suche breiter oder starte mit PDF-Import beziehungsweise einer leeren Struktur.
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button type="button" className="button-secondary w-full sm:w-auto" onClick={() => goToStep(7)}>
-              Zurück
-            </button>
-            <button
-              type="button"
-              className="button-primary w-full sm:w-auto"
-              disabled={!recommendedTemplate || (target === "new" && !targetGroupId)}
-              onClick={() =>
-                recommendedTemplate &&
-                onSelectTemplate(
-                  recommendedTemplate,
-                  target,
-                  gradeScale,
-                  metaDraft,
-                  target === "new" ? targetGroupId || null : null,
-                  totalPoints,
-                )
-              }
-            >
-              Fertigstellen, speichern und im EWH-Editor öffnen
-            </button>
-          </div>
+          <aside className="template-preview-panel">
+            {selectedTemplate ? (
+              <div
+                className="template-preview-subject-wrap"
+                style={getSubjectThemeStyle(getSubjectTheme(selectedTemplate.subject))}
+              >
+                <div>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <span className="template-subject-mark template-subject-mark-large" aria-hidden="true">
+                      <SubjectThemeIcon icon={getSubjectTheme(selectedTemplate.subject).icon} />
+                    </span>
+                    <span className="template-badge template-badge-strong template-subject-badge">
+                      {selectedTemplate.subject}
+                    </span>
+                    <span className="template-badge">{stageLongLabel(selectedTemplate.schoolStage)}</span>
+                    <span className="template-badge">{focusLabel(selectedTemplate.focus)}</span>
+                  </div>
+                  <h3 className="themed-strong text-xl font-semibold">{selectedTemplate.title}</h3>
+                  <p className="themed-muted mt-2 text-sm leading-6">{selectedTemplate.pedagogicalHint}</p>
+                </div>
+
+                <div className="template-section-list">
+                  {selectedTemplate.previewSections.map((section, index) => {
+                    const sectionPointValue = selectedTemplatePoints[index] ?? section.points;
+                    const sliderMax = Math.max(
+                      selectedTemplate.totalPoints * 1.5,
+                      selectedTemplateTotalPoints,
+                      sectionPointValue + 20,
+                    );
+                    return (
+                    <div key={section.title} className="template-section-meter">
+                      <div className="flex items-center justify-between gap-3">
+                        <strong>{section.title}</strong>
+                        <span>{formatNumber(sectionPointValue)} P.</span>
+                      </div>
+                      <input
+                        className="template-section-slider"
+                        type="range"
+                        min={POINT_STEP}
+                        max={sliderMax}
+                        step={POINT_STEP}
+                        value={sectionPointValue}
+                        style={{
+                          "--template-slider-fill": `${Math.min(100, (sectionPointValue / sliderMax) * 100)}%`,
+                        } as CSSProperties}
+                        aria-label={`${section.title} Punkte`}
+                        onChange={(event) => updateTemplateSectionPoint(index, Number(event.target.value))}
+                      />
+                      <p>{section.tasks.join(" · ")}</p>
+                    </div>
+                    );
+                  })}
+                </div>
+
+                <div className="template-quick-settings">
+                  <Field label="Zielpunktzahl">
+                    <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
+                  </Field>
+                  {renderTargetControls()}
+                  {renderMetaSummary()}
+                </div>
+
+                <button
+                  type="button"
+                  className="button-primary w-full gap-2"
+                  disabled={!canCreate}
+                  onClick={() =>
+                    adjustedSelectedTemplate &&
+                    onSelectTemplate(
+                      adjustedSelectedTemplate,
+                      target,
+                      gradeScale,
+                      metaDraft,
+                      target === "new" ? targetGroupId || null : null,
+                      totalPoints,
+                    )
+                  }
+                >
+                  <DashboardIcon />
+                  Erstellen und im EWH-Editor öffnen
+                </button>
+              </div>
+            ) : (
+              <div className="template-empty-state">
+                <InfoIcon className="h-6 w-6" />
+                <p className="themed-muted text-sm leading-6">Wähle eine Vorlage aus der Ergebnisliste.</p>
+              </div>
+            )}
+          </aside>
+          {renderMetaEditor()}
         </div>
-        )}
+      )}
 
-        {source === "pdf" && step === 8 && (
-          <div className="space-y-6">
-          <div className="surface-muted rounded-3xl p-5">
-            <h3 className="themed-strong text-base font-semibold">PDF als Wizard-Zweig übernehmen</h3>
-            <p className="status-note mt-2 text-sm leading-6">
-              Der PDF-Vorschlag landet nicht mehr direkt im Editor, sondern übernimmt Ziel, Metadaten und
-              Notenschlüssel aus diesem Wizard-Durchlauf.
+      {mode === "pdf" && (
+        <div className="template-secondary-layout">
+          <section className="template-preview-panel">
+            <h3 className="themed-strong text-xl font-semibold">Aus PDF starten</h3>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Nutze ein Aufgabenblatt oder einen vorhandenen Erwartungshorizont als Ausgangspunkt.
             </p>
-          </div>
-
+            <Field label="Zielpunktzahl">
+              <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
+            </Field>
+            {renderTargetControls()}
+            {renderMetaSummary()}
+          </section>
           <PdfImportAssistant
             embedded
-            disabled={target === "new" && !targetGroupId}
+            disabled={!canCreate}
             applyLabel="Mit PDF-Vorschlag in EWH-Editor"
             onApplySuggestion={(suggestion) =>
               onApplyPdfSuggestion({
@@ -1081,15 +938,146 @@ export const GuidedExamBuilder = ({
               })
             }
           />
-
-          <div className="flex justify-start">
-            <button type="button" className="button-secondary" onClick={() => goToStep(7)}>
-              Zurück
-            </button>
-          </div>
+          {renderMetaEditor()}
         </div>
-        )}
-      </Card>
-    </div>
+      )}
+
+      {mode === "manual" && (
+        <div className="template-secondary-layout">
+          <section className="template-preview-panel">
+            <h3 className="themed-strong text-xl font-semibold">Leere Struktur vorbereiten</h3>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Für Fälle ohne passende Vorlage: wenige Eckdaten setzen, dann im Editor ausarbeiten.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Fach">
+                <select className="field" value={manualSubject} onChange={(event) => setManualSubject(event.target.value)}>
+                  {[...BUILDER_SUBJECT_OPTIONS, "__custom__" as const].map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject === "__custom__" ? "Eigenes Fach" : subject}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Stufe">
+                <select className="field" value={manualStage} onChange={(event) => setManualStage(event.target.value as BuilderSchoolStage)}>
+                  <option value="sek1">Sekundarstufe I</option>
+                  <option value="sek2">Sekundarstufe II</option>
+                </select>
+              </Field>
+            </div>
+            {manualSubject === "__custom__" && (
+              <Field label="Eigenes Fach">
+                <input
+                  className="field"
+                  placeholder="z. B. Physik, Politik, Biologie"
+                  value={manualCustomSubject}
+                  onChange={(event) => setManualCustomSubject(event.target.value)}
+                />
+              </Field>
+            )}
+            <Field label="Gesamtpunktzahl">
+              <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
+            </Field>
+            {renderTargetControls()}
+            {renderMetaSummary()}
+          </section>
+
+          <section className="template-manual-panel">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="themed-strong text-lg font-semibold">Sektionen</h3>
+                <p className="themed-muted mt-1 text-sm">
+                  Summe: <strong>{formatNumber(weightSum)}</strong> / 100 %
+                </p>
+              </div>
+              <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={applyManualPreset}>
+                Vorschlag laden
+              </button>
+            </div>
+
+            {difference !== 0 && (
+              <p className="warning-note text-xs">
+                Noch {difference > 0 ? formatNumber(difference) : formatNumber(Math.abs(difference))} %{" "}
+                {difference > 0 ? "zu verteilen" : "zu viel vergeben"}.
+              </p>
+            )}
+
+            <div className="space-y-4">
+              {sectionDrafts.map((section, index) => (
+                <div key={section.id} className="template-manual-section">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="themed-strong text-sm font-semibold">{getPartLabel(index)}</p>
+                    <span className="label">{formatNumber((totalPoints * section.weight) / 100)} Punkte</span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
+                    <Field label="Titel">
+                      <input
+                        className="field"
+                        value={section.title}
+                        onChange={(event) =>
+                          setSectionDrafts((current) =>
+                            current.map((entry) =>
+                              entry.id === section.id ? { ...entry, title: event.target.value } : entry,
+                            ),
+                          )
+                        }
+                      />
+                    </Field>
+                    <Field label="Gewichtung">
+                      <NumberInput
+                        className="field"
+                        value={section.weight}
+                        min={0}
+                        step={0.5}
+                        onCommit={(value) =>
+                          setSectionDrafts((current) =>
+                            current.map((entry) => (entry.id === section.id ? { ...entry, weight: value } : entry)),
+                          )
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Beschreibung">
+                    <TextAreaField
+                      className="mt-2 min-h-20"
+                      value={section.description}
+                      showListTransform
+                      onValueChange={(value) =>
+                        setSectionDrafts((current) =>
+                          current.map((entry) =>
+                            entry.id === section.id ? { ...entry, description: value } : entry,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="button-primary w-full gap-2"
+              disabled={!canCreate || difference !== 0 || hasEmptyTitles}
+              onClick={() =>
+                onApplyManualStructure({
+                  totalPoints,
+                  gradeScale,
+                  sections: sectionDrafts,
+                  target,
+                  meta: metaDraft,
+                  targetGroupId: target === "new" ? targetGroupId || null : null,
+                })
+              }
+            >
+              <DashboardIcon />
+              Struktur im EWH-Editor öffnen
+            </button>
+          </section>
+          {renderMetaEditor()}
+        </div>
+      )}
+    </Card>
   );
 };
