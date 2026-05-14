@@ -100,6 +100,13 @@ export const CheckIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const LoadingIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+    <path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" strokeLinecap="round" opacity="0.35" />
+    <path d="M3.5 12A8.5 8.5 0 0 1 12 3.5" strokeLinecap="round" />
+  </svg>
+);
+
 export const CloseIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <path d="m7 7 10 10M17 7 7 17" strokeLinecap="round" />

@@ -452,7 +452,9 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
     Object.entries(database.assessments).map(([assessmentKey, assessment]) => {
       const groupId = getStudentGroupIdByStudentId(database, assessment.studentId);
       if (!groupId || !targetIds.has(groupId)) return [assessmentKey, assessment];
-      if (!assessment.teacherComment && !assessment.signatureDataUrl) return [assessmentKey, assessment];
+      if (Object.keys(assessment.taskScores).length === 0 && !assessment.teacherComment && !assessment.signatureDataUrl) {
+        return [assessmentKey, assessment];
+      }
 
       didChange = true;
       return [
@@ -468,6 +470,66 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
   );
 
   return didChange ? { ...database, assessments: nextAssessments } : database;
+};
+
+export const encryptAndScrubSensitiveAssessmentsForGroups = async (
+  database: StudentDatabase,
+  passwordByGroupId: Record<string, string>,
+): Promise<StudentDatabase> => {
+  const targetIds = new Set(Object.keys(passwordByGroupId));
+  if (targetIds.size === 0) return database;
+
+  let didChange = false;
+
+  const nextEntries = await Promise.all(
+    Object.entries(database.assessments).map(async ([assessmentKey, assessment]) => {
+      const groupId = getStudentGroupIdByStudentId(database, assessment.studentId);
+      if (!groupId || !targetIds.has(groupId)) return [assessmentKey, assessment] as const;
+
+      const password = passwordByGroupId[groupId]?.trim();
+      if (!password) return [assessmentKey, assessment] as const;
+
+      const hasTaskScores = Object.keys(assessment.taskScores).length > 0;
+      const encryptedTaskScores = hasTaskScores
+        ? await encryptText(JSON.stringify(assessment.taskScores), password)
+        : assessment.encryptedTaskScores ?? null;
+      const encryptedTeacherComment = assessment.teacherComment
+        ? await encryptText(assessment.teacherComment, password)
+        : assessment.encryptedTeacherComment ?? null;
+      const encryptedSignatureDataUrl = assessment.signatureDataUrl
+        ? await encryptText(assessment.signatureDataUrl, password)
+        : assessment.encryptedSignatureDataUrl ?? null;
+
+      if (
+        !hasTaskScores &&
+        !assessment.teacherComment &&
+        !assessment.signatureDataUrl &&
+        encryptedTaskScores === (assessment.encryptedTaskScores ?? null) &&
+        encryptedTeacherComment === (assessment.encryptedTeacherComment ?? null) &&
+        encryptedSignatureDataUrl === (assessment.encryptedSignatureDataUrl ?? null)
+      ) {
+        return [assessmentKey, assessment] as const;
+      }
+
+      didChange = true;
+      return [
+        assessmentKey,
+        {
+          ...assessment,
+          taskScores: {},
+          encryptedTaskScores,
+          teacherComment: "",
+          signatureDataUrl: null,
+          encryptedTeacherComment,
+          encryptedSignatureDataUrl,
+        },
+      ] as const;
+    }),
+  );
+
+  return didChange
+    ? { ...database, assessments: Object.fromEntries(nextEntries), updatedAt: database.updatedAt }
+    : database;
 };
 
 export const hydrateSensitiveAssessmentsForGroup = async (
@@ -561,13 +623,13 @@ export const serializeStudentDatabaseForStorage = async (
 
       const encryptedTaskScores = Object.keys(assessment.taskScores).length > 0
         ? await encryptText(JSON.stringify(assessment.taskScores), unlockedPassword)
-        : null;
+        : assessment.encryptedTaskScores ?? null;
       const encryptedTeacherComment = assessment.teacherComment
         ? await encryptText(assessment.teacherComment, unlockedPassword)
-        : null;
+        : assessment.encryptedTeacherComment ?? null;
       const encryptedSignatureDataUrl = assessment.signatureDataUrl
         ? await encryptText(assessment.signatureDataUrl, unlockedPassword)
-        : null;
+        : assessment.encryptedSignatureDataUrl ?? null;
 
       return [
         assessmentKey,

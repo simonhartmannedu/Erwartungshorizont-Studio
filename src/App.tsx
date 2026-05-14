@@ -77,6 +77,7 @@ import {
   getStudentGroup,
   getStudentRecord,
   hydrateSensitiveAssessmentsForGroup,
+  encryptAndScrubSensitiveAssessmentsForGroups,
   markStudentPrinted,
   removeStudentGroup,
   removeStudentFromGroup,
@@ -137,6 +138,7 @@ import {
   FullscreenExitIcon,
   FullscreenIcon,
   GroupIcon,
+  LoadingIcon,
   SaveIcon,
   MoonIcon,
   PaletteIcon,
@@ -731,6 +733,7 @@ function App() {
   const [headerUnlockDialogOpen, setHeaderUnlockDialogOpen] = useState(false);
   const [headerUnlockPasswordInput, setHeaderUnlockPasswordInput] = useState("");
   const [headerUnlockError, setHeaderUnlockError] = useState("");
+  const [headerUnlockLoading, setHeaderUnlockLoading] = useState(false);
   const [pendingSecurityTokenCards, setPendingSecurityTokenCards] = useState<SecurityTokenCard[]>([]);
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
@@ -749,16 +752,45 @@ function App() {
     });
   };
 
-  const clearUnlockedGroups = (notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
-    const lockedGroupIds = Object.keys(unlockedGroupPasswordsRef.current);
-    unlockedGroupPasswordsRef.current = {};
-    setUnlockedGroupIds([]);
-    if (lockedGroupIds.length > 0) {
-      setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, lockedGroupIds));
+  const lockUnlockedGroupsWithSnapshot = (
+    passwordByGroupId: Record<string, string>,
+    notice?: { title: string; detail?: string; tone?: AppNoticeTone },
+  ) => {
+    const lockedGroupIds = Object.keys(passwordByGroupId);
+    if (lockedGroupIds.length === 0) {
+      if (notice) {
+        pushNotice(notice.tone ?? "warning", notice.title, notice.detail);
+      }
+      return;
     }
+
+    void (async () => {
+      try {
+        const protectedDatabase = await encryptAndScrubSensitiveAssessmentsForGroups(
+          studentDatabaseRef.current,
+          passwordByGroupId,
+        );
+        setStudentDatabase(protectedDatabase);
+      } catch (error) {
+        console.error("Failed to encrypt assessments before locking", error);
+        pushNotice(
+          "danger",
+          "Sperren nicht vollständig abgeschlossen",
+          "Die Bewertungsdaten konnten vor dem Sperren nicht neu verschlüsselt werden. Bitte entsperre die Klasse erneut und exportiere ein Backup.",
+        );
+      }
+    })();
+
     if (notice) {
       pushNotice(notice.tone ?? "warning", notice.title, notice.detail);
     }
+  };
+
+  const clearUnlockedGroups = (notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
+    const lockedPasswords = { ...unlockedGroupPasswordsRef.current };
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
+    lockUnlockedGroupsWithSnapshot(lockedPasswords, notice);
   };
 
   const lockGroupSession = (groupId: string, notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
@@ -767,14 +799,11 @@ function App() {
     const nextPasswords = { ...unlockedGroupPasswordsRef.current };
     if (!(groupId in nextPasswords)) return;
 
+    const lockedPassword = nextPasswords[groupId];
     delete nextPasswords[groupId];
     unlockedGroupPasswordsRef.current = nextPasswords;
     setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
-    setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, [groupId]));
-
-    if (notice) {
-      pushNotice(notice.tone ?? "info", notice.title, notice.detail);
-    }
+    lockUnlockedGroupsWithSnapshot({ [groupId]: lockedPassword }, notice);
   };
 
   useEffect(() => {
@@ -842,7 +871,8 @@ function App() {
 
   useEffect(() => {
     if (!storageReady) return;
-    void saveStudentDatabase(studentDatabase, (groupId) => unlockedGroupPasswordsRef.current[groupId] ?? null);
+    const unlockedPasswordsSnapshot = { ...unlockedGroupPasswordsRef.current };
+    void saveStudentDatabase(studentDatabase, (groupId) => unlockedPasswordsSnapshot[groupId] ?? null);
   }, [studentDatabase, storageReady]);
 
   useEffect(() => {
@@ -2214,6 +2244,7 @@ function App() {
     setHeaderUnlockDialogOpen(true);
     setHeaderUnlockPasswordInput("");
     setHeaderUnlockError("");
+    setHeaderUnlockLoading(false);
   };
 
   const handleHeaderLockToggle = () => {
@@ -3998,11 +4029,14 @@ function App() {
         title="Klassenpasswort eingeben"
         description="Nach erfolgreicher Prüfung werden Bewertungsdaten, Kommentare, Signaturen und Klarnamen dieser Lerngruppe nur lokal für die aktuelle Sitzung geladen."
         onCancel={() => {
+          if (headerUnlockLoading) return;
           setHeaderUnlockDialogOpen(false);
           setHeaderUnlockPasswordInput("");
           setHeaderUnlockError("");
+          setHeaderUnlockLoading(false);
         }}
         onConfirm={async () => {
+          if (headerUnlockLoading) return;
           if (!activeGroup) return;
           const password = headerUnlockPasswordInput.trim();
           if (!password) {
@@ -4010,17 +4044,30 @@ function App() {
             return;
           }
 
-          const unlocked = await handleUnlockGroup(activeGroup.id, password, { silent: true });
-          if (!unlocked) {
-            setHeaderUnlockError("Das Klassenpasswort ist falsch.");
-            return;
-          }
-
-          setHeaderUnlockDialogOpen(false);
-          setHeaderUnlockPasswordInput("");
+          setHeaderUnlockLoading(true);
           setHeaderUnlockError("");
+          try {
+            const unlocked = await handleUnlockGroup(activeGroup.id, password, { silent: true });
+            if (!unlocked) {
+              setHeaderUnlockError("Das Klassenpasswort ist falsch.");
+              return;
+            }
+
+            setHeaderUnlockDialogOpen(false);
+            setHeaderUnlockPasswordInput("");
+            setHeaderUnlockError("");
+            pushNotice(
+              "success",
+              "Lerngruppe entschlüsselt",
+              "Bewertungen, Kommentare und Namen wurden lokal für diese Sitzung geladen.",
+            );
+          } finally {
+            setHeaderUnlockLoading(false);
+          }
         }}
-        confirmLabel="Lerngruppe entschlüsseln"
+        confirmLabel={headerUnlockLoading ? "Wird geladen..." : "Lerngruppe entschlüsseln"}
+        cancelDisabled={headerUnlockLoading}
+        confirmDisabled={headerUnlockLoading}
       >
         <div className="dialog-preview rounded-2xl p-4">
           <Field
@@ -4033,6 +4080,7 @@ function App() {
               className="field"
               type="password"
               value={headerUnlockPasswordInput}
+              disabled={headerUnlockLoading}
               onChange={(event) => {
                 setHeaderUnlockPasswordInput(event.target.value);
                 if (headerUnlockError) {
@@ -4041,6 +4089,12 @@ function App() {
               }}
             />
           </Field>
+          {headerUnlockLoading ? (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border p-3 text-sm font-semibold" role="status" aria-live="polite">
+              <LoadingIcon className="h-5 w-5 animate-spin" />
+              <span>Bewertungsdaten werden entschlüsselt. Bitte Fenster nicht schließen.</span>
+            </div>
+          ) : null}
           {headerUnlockError ? (
             <p className="mt-3 text-sm font-medium" style={{ color: "var(--app-soft-text)" }}>
               {headerUnlockError}
