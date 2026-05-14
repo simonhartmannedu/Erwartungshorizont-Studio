@@ -315,7 +315,7 @@ const getWorkspaceDisplayLabel = (workspace: DraftWorkspace | null | undefined) 
 
 const tabs: { id: TabId; label: string }[] = [
   { id: "groups", label: "Lerngruppen" },
-  { id: "guidedBuilder", label: "EWH-Builder" },
+  { id: "guidedBuilder", label: "EWH-Templates" },
   { id: "builder", label: "EWH-Editor" },
   { id: "archive", label: "EWH-Archiv" },
 ];
@@ -3535,7 +3535,7 @@ function App() {
                       <p className="label">Noch kein EWH zugeordnet</p>
                       <p className="themed-muted mt-2 text-sm leading-6">
                         Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
-                        bis du einen EWH per Wizard anlegst oder eine Vorlage zuweist.
+                        bis du einen EWH über die Vorlagensuche anlegst oder aus dem Archiv zuweist.
                       </p>
                     </div>
                   ) : null}
@@ -3555,10 +3555,10 @@ function App() {
             {activeTab === "guidedBuilder" && (
               <Suspense
                 fallback={(
-                  <Card title="Wizard lädt" subtitle="Der geführte Builder wird bei Bedarf nachgeladen.">
+                  <Card title="Vorlagensuche lädt" subtitle="EWH-Templates werden bei Bedarf nachgeladen.">
                     <div className="surface-muted rounded-3xl p-5">
                       <p className="themed-muted text-sm leading-6">
-                        Die Wizard-Oberfläche wird vorbereitet.
+                        Die Vorlagenoberfläche wird vorbereitet.
                       </p>
                     </div>
                   </Card>
@@ -3729,7 +3729,7 @@ function App() {
                           onClick={() => setActiveTab("guidedBuilder")}
                         >
                           <PlusIcon />
-                          Wizard starten
+                          Vorlage suchen
                         </button>
                         <button
                           type="button"
