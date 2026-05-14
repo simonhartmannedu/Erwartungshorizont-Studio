@@ -33,8 +33,11 @@ const {
 const { renderPrintDocument } = require("../.regression-dist/src/utils/export.js");
 const { parseDraftBundle, parseStudentDatabaseState } = require("../.regression-dist/src/utils/storage.js");
 const {
+  encryptAndScrubSensitiveAssessmentsForGroups,
   getEffectiveSignatureDataUrl,
+  hydrateSensitiveAssessmentsForGroup,
   scaleTaskScoresForStudents,
+  serializeStudentDatabaseForStorage,
   setStudentOrderInGroup,
 } = require("../.regression-dist/src/utils/students.js");
 
@@ -270,6 +273,43 @@ const testTaskScoreScaling = async () => {
   assert.equal(scaled.assessments[studentId].taskScores.taskA, 9.5);
 };
 
+const testProtectedScoresSurviveLockAndLockedSave = async () => {
+  const { password, database } = await createStudentDatabase();
+  const groupId = database.groups[0].id;
+  const studentId = "student-1";
+  const assessmentKey = studentId;
+  const oldEncryptedTaskScores = await encryptText(JSON.stringify({ taskA: 3 }), password);
+  const databaseWithLatestPlainScores = {
+    ...database,
+    assessments: {
+      [assessmentKey]: {
+        ...database.assessments[assessmentKey],
+        taskScores: { taskA: 8, taskB: 2.5 },
+        encryptedTaskScores: oldEncryptedTaskScores,
+        teacherComment: "",
+        encryptedTeacherComment: null,
+        signatureDataUrl: null,
+        encryptedSignatureDataUrl: null,
+      },
+    },
+  };
+
+  const encryptedAtLock = await encryptAndScrubSensitiveAssessmentsForGroups(
+    databaseWithLatestPlainScores,
+    { [groupId]: password },
+  );
+  assert.deepEqual(encryptedAtLock.assessments[assessmentKey].taskScores, {});
+
+  const lockedSave = await serializeStudentDatabaseForStorage(encryptedAtLock, () => null);
+  const rehydrated = await hydrateSensitiveAssessmentsForGroup(lockedSave, groupId, password);
+
+  assert.deepEqual(
+    rehydrated.assessments[assessmentKey].taskScores,
+    { taskA: 8, taskB: 2.5 },
+    "locking and a later locked save must preserve the latest entered scores",
+  );
+};
+
 const testStudentReorderingKeepsAssessments = async () => {
   const { database } = await createStudentDatabase();
   const group = database.groups[0];
@@ -380,6 +420,7 @@ Promise.all([
   testPrintEscaping(),
   testClassDefaultSignatureFallback(),
   testTaskScoreScaling(),
+  testProtectedScoresSurviveLockAndLockedSave(),
   testStudentReorderingKeepsAssessments(),
   Promise.resolve().then(testDuplicatedArchiveExamGetsFreshIds),
   Promise.resolve().then(testExamMetadataIsScopedPerClone),

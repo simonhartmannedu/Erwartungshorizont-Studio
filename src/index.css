@@ -841,6 +841,20 @@
     box-shadow: none;
   }
 
+  .button-primary:disabled,
+  .button-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .button-primary:disabled:hover,
+  .button-secondary:disabled:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
   .button-soft {
     @apply inline-flex items-center justify-center rounded-2xl px-3 py-2 text-sm font-semibold transition-[background-color,box-shadow,transform,color] duration-150 ease-out focus:outline-none;
     background: var(--app-soft-bg);

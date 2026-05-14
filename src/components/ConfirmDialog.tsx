@@ -11,6 +11,8 @@ interface Props {
   onConfirm: () => void;
   onSaveAndConfirm?: () => void;
   confirmLabel: string;
+  cancelDisabled?: boolean;
+  confirmDisabled?: boolean;
 }
 
 export const ConfirmDialog = ({
@@ -22,6 +24,8 @@ export const ConfirmDialog = ({
   onConfirm,
   onSaveAndConfirm,
   confirmLabel,
+  cancelDisabled = false,
+  confirmDisabled = false,
 }: Props) => {
   if (!open) return null;
 
@@ -32,17 +36,17 @@ export const ConfirmDialog = ({
         <p className="dialog-description mt-3 whitespace-pre-line text-sm leading-6">{description}</p>
         {children && <div className="mt-4">{children}</div>}
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <button type="button" className="button-secondary gap-2" onClick={onCancel}>
+          <button type="button" className="button-secondary gap-2" onClick={onCancel} disabled={cancelDisabled}>
             <CloseIcon />
             Abbrechen
           </button>
           {onSaveAndConfirm && (
-            <button type="button" className="button-secondary gap-2" onClick={onSaveAndConfirm}>
+            <button type="button" className="button-secondary gap-2" onClick={onSaveAndConfirm} disabled={confirmDisabled}>
               <ArchiveIcon />
               Vorher speichern
             </button>
           )}
-          <button type="button" className="button-primary gap-2" onClick={onConfirm}>
+          <button type="button" className="button-primary gap-2" onClick={onConfirm} disabled={confirmDisabled}>
             <CheckIcon />
             {confirmLabel}
           </button>
