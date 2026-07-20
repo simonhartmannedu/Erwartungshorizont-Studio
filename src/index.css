@@ -711,6 +711,74 @@
     --app-selection-text: #ffffff;
   }
 
+  :root[data-theme="pdf-report"] {
+    --app-bg: #ffffff;
+    --app-bg-image: none;
+    --app-text: #111111;
+    --app-text-strong: #111111;
+    --app-text-muted: #333333;
+    --app-border: #111111;
+    --app-border-default: #111111;
+    --app-panel-bg: #ffffff;
+    --app-panel-shadow: none;
+    --app-field-bg: #ffffff;
+    --app-field-border: #111111;
+    --app-field-focus: #111111;
+    --app-field-ring: rgba(17, 17, 17, 0.18);
+    --app-label: #111111;
+    --app-primary-bg: #111111;
+    --app-primary-text: #ffffff;
+    --app-primary-hover: #000000;
+    --app-primary-border-hover: #111111;
+    --app-primary-ring: rgba(17, 17, 17, 0.2);
+    --app-secondary-bg: #ffffff;
+    --app-secondary-text: #111111;
+    --app-secondary-border: #111111;
+    --app-secondary-hover: #f2f2f2;
+    --app-secondary-border-hover: #111111;
+    --app-secondary-ring: rgba(17, 17, 17, 0.14);
+    --app-soft-bg: #ffffff;
+    --app-soft-text: #111111;
+    --app-soft-hover: #f2f2f2;
+    --app-soft-ring: rgba(17, 17, 17, 0.18);
+    --app-selection-bg: #111111;
+    --app-selection-text: #ffffff;
+  }
+
+  :root.dark[data-theme="pdf-report"] {
+    --app-bg: #000000;
+    --app-bg-image: none;
+    --app-text: #ffffff;
+    --app-text-strong: #ffffff;
+    --app-text-muted: #ffffff;
+    --app-border: #ffffff;
+    --app-border-default: #ffffff;
+    --app-panel-bg: #000000;
+    --app-panel-shadow: none;
+    --app-field-bg: #000000;
+    --app-field-border: #ffffff;
+    --app-field-focus: #ffffff;
+    --app-field-ring: rgba(255, 255, 255, 0.22);
+    --app-label: #ffffff;
+    --app-primary-bg: #ffffff;
+    --app-primary-text: #000000;
+    --app-primary-hover: #ffffff;
+    --app-primary-border-hover: #ffffff;
+    --app-primary-ring: rgba(255, 255, 255, 0.22);
+    --app-secondary-bg: #000000;
+    --app-secondary-text: #ffffff;
+    --app-secondary-border: #ffffff;
+    --app-secondary-hover: #111111;
+    --app-secondary-border-hover: #ffffff;
+    --app-secondary-ring: rgba(255, 255, 255, 0.18);
+    --app-soft-bg: #000000;
+    --app-soft-text: #ffffff;
+    --app-soft-hover: #111111;
+    --app-soft-ring: rgba(255, 255, 255, 0.18);
+    --app-selection-bg: #ffffff;
+    --app-selection-text: #000000;
+  }
+
   body {
     @apply min-h-screen font-sans antialiased transition-colors;
     background-color: var(--app-bg);
@@ -760,6 +828,123 @@
     box-shadow:
       0 18px 44px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
       0 0 0 1px color-mix(in srgb, var(--app-field-focus) 5%, transparent);
+  }
+
+  :root[data-theme="pdf-report"] .app-shell {
+    background-size: auto;
+  }
+
+  :root[data-theme="pdf-report"] * {
+    border-radius: 0 !important;
+  }
+
+  :root[data-theme="pdf-report"] .panel,
+  :root[data-theme="pdf-report"] .surface-elevated,
+  :root[data-theme="pdf-report"] .surface-muted,
+  :root[data-theme="pdf-report"] .surface-panel,
+  :root[data-theme="pdf-report"] .workspace-switcher-shell,
+  :root[data-theme="pdf-report"] .themed-table-shell,
+  :root[data-theme="pdf-report"] .callout,
+  :root[data-theme="pdf-report"] .empty-workspace-state,
+  :root[data-theme="pdf-report"] .linked-section-block {
+    border-radius: 0 !important;
+    backdrop-filter: none;
+  }
+
+  :root[data-theme="pdf-report"] .panel:hover {
+    border-color: var(--app-border);
+    box-shadow: var(--app-panel-shadow);
+  }
+
+  :root[data-theme="pdf-report"] .field,
+  :root[data-theme="pdf-report"] .button-primary,
+  :root[data-theme="pdf-report"] .button-secondary,
+  :root[data-theme="pdf-report"] .button-soft,
+  :root[data-theme="pdf-report"] .student-chip,
+  :root[data-theme="pdf-report"] .workspace-mobile-trigger,
+  :root[data-theme="pdf-report"] .editor-toc-link {
+    border-radius: 0 !important;
+  }
+
+  :root[data-theme="pdf-report"] .button-primary:hover,
+  :root[data-theme="pdf-report"] .button-secondary:hover,
+  :root[data-theme="pdf-report"] .button-soft:hover,
+  :root[data-theme="pdf-report"] .workspace-mobile-trigger:hover,
+  :root[data-theme="pdf-report"] .workspace-tab:hover,
+  :root[data-theme="pdf-report"] .editor-toc-link:hover {
+    transform: none;
+  }
+
+  :root[data-theme="pdf-report"] .label {
+    letter-spacing: 0.08em;
+  }
+
+  :root[data-theme="pdf-report"] .hero-kicker {
+    border: 1px solid var(--app-border-default);
+    border-radius: 0;
+    background: var(--app-panel-bg);
+    box-shadow: none;
+    color: var(--app-text-strong);
+  }
+
+  :root[data-theme="pdf-report"] .card-title,
+  :root[data-theme="pdf-report"] .subsection-title {
+    font-family: Arial, sans-serif;
+  }
+
+  :root[data-theme="pdf-report"] .themed-table-head {
+    background: var(--app-secondary-bg);
+    color: var(--app-text-strong);
+  }
+
+  :root[data-theme="pdf-report"] .school-year-pill,
+  :root[data-theme="pdf-report"] .badge-slate,
+  :root[data-theme="pdf-report"] .badge-amber,
+  :root[data-theme="pdf-report"] .badge-rose,
+  :root[data-theme="pdf-report"] .badge-emerald,
+  :root[data-theme="pdf-report"] .callout-icon,
+  :root[data-theme="pdf-report"] .security-key-trigger,
+  :root[data-theme="pdf-report"] .security-key-trigger-orb,
+  :root[data-theme="pdf-report"] .security-key-trigger-ring,
+  :root[data-theme="pdf-report"] .security-key-trigger-lock {
+    border-radius: 0 !important;
+  }
+
+  :root[data-theme="pdf-report"] .surface-muted,
+  :root[data-theme="pdf-report"] .surface-elevated,
+  :root[data-theme="pdf-report"] .surface-panel,
+  :root[data-theme="pdf-report"] .surface-panel-strong,
+  :root[data-theme="pdf-report"] .workspace-switcher-shell,
+  :root[data-theme="pdf-report"] .themed-table-shell,
+  :root[data-theme="pdf-report"] .callout,
+  :root[data-theme="pdf-report"] .school-year-pill,
+  :root[data-theme="pdf-report"] .badge-slate,
+  :root[data-theme="pdf-report"] .badge-amber,
+  :root[data-theme="pdf-report"] .badge-rose,
+  :root[data-theme="pdf-report"] .badge-emerald {
+    background: var(--app-secondary-bg) !important;
+    color: var(--app-text-strong) !important;
+    box-shadow: none !important;
+  }
+
+  :root[data-theme="pdf-report"] .metric-primary {
+    background: var(--app-primary-bg) !important;
+    color: var(--app-primary-text) !important;
+  }
+
+  :root[data-theme="pdf-report"] .metric-accent,
+  :root[data-theme="pdf-report"] .callout-warning,
+  :root[data-theme="pdf-report"] .callout-info,
+  :root[data-theme="pdf-report"] .callout-success,
+  :root[data-theme="pdf-report"] .callout-danger {
+    background: var(--app-secondary-bg) !important;
+    border-color: var(--app-secondary-border) !important;
+    color: var(--app-text-strong) !important;
+  }
+
+  :root.dark[data-theme="pdf-report"] .themed-table-head {
+    background: var(--app-secondary-bg);
+    color: var(--app-text-strong);
   }
 
   .field {
@@ -979,6 +1164,22 @@
     background: color-mix(in srgb, var(--app-secondary-hover) 82%, transparent);
     color: var(--app-label);
     box-shadow: var(--app-panel-shadow);
+  }
+
+  .school-year-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    border: 1px solid var(--app-secondary-border);
+    border-radius: 0.7rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--app-secondary-bg);
+    color: var(--app-text-strong);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--app-text-strong) 5%, transparent);
   }
 
   .card-title {
@@ -3099,7 +3300,7 @@
 .builder-launch-shell {
   position: relative;
   overflow: hidden;
-  border-radius: 2rem;
+  border-radius: 1.1rem;
   border: 1px solid color-mix(in srgb, var(--app-field-focus) 18%, var(--app-secondary-border));
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--app-field-focus) 16%, transparent), transparent 34%),
@@ -3158,7 +3359,7 @@
   position: relative;
   width: min(320px, 72vw);
   aspect-ratio: 1;
-  border-radius: 9999px;
+  border-radius: 1.35rem;
   display: grid;
   place-items: center;
 }
@@ -3201,7 +3402,7 @@
   position: absolute;
   width: 0.9rem;
   height: 0.9rem;
-  border-radius: 9999px;
+  border-radius: 1.1rem;
   background: color-mix(in srgb, var(--app-field-focus) 88%, white);
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-field-focus) 10%, transparent);
   animation: storage-loader-led-pulse 2.6s ease-in-out infinite;
@@ -3228,7 +3429,7 @@
   position: relative;
   width: 40%;
   aspect-ratio: 1;
-  border-radius: 9999px;
+  border-radius: 0.75rem;
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--app-secondary-border) 88%, transparent);

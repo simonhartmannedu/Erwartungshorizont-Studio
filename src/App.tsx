@@ -35,14 +35,18 @@ import {
 } from "./utils/storage";
 import {
   buildAppBackupFilenameForClass,
+  buildSchoolYearArchiveFilename,
   clearBackupComplete,
   createEncryptedAppBackup,
+  createEncryptedSchoolYearWorkspaceArchive,
   describeBackupStatus,
   isEncryptedAppBackup,
+  isEncryptedSchoolYearWorkspaceArchive,
   isEncryptedStudentDatabaseBackup,
   loadLastBackupAt,
   markBackupComplete,
   parseAppBackup,
+  parseSchoolYearWorkspaceArchive,
   parseStudentDatabaseBackup,
 } from "./utils/backup";
 import { scaleExamPoints } from "./utils/scaling";
@@ -91,7 +95,6 @@ import {
 } from "./utils/students";
 import {
   downloadCsvFile,
-  downloadDataFile,
   exportClassOverviewCsv,
   exportGradeScaleCsv,
   exportStudentExamCsv,
@@ -101,6 +104,7 @@ import {
   openPrintPopupHost,
   openPrintWindow,
   openSecurityTokenPrintWindow,
+  prepareFileSave,
   resolveCommentTemplate,
 } from "./utils/export";
 import { ImportSortOptions, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
@@ -122,6 +126,7 @@ import {
 } from "./components/EditorToc";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
+import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
 import { CelebrationOverlay } from "./components/CelebrationOverlay";
@@ -160,7 +165,7 @@ const ExpectationArchiveDashboard = lazy(async () => {
   return { default: module.ExpectationArchiveDashboard };
 });
 
-type TabId = "guidedBuilder" | "builder" | "groups" | "archive";
+type TabId = "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 type PendingArchiveOverwrite = {
   existing: ExpectationArchiveEntry;
   incoming: ExpectationArchiveEntry;
@@ -241,42 +246,26 @@ type PendingImportPreview =
         studentDatabase: StudentDatabase;
         exportedAt: string | null;
       };
+    }
+  | {
+      kind: "schoolyear-workspace-archive";
+      sourceLabel: string;
+      summary: string;
+      warning?: string;
+      data: {
+        draftBundle: DraftBundle;
+        studentDatabase: StudentDatabase;
+        schoolYear: string;
+        exportedAt: string;
+      };
     };
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
 const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
-const DEMO_GROUP_PASSWORD = "demo";
-const DEMO_SEED_VERSION = "student-demo-v3";
+const DEMO_SEED_VERSION = "student-demo-v2";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
-const DEMO_STUDENT_NAMES = [
-  "Berger, Lina",
-  "Schneider, Noah",
-  "Kaya, Elif",
-  "Mertens, Jonas",
-  "Nguyen, Minh",
-  "Hoffmann, Clara",
-  "Yilmaz, Arda",
-  "Weber, Sophie",
-  "Fischer, Ben",
-  "Klein, Mia",
-  "Wagner, Leon",
-  "Roth, Emma",
-  "Becker, Paul",
-  "Schulz, Hanna",
-  "Neumann, Felix",
-  "Ali, Samira",
-  "Krause, Tim",
-  "Bauer, Marie",
-  "Wolf, Elias",
-  "Jansen, Lotta",
-  "Koch, Anton",
-  "Peters, Mila",
-  "Hartmann, Oskar",
-  "Lehmann, Amelie",
-  "Simon, Theo",
-];
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 const shouldForceDemoSeed = runtimeQuery.get("resetDemo") === "1" || runtimeQuery.get("freshDemo") === "1";
@@ -307,6 +296,8 @@ const TabIcon = ({ id }: { id: TabId }) => {
       return <GroupIcon />;
     case "archive":
       return <ArchiveIcon />;
+    case "backup":
+      return <SaveIcon />;
   }
 };
 
@@ -318,12 +309,14 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "guidedBuilder", label: "EWH-Templates" },
   { id: "builder", label: "EWH-Editor" },
   { id: "archive", label: "EWH-Archiv" },
+  { id: "backup", label: "Backup" },
 ];
 
 const getTabButtonId = (tabId: TabId) => `app-tab-${tabId}`;
 const getTabPanelId = (tabId: TabId) => `app-tabpanel-${tabId}`;
 
 const visualThemeOptions: { value: VisualTheme; label: string }[] = [
+  { value: "pdf-report", label: "PDF-Report" },
   { value: "earth-paper", label: "Bernsteinzimmer" },
   { value: "nrw-trikolore", label: "NRW-Trikolore" },
   { value: "waldmeister-schorle", label: "Waldmeister-Schorle" },
@@ -467,6 +460,9 @@ const normalizeArchiveTitle = (value: string) => value.trim().toLocaleLowerCase(
 const workspaceMatchesGroup = (workspace: DraftWorkspace, groupId: string) =>
   !groupId || workspace.assignedGroupId === groupId;
 
+const workspaceMatchesSchoolYear = (workspace: DraftWorkspace, schoolYearFilter: string) =>
+  schoolYearFilter === "all" || getWorkspaceSchoolYear(workspace) === schoolYearFilter;
+
 const getWorkspaceCorrectionSnapshot = (
   workspace: DraftWorkspace,
   group: ReturnType<typeof getStudentGroup>,
@@ -508,6 +504,77 @@ const pickPreferredWorkspaceForGroup = (
     return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
   })[0] ?? null;
 
+const getWorkspaceSchoolYear = (workspace: DraftWorkspace) => workspace.exam.meta.schoolYear.trim();
+
+const getSchoolYearLabel = (schoolYear: string) => schoolYear || "Ohne Schuljahr";
+
+const getAssessmentWorkspaceId = (assessment: { workspaceId: string | null }) =>
+  assessment.workspaceId?.trim() || null;
+
+const createStudentDatabaseForWorkspaceArchive = (
+  database: StudentDatabase,
+  workspaces: DraftWorkspace[],
+): StudentDatabase => {
+  const workspaceIds = new Set(workspaces.map((workspace) => workspace.id));
+  const archivedAssessments = Object.fromEntries(
+    Object.entries(database.assessments).filter(([, assessment]) => {
+      const workspaceId = getAssessmentWorkspaceId(assessment);
+      return Boolean(workspaceId && workspaceIds.has(workspaceId));
+    }),
+  );
+  const referencedStudentIds = new Set(
+    Object.values(archivedAssessments).map((assessment) => assessment.studentId),
+  );
+  const referencedGroupIds = new Set(
+    workspaces
+      .map((workspace) => workspace.assignedGroupId)
+      .filter((groupId): groupId is string => Boolean(groupId)),
+  );
+  const groups = database.groups.filter((group) => {
+    if (referencedGroupIds.has(group.id)) return true;
+    return group.students.some((student) => referencedStudentIds.has(student.id));
+  });
+
+  return {
+    version: database.version,
+    groups,
+    assessments: archivedAssessments,
+    updatedAt: new Date().toISOString(),
+  };
+};
+
+const removeWorkspaceAssessments = (database: StudentDatabase, workspaceIds: Set<string>): StudentDatabase => ({
+  ...database,
+  assessments: Object.fromEntries(
+    Object.entries(database.assessments).filter(([, assessment]) => {
+      const workspaceId = getAssessmentWorkspaceId(assessment);
+      return !workspaceId || !workspaceIds.has(workspaceId);
+    }),
+  ),
+  updatedAt: new Date().toISOString(),
+});
+
+const mergeStudentDatabases = (
+  current: StudentDatabase,
+  incoming: StudentDatabase,
+): StudentDatabase => {
+  const currentGroupIds = new Set(current.groups.map((group) => group.id));
+  const mergedGroups = [
+    ...current.groups,
+    ...incoming.groups.filter((group) => !currentGroupIds.has(group.id)),
+  ];
+
+  return {
+    version: Math.max(current.version, incoming.version),
+    groups: mergedGroups,
+    assessments: {
+      ...current.assessments,
+      ...incoming.assessments,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+};
+
 const toFiniteNumber = (value: unknown, fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
@@ -542,6 +609,7 @@ function App() {
           id: nextExam.id || crypto.randomUUID(),
           meta: {
             schoolYear: nextExam.meta?.schoolYear ?? "",
+            subject: nextExam.meta?.subject ?? "",
             gradeLevel: nextExam.meta?.gradeLevel ?? "",
             course: nextExam.meta?.course ?? "",
             teacher: nextExam.meta?.teacher ?? "",
@@ -635,16 +703,19 @@ function App() {
       ],
     };
   };
-  const createDemoStudentDatabase = async (workspace: DraftWorkspace): Promise<StudentDatabase> => {
-    const students = await Promise.all(
-      DEMO_STUDENT_NAMES.map(async (fullName, index) => ({
-        id: `demo-student-${index + 1}`,
-        alias: `Student ${index + 1}`,
-        encryptedName: await encryptText(fullName, DEMO_GROUP_PASSWORD),
-        isAbsent: index === DEMO_STUDENT_NAMES.length - 1,
-        createdAt: DEMO_TIMESTAMP,
-      })),
-    );
+  const createDemoStudentDatabase = (workspace: DraftWorkspace): StudentDatabase => {
+    const placeholderEncryptedName = {
+      ciphertext: "demo",
+      iv: "demo",
+      salt: "demo",
+    };
+    const students = Array.from({ length: 25 }, (_, index) => ({
+      id: `demo-student-${index + 1}`,
+      alias: `Student ${index + 1}`,
+      encryptedName: placeholderEncryptedName,
+      isAbsent: index === 24,
+      createdAt: DEMO_TIMESTAMP,
+    }));
     const tasks = workspace.exam.sections.flatMap((section) => section.tasks);
     const snapScore = (value: number, maxPoints: number) =>
       Math.min(maxPoints, Math.max(0, Math.round(value * 2) / 2));
@@ -679,14 +750,14 @@ function App() {
       }),
     );
 
-    const database: StudentDatabase = {
+    return {
       version: 1,
       groups: [
         {
           id: DEMO_GROUP_ID,
           subject: "Englisch",
           className: "8b Demo",
-          passwordVerifier: await createPasswordVerifier(DEMO_GROUP_ID, DEMO_GROUP_PASSWORD),
+          passwordVerifier: null,
           defaultSignatureDataUrl: null,
           students,
           createdAt: DEMO_TIMESTAMP,
@@ -696,10 +767,6 @@ function App() {
       assessments,
       updatedAt: DEMO_TIMESTAMP,
     };
-
-    return encryptAndScrubSensitiveAssessmentsForGroups(database, {
-      [DEMO_GROUP_ID]: DEMO_GROUP_PASSWORD,
-    });
   };
 
   const getSectionBlockBounds = (sections: Section[], sectionId: string) => {
@@ -737,11 +804,13 @@ function App() {
   const [restoreCheckpoint, setRestoreCheckpoint] = useState<RestoreCheckpoint | null>(null);
   const [pendingImportPreview, setPendingImportPreview] = useState<PendingImportPreview | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("builder");
+  const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     groups: null,
     guidedBuilder: null,
     builder: null,
     archive: null,
+    backup: null,
   });
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [sectionDropIndicator, setSectionDropIndicator] = useState<SectionDropIndicator>(null);
@@ -857,7 +926,7 @@ function App() {
         const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
         const nextArchiveEntries = shouldSeedDemoWorkspace ? [] : storedArchiveEntries;
         const nextStudentDatabase = shouldSeedDemoWorkspace
-          ? await createDemoStudentDatabase(nextDraftBundle.workspaces[0])
+          ? createDemoStudentDatabase(nextDraftBundle.workspaces[0])
           : storedStudentDatabase;
 
         if (shouldSeedDemoWorkspace) {
@@ -1034,9 +1103,23 @@ function App() {
 
   const selectedStudent =
     activeGroupId && activeStudentId ? { groupId: activeGroupId, studentId: activeStudentId } : null;
+  const schoolYearNavigationOptions = useMemo(() => {
+    const schoolYears = Array.from(
+      new Set(draftBundle.workspaces.map((workspace) => getWorkspaceSchoolYear(workspace))),
+    ).sort((left, right) => getSchoolYearLabel(left).localeCompare(getSchoolYearLabel(right), "de-DE", { numeric: true }));
+    if (activeSchoolYearFilter !== "all" && !schoolYears.includes(activeSchoolYearFilter)) {
+      schoolYears.push(activeSchoolYearFilter);
+    }
+    return schoolYears;
+  }, [activeSchoolYearFilter, draftBundle.workspaces]);
   const visibleWorkspaces = useMemo(
-    () => draftBundle.workspaces.filter((workspace) => workspaceMatchesGroup(workspace, activeGroupId)),
-    [draftBundle.workspaces, activeGroupId],
+    () =>
+      draftBundle.workspaces.filter(
+        (workspace) =>
+          workspaceMatchesGroup(workspace, activeGroupId) &&
+          workspaceMatchesSchoolYear(workspace, activeSchoolYearFilter),
+      ),
+    [activeGroupId, activeSchoolYearFilter, draftBundle.workspaces],
   );
   const emptyGroupExam = useMemo(() => normalizeExamStructure(createEmptyExam()), []);
   const hasNoAssignedWorkspaceForActiveGroup = Boolean(activeGroupId) && visibleWorkspaces.length === 0;
@@ -1073,6 +1156,40 @@ function App() {
     () => describeBackupStatus(studentDatabase, lastBackupAt),
     [studentDatabase, lastBackupAt],
   );
+  const schoolYearBackupOptions = useMemo<SchoolYearBackupOption[]>(() => {
+    const workspaceIdsWithAssessments = new Map<string, number>();
+    Object.values(studentDatabase.assessments).forEach((assessment) => {
+      const workspaceId = getAssessmentWorkspaceId(assessment);
+      if (!workspaceId) return;
+      workspaceIdsWithAssessments.set(workspaceId, (workspaceIdsWithAssessments.get(workspaceId) ?? 0) + 1);
+    });
+
+    const optionBySchoolYear = new Map<string, SchoolYearBackupOption>();
+    draftBundle.workspaces.forEach((workspace) => {
+      const schoolYear = getWorkspaceSchoolYear(workspace);
+      const current = optionBySchoolYear.get(schoolYear) ?? {
+        value: schoolYear,
+        label: getSchoolYearLabel(schoolYear),
+        workspaceCount: 0,
+        snapshotCount: 0,
+        assessmentCount: 0,
+      };
+      optionBySchoolYear.set(schoolYear, {
+        ...current,
+        workspaceCount: current.workspaceCount + 1,
+        snapshotCount: current.snapshotCount + workspace.versions.length,
+        assessmentCount: current.assessmentCount + (workspaceIdsWithAssessments.get(workspace.id) ?? 0),
+      });
+    });
+
+    return Array.from(optionBySchoolYear.values()).sort((left, right) =>
+      left.label.localeCompare(right.label, "de-DE", { numeric: true }),
+    );
+  }, [draftBundle.workspaces, studentDatabase.assessments]);
+  const totalSnapshotCount = useMemo(
+    () => draftBundle.workspaces.reduce((sum, workspace) => sum + workspace.versions.length, 0),
+    [draftBundle.workspaces],
+  );
 
   const captureRestoreCheckpoint = (): RestoreCheckpoint => ({
     draftBundle,
@@ -1083,35 +1200,26 @@ function App() {
     lastBackupAt,
   });
 
-  const resetDemoWorkspace = async () => {
-    try {
-      const nextDraftBundle = createDemoDraftBundle();
-      const nextArchiveEntries: ExpectationArchiveEntry[] = [];
-      const nextStudentDatabase = await createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
+  const resetDemoWorkspace = () => {
+    const nextDraftBundle = createDemoDraftBundle();
+    const nextArchiveEntries: ExpectationArchiveEntry[] = [];
+    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
 
-      setDraftBundle(nextDraftBundle);
-      setArchiveEntries(nextArchiveEntries);
-      void saveExpectationArchive(nextArchiveEntries);
-      markDemoSeedCurrent();
-      setStudentDatabase(nextStudentDatabase);
-      setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
-      setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
-      unlockedGroupPasswordsRef.current = {};
-      setUnlockedGroupIds([]);
-      setRestoreCheckpoint(null);
-      setPendingImportPreview(null);
-      setLastBackupAt(null);
-      clearBackupComplete();
-      setActiveTab("groups");
-      pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
-    } catch (error) {
-      console.error("Failed to reset demo data", error);
-      pushNotice(
-        "danger",
-        "Demo-Daten konnten nicht geladen werden",
-        "Die verschlüsselten Beispieldaten konnten nicht neu erstellt werden. Bitte lade die Seite erneut.",
-      );
-    }
+    setDraftBundle(nextDraftBundle);
+    setArchiveEntries(nextArchiveEntries);
+    void saveExpectationArchive(nextArchiveEntries);
+    markDemoSeedCurrent();
+    setStudentDatabase(nextStudentDatabase);
+    setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
+    setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
+    unlockedGroupPasswordsRef.current = {};
+    setUnlockedGroupIds([]);
+    setRestoreCheckpoint(null);
+    setPendingImportPreview(null);
+    setLastBackupAt(null);
+    clearBackupComplete();
+    setActiveTab("groups");
+    pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
   };
 
   const applyImportedState = (
@@ -1141,6 +1249,7 @@ function App() {
 
     setActiveGroupId(preferredGroup?.id ?? "");
     setActiveStudentId(preferredGroup?.students[0]?.id ?? "");
+    setActiveSchoolYearFilter("all");
 
     if (nextLastBackupAt) {
       markBackupComplete(nextLastBackupAt);
@@ -1161,6 +1270,7 @@ function App() {
     setUnlockedGroupIds([]);
     setActiveGroupId(restoreCheckpoint.activeGroupId);
     setActiveStudentId(restoreCheckpoint.activeStudentId);
+    setActiveSchoolYearFilter("all");
     if (restoreCheckpoint.lastBackupAt) {
       markBackupComplete(restoreCheckpoint.lastBackupAt);
     } else {
@@ -2454,16 +2564,174 @@ function App() {
       return false;
     }
 
+    const exportedAt = new Date().toISOString();
+    const filename = buildAppBackupFilenameForClass(exportedAt, activeGroup?.className ?? null);
+    const saveTarget = await prepareFileSave(filename, {
+      description: "Verschlüsseltes EWH-Backup",
+      accept: { "application/json": [".json"] },
+    });
+
+    if (!saveTarget) {
+      pushNotice("info", "Backup-Speichern abgebrochen", "Es wurden keine Sicherungsdaten geschrieben.");
+      return false;
+    }
+
     const backup = await createEncryptedAppBackup({
       draftBundle,
       studentDatabase,
       archiveEntries,
-    }, passphrase.trim());
-    downloadDataFile(buildAppBackupFilenameForClass(backup.exportedAt, activeGroup?.className ?? null), backup);
+    }, passphrase.trim(), exportedAt);
+    const saveResult = await saveTarget.save(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
     markBackupComplete(backup.exportedAt);
     setLastBackupAt(backup.exportedAt);
-    pushNotice("success", "Backup exportiert", `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`);
+    pushNotice(
+      "success",
+      saveResult === "saved" ? "Backup gespeichert" : "Backup exportiert",
+      saveResult === "saved"
+        ? `Verschlüsseltes Backup am gewählten Speicherort erstellt: ${filename}.`
+        : `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`,
+    );
     return true;
+  };
+
+  const handleArchiveSchoolYear = async (schoolYear: string, passphrase: string) => {
+    if (!passphrase.trim()) {
+      pushNotice("warning", "Archiv-Passwort fehlt", "Bitte vergib ein Passwort für die Schuljahr-Archivdatei.");
+      return false;
+    }
+
+    const workspacesToArchive = draftBundle.workspaces.filter(
+      (workspace) => getWorkspaceSchoolYear(workspace) === schoolYear,
+    );
+    if (workspacesToArchive.length === 0) {
+      pushNotice("warning", "Kein Schuljahr ausgewählt", "Für dieses Schuljahr wurden keine Klassenarbeiten gefunden.");
+      return false;
+    }
+
+    const exportedAt = new Date().toISOString();
+    const filename = buildSchoolYearArchiveFilename(getSchoolYearLabel(schoolYear), exportedAt);
+    const saveTarget = await prepareFileSave(filename, {
+      description: "Verschlüsseltes Schuljahr-Archiv",
+      accept: { "application/json": [".json"] },
+    });
+
+    if (!saveTarget) {
+      pushNotice("info", "Schuljahr-Archiv abgebrochen", "Es wurden keine Klassenarbeiten entfernt.");
+      return false;
+    }
+
+    const workspaceIds = new Set(workspacesToArchive.map((workspace) => workspace.id));
+    const archivedStudentDatabase = createStudentDatabaseForWorkspaceArchive(studentDatabase, workspacesToArchive);
+    const archivedDraftBundle: DraftBundle = {
+      activeWorkspaceId: workspacesToArchive[0]?.id ?? "",
+      workspaces: workspacesToArchive,
+    };
+    const encryptedArchive = await createEncryptedSchoolYearWorkspaceArchive(
+      {
+        draftBundle: archivedDraftBundle,
+        studentDatabase: archivedStudentDatabase,
+      },
+      passphrase.trim(),
+      getSchoolYearLabel(schoolYear),
+      exportedAt,
+    );
+
+    const saveResult = await saveTarget.save(
+      new Blob([JSON.stringify(encryptedArchive, null, 2)], { type: "application/json" }),
+    );
+
+    setRestoreCheckpoint(captureRestoreCheckpoint());
+    const remainingWorkspaces = draftBundle.workspaces.filter((workspace) => !workspaceIds.has(workspace.id));
+    const fallbackWorkspace = remainingWorkspaces.length === 0
+      ? createDraftWorkspace(createEmptyExam(), "Neues Schuljahr")
+      : null;
+    const nextWorkspaces = fallbackWorkspace ? [fallbackWorkspace] : remainingWorkspaces;
+    const nextActiveWorkspaceId = nextWorkspaces.some((workspace) => workspace.id === draftBundle.activeWorkspaceId)
+      ? draftBundle.activeWorkspaceId
+      : nextWorkspaces[0]?.id ?? "";
+
+    setDraftBundle({
+      activeWorkspaceId: nextActiveWorkspaceId,
+      workspaces: nextWorkspaces,
+    });
+    setStudentDatabase((current) => {
+      const next = removeWorkspaceAssessments(current, workspaceIds);
+      studentDatabaseRef.current = next;
+      return next;
+    });
+    const nextVersionedState = { ...lastVersionedExamByWorkspaceRef.current };
+    workspaceIds.forEach((workspaceId) => {
+      delete nextVersionedState[workspaceId];
+    });
+    if (fallbackWorkspace) {
+      nextVersionedState[fallbackWorkspace.id] = JSON.stringify(fallbackWorkspace.exam);
+    }
+    lastVersionedExamByWorkspaceRef.current = nextVersionedState;
+    setActiveSchoolYearFilter("all");
+    setActiveTab("backup");
+    pushNotice(
+      "success",
+      saveResult === "saved" ? "Schuljahr archiviert" : "Schuljahr exportiert",
+      `${workspacesToArchive.length} Klassenarbeiten aus ${getSchoolYearLabel(schoolYear)} wurden gesichert und aus der Arbeitsoberfläche entfernt. Das EWH-Archiv blieb unverändert.`,
+    );
+    return true;
+  };
+
+  const handleStartSchoolYear = (schoolYear: string, studentListMode: "keep" | "delete") => {
+    const normalizedSchoolYear = schoolYear.trim();
+    if (!normalizedSchoolYear) {
+      pushNotice("warning", "Schuljahr fehlt", "Bitte gib das neue Schuljahr ein, z. B. 2026/27.");
+      return;
+    }
+
+    if (studentListMode === "delete") {
+      setRestoreCheckpoint(captureRestoreCheckpoint());
+    }
+
+    const nextExam = normalizeExamStructure(createEmptyExam());
+    nextExam.meta.schoolYear = normalizedSchoolYear;
+    nextExam.meta.course = studentListMode === "keep" ? activeGroup?.className ?? "" : "";
+    const schoolYearWorkspaceCount = draftBundle.workspaces.filter(
+      (workspace) => getWorkspaceSchoolYear(workspace) === normalizedSchoolYear,
+    ).length;
+    const nextWorkspace = createDraftWorkspace(
+      nextExam,
+      `Klassenarbeit ${schoolYearWorkspaceCount + 1}`,
+      null,
+      studentListMode === "keep" ? activeGroupId || null : null,
+    );
+
+    setDraftBundle((current) => ({
+      activeWorkspaceId: nextWorkspace.id,
+      workspaces: [...current.workspaces, nextWorkspace],
+    }));
+    lastVersionedExamByWorkspaceRef.current = {
+      ...lastVersionedExamByWorkspaceRef.current,
+      [nextWorkspace.id]: JSON.stringify(nextWorkspace.exam),
+    };
+    setActiveSchoolYearFilter(normalizedSchoolYear);
+    setActiveTab("builder");
+    setCollapsedSectionIds([]);
+
+    if (studentListMode === "delete") {
+      const emptyDatabase = createEmptyStudentDatabase();
+      setStudentDatabase(emptyDatabase);
+      studentDatabaseRef.current = emptyDatabase;
+      unlockedGroupPasswordsRef.current = {};
+      setUnlockedGroupIds([]);
+      setActiveGroupId("");
+      setActiveStudentId("");
+      clearBackupComplete();
+      setLastBackupAt(null);
+    }
+
+    pushNotice(
+      "success",
+      "Neues Schuljahr angelegt",
+      studentListMode === "keep"
+        ? `${normalizedSchoolYear} ist aktiv. Bestehende Schülerlisten bleiben verfügbar.`
+        : `${normalizedSchoolYear} ist aktiv. Schülerlisten und Bewertungen wurden aus dem aktuellen Browserprofil entfernt.`,
+    );
   };
 
   const handleImportDatabase = (file: File, passphrase: string) => {
@@ -2485,6 +2753,26 @@ function App() {
                 archiveEntries: importedAppState.archiveEntries,
                 studentDatabase: importedAppState.studentDatabase,
                 exportedAt: parsed.exportedAt,
+              },
+            });
+            return;
+          }
+
+          if (isEncryptedSchoolYearWorkspaceArchive(parsed)) {
+            const importedArchive = await parseSchoolYearWorkspaceArchive(parsed, passphrase.trim());
+            const snapshotCount = importedArchive.draftBundle.workspaces.reduce(
+              (sum, workspace) => sum + workspace.versions.length,
+              0,
+            );
+            setPendingImportPreview({
+              kind: "schoolyear-workspace-archive",
+              sourceLabel: file.name,
+              summary: `${importedArchive.draftBundle.workspaces.length} Klassenarbeiten und ${snapshotCount} Schnappschüsse aus ${importedArchive.schoolYear}. EWH-Archiv-Einträge sind nicht enthalten.`,
+              data: {
+                draftBundle: importedArchive.draftBundle,
+                studentDatabase: importedArchive.studentDatabase,
+                schoolYear: importedArchive.schoolYear,
+                exportedAt: importedArchive.exportedAt,
               },
             });
             return;
@@ -2544,6 +2832,48 @@ function App() {
         `Importiert aus ${pendingImportPreview.sourceLabel} vom ${new Date(pendingImportPreview.data.exportedAt).toLocaleString("de-DE")}.`,
       );
       setPendingImportPreview(null);
+      return;
+    }
+
+    if (pendingImportPreview.kind === "schoolyear-workspace-archive") {
+      const existingWorkspaceIds = new Set(draftBundle.workspaces.map((workspace) => workspace.id));
+      const incomingWorkspaces = pendingImportPreview.data.draftBundle.workspaces.filter(
+        (workspace) => !existingWorkspaceIds.has(workspace.id),
+      );
+      const skippedCount = pendingImportPreview.data.draftBundle.workspaces.length - incomingWorkspaces.length;
+
+      if (incomingWorkspaces.length === 0) {
+        pushNotice(
+          "warning",
+          "Schuljahr bereits vorhanden",
+          "Alle Klassenarbeiten aus dieser Archivdatei sind bereits in der aktuellen Arbeitsliste vorhanden.",
+        );
+        setPendingImportPreview(null);
+        return;
+      }
+
+      setRestoreCheckpoint(captureRestoreCheckpoint());
+      setDraftBundle((current) => ({
+        activeWorkspaceId: current.activeWorkspaceId || incomingWorkspaces[0]?.id || "",
+        workspaces: [...current.workspaces, ...incomingWorkspaces],
+      }));
+      setStudentDatabase((current) => {
+        const next = mergeStudentDatabases(current, pendingImportPreview.data.studentDatabase);
+        studentDatabaseRef.current = next;
+        return next;
+      });
+      lastVersionedExamByWorkspaceRef.current = {
+        ...lastVersionedExamByWorkspaceRef.current,
+        ...Object.fromEntries(incomingWorkspaces.map((workspace) => [workspace.id, JSON.stringify(workspace.exam)])),
+      };
+      pushNotice(
+        skippedCount > 0 ? "warning" : "success",
+        "Schuljahr wiederhergestellt",
+        `${incomingWorkspaces.length} Klassenarbeiten aus ${pendingImportPreview.data.schoolYear} wurden in die Arbeitsliste übernommen.${skippedCount > 0 ? ` ${skippedCount} vorhandene Klassenarbeiten wurden übersprungen.` : ""}`,
+      );
+      setPendingImportPreview(null);
+      setActiveSchoolYearFilter(incomingWorkspaces[0] ? getWorkspaceSchoolYear(incomingWorkspaces[0]) : "all");
+      setActiveTab("backup");
       return;
     }
 
@@ -3024,7 +3354,7 @@ function App() {
       };
     });
 
-    downloadCsvFile(`${activeGroup.className || "Klasse"}_Klassendaten.csv`, rows);
+    void downloadCsvFile(`${activeGroup.className || "Klasse"}_Klassendaten.csv`, rows);
   };
 
   const handleExportClassOverviewCsv = () => {
@@ -3075,6 +3405,9 @@ function App() {
         : "Geschützte Lerngruppe entsperrt: Druck und CSV arbeiten mit lokal entschlüsselten Bewertungsdaten."
       : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und CSV-Exporte nutzen deshalb nur den Schülercode."
     : "PDF für Ausdrucke, CSV für Tabellenkalkulationen und JSON für Sicherungen.";
+  const currentSchoolYearPillLabel = activeSchoolYearFilter === "all"
+    ? getSchoolYearLabel(activeWorkspace ? getWorkspaceSchoolYear(activeWorkspace) : draftBundle.workspaces[0] ? getWorkspaceSchoolYear(draftBundle.workspaces[0]) : "")
+    : getSchoolYearLabel(activeSchoolYearFilter);
 
   const handlePrintSecurityTokens = () => {
     const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
@@ -3178,9 +3511,14 @@ function App() {
             <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
             <div className="brand-header-lockup">
               <div className="min-w-0">
-                <h1 className="font-display themed-strong text-4xl md:text-5xl">
-                  Erwartungshorizont Studio
-                </h1>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="font-display themed-strong text-4xl md:text-5xl">
+                    Erwartungshorizont Studio
+                  </h1>
+                  <span className="school-year-pill">
+                    Schuljahr {currentSchoolYearPillLabel}
+                  </span>
+                </div>
                 <p className="themed-muted mt-4 max-w-3xl text-base leading-7">
                   Erwartungshorizonte, erstellen und verwalten
                 </p>
@@ -3244,12 +3582,8 @@ function App() {
                 Diese GitHub-Pages-Demo lädt beim ersten Aufruf eine lokale Beispiel-Klassenarbeit. Alle Änderungen
                 bleiben nur in diesem Browser.
               </p>
-              <p>
-                Die Beispiel-Lerngruppe startet verschlüsselt. Zum Testen der Entschlüsselung lautet das
-                Klassenpasswort <strong>demo</strong>.
-              </p>
               <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className="button-secondary" onClick={() => void resetDemoWorkspace()}>
+                <button type="button" className="button-secondary" onClick={resetDemoWorkspace}>
                   Demo-Daten zurücksetzen
                 </button>
               </div>
@@ -3295,6 +3629,21 @@ function App() {
         <section className="mb-5 no-print">
           <div className="workspace-switcher-shell rounded-2xl border px-3 py-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <label className="w-full md:flex md:w-auto md:min-w-[250px] md:items-center md:gap-2">
+                <span className="label md:mb-0 md:shrink-0">Schuljahr</span>
+                <select
+                  className="field py-2 md:min-h-[2.6rem]"
+                  value={activeSchoolYearFilter}
+                  onChange={(event) => setActiveSchoolYearFilter(event.target.value)}
+                >
+                  <option value="all">Alle Schuljahre</option>
+                  {schoolYearNavigationOptions.map((schoolYear) => (
+                    <option key={schoolYear || "empty-school-year-navigation"} value={schoolYear}>
+                      {getSchoolYearLabel(schoolYear)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 md:hidden">
                   <button
@@ -3965,6 +4314,30 @@ function App() {
             )}
             </div>
 
+            <div
+              id={getTabPanelId("backup")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("backup")}
+              hidden={activeTab !== "backup"}
+              tabIndex={0}
+              className="space-y-6"
+            >
+            {activeTab === "backup" && (
+              <BackupPanel
+                backupStatus={backupStatus}
+                lastBackupAt={lastBackupAt}
+                schoolYearOptions={schoolYearBackupOptions}
+                totalSnapshotCount={totalSnapshotCount}
+                canRollbackImport={Boolean(restoreCheckpoint)}
+                onExportFullBackup={handleExportDatabase}
+                onImportBackup={handleImportDatabase}
+                onRollbackImport={rollbackLastImport}
+                onArchiveSchoolYear={handleArchiveSchoolYear}
+                onStartSchoolYear={handleStartSchoolYear}
+              />
+            )}
+            </div>
+
             {activeTab === "builder" && activeWorkspace && (
               <div className="no-print">
                 <ImportExportControls
@@ -4032,6 +4405,10 @@ function App() {
           {pendingImportPreview?.kind === "app-backup" ? (
             <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
               Der aktuelle Arbeitsstand wird vollständig ersetzt. Vor dem Übernehmen wird automatisch ein lokaler Rollback-Punkt erstellt.
+            </p>
+          ) : pendingImportPreview?.kind === "schoolyear-workspace-archive" ? (
+            <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
+              Die Klassenarbeiten aus dem Schuljahr-Archiv werden zur aktuellen Arbeitsliste hinzugefügt. Das bestehende EWH-Archiv bleibt unverändert.
             </p>
           ) : (
             <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>

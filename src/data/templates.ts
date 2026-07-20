@@ -41,6 +41,7 @@ const createBaseExam = ({
   notes,
   gradeLevel,
   course,
+  subject = "Englisch",
   schoolYear = "2025/2026",
 }: {
   title: string;
@@ -48,11 +49,13 @@ const createBaseExam = ({
   notes: string;
   gradeLevel: string;
   course: string;
+  subject?: string;
   schoolYear?: string;
 }): Omit<Exam, "sections"> => ({
   id: crypto.randomUUID(),
   meta: {
     schoolYear,
+    subject,
     gradeLevel,
     course,
     teacher: "M. Beispiel",

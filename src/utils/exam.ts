@@ -2,6 +2,7 @@ import { Exam, ExamMeta } from "../types";
 
 export const createEmptyExamMeta = (): ExamMeta => ({
   schoolYear: "",
+  subject: "",
   gradeLevel: "",
   course: "",
   teacher: "",
