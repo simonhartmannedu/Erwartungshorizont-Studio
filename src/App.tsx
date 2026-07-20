@@ -13,7 +13,7 @@ import {
   ThemeMode,
   VisualTheme,
 } from "./types";
-import { ExamTemplateDefinition, examTemplates } from "./data/templates";
+import type { ExamTemplateDefinition } from "./data/templates";
 import { sampleExam } from "./data/sampleExam";
 import { calculateExamSummary } from "./utils/calculations";
 import {
@@ -938,6 +938,7 @@ function App() {
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
   const [confettiBurstKey, setConfettiBurstKey] = useState(0);
+  const [loadedExamTemplates, setLoadedExamTemplates] = useState<ExamTemplateDefinition[] | null>(null);
   const completedCorrectionCelebrationKeysRef = useRef<Record<string, boolean>>({});
   const lastVersionedExamByWorkspaceRef = useRef<Record<string, string>>({});
   const previousActiveGroupIdRef = useRef<string>("");
@@ -991,6 +992,29 @@ function App() {
     setUnlockedGroupIds([]);
     lockUnlockedGroupsWithSnapshot(lockedPasswords, notice);
   };
+
+  useEffect(() => {
+    if (activeTab !== "guidedBuilder" || loadedExamTemplates) return;
+
+    let cancelled = false;
+
+    void import("./data/templates")
+      .then((module) => {
+        if (!cancelled) {
+          setLoadedExamTemplates(module.examTemplates);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load exam templates", error);
+        if (!cancelled) {
+          pushNotice("danger", "Templates konnten nicht geladen werden");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, loadedExamTemplates]);
 
   const lockGroupSession = (groupId: string, notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
     if (!groupId) return;
@@ -4282,37 +4306,47 @@ function App() {
                   </Card>
                 )}
               >
-                <GuidedExamBuilder
-                  groups={studentDatabase.groups.map((group) => ({
-                    id: group.id,
-                    subject: group.subject,
-                    className: group.className,
-                  }))}
-                  activeGroupId={activeGroupId}
-                  templates={examTemplates}
-                  initialTotalPoints={summary.totalMaxPoints}
-                  initialGradeScale={exam.gradeScale}
-                  initialSubject={activeGroup?.subject || ""}
-                  initialMeta={exam.meta}
-                  initialSections={exam.sections.map((section) => ({
-                    id: section.id,
-                    title: section.title,
-                    weight: section.weight,
-                    description: section.description,
-                  }))}
-                  onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
-                    applyTemplate(
-                      template,
-                      target,
-                      gradeScale,
-                      { ...meta },
-                      targetGroupId,
-                      targetTotalPoints,
-                    );
-                  }}
-                  onApplyManualStructure={applyGuidedBuilderStructure}
-                  onApplyPdfSuggestion={applyImportedExamSuggestion}
-                />
+                {loadedExamTemplates ? (
+                  <GuidedExamBuilder
+                    groups={studentDatabase.groups.map((group) => ({
+                      id: group.id,
+                      subject: group.subject,
+                      className: group.className,
+                    }))}
+                    activeGroupId={activeGroupId}
+                    templates={loadedExamTemplates}
+                    initialTotalPoints={summary.totalMaxPoints}
+                    initialGradeScale={exam.gradeScale}
+                    initialSubject={activeGroup?.subject || ""}
+                    initialMeta={exam.meta}
+                    initialSections={exam.sections.map((section) => ({
+                      id: section.id,
+                      title: section.title,
+                      weight: section.weight,
+                      description: section.description,
+                    }))}
+                    onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
+                      applyTemplate(
+                        template,
+                        target,
+                        gradeScale,
+                        { ...meta },
+                        targetGroupId,
+                        targetTotalPoints,
+                      );
+                    }}
+                    onApplyManualStructure={applyGuidedBuilderStructure}
+                    onApplyPdfSuggestion={applyImportedExamSuggestion}
+                  />
+                ) : (
+                  <Card title="Vorlagensuche lädt" subtitle="EWH-Templates werden bei Bedarf nachgeladen.">
+                    <div className="surface-muted rounded-3xl p-5">
+                      <p className="themed-muted text-sm leading-6">
+                        Die Template-Daten werden vorbereitet.
+                      </p>
+                    </div>
+                  </Card>
+                )}
               </Suspense>
             )}
             </div>
