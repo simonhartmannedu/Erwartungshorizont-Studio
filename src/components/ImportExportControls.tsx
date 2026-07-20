@@ -12,6 +12,8 @@ interface Props {
   onExportCsvClass?: () => void;
   onExportCsvClassOverview?: () => void;
   onExportCsvGradeScale?: () => void;
+  onExportScoringCsv?: () => void;
+  onExportScoringOds?: () => void;
   onImportBackup: (file: File, passphrase: string) => void;
   onExportBackup: (passphrase: string) => Promise<boolean>;
   printLabel?: string;
@@ -23,6 +25,8 @@ interface Props {
   exportCsvClassLabel?: string;
   exportCsvClassOverviewLabel?: string;
   exportCsvGradeScaleLabel?: string;
+  exportScoringCsvLabel?: string;
+  exportScoringOdsLabel?: string;
   printHint?: string;
 }
 
@@ -38,6 +42,8 @@ export const ImportExportControls = ({
   onExportCsvClass,
   onExportCsvClassOverview,
   onExportCsvGradeScale,
+  onExportScoringCsv,
+  onExportScoringOds,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
@@ -47,6 +53,8 @@ export const ImportExportControls = ({
   exportCsvClassLabel,
   exportCsvClassOverviewLabel,
   exportCsvGradeScaleLabel,
+  exportScoringCsvLabel,
+  exportScoringOdsLabel,
   printHint,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
@@ -93,8 +101,20 @@ export const ImportExportControls = ({
           </div>
         </div>
         <div className="surface-muted rounded-3xl p-4">
-          <p className="label">CSV-Export</p>
+          <p className="label">Tabellenexport</p>
           <div className="mt-3 flex flex-wrap gap-3">
+            {onExportScoringOds && (
+              <button type="button" className="button-primary gap-2" onClick={onExportScoringOds}>
+                <DownloadIcon />
+                {exportScoringOdsLabel || "Punktetabelle als ODS"}
+              </button>
+            )}
+            {onExportScoringCsv && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportScoringCsv}>
+                <DownloadIcon />
+                {exportScoringCsvLabel || "Punktetabelle als CSV"}
+              </button>
+            )}
             {onExportCsvStudent && (
               <button type="button" className="button-secondary gap-2" onClick={onExportCsvStudent}>
                 <DownloadIcon />

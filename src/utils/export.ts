@@ -607,6 +607,206 @@ export const exportClassOverviewCsv = (
   void downloadCsvFile(`${safePrefix}_Klassenuebersicht.csv`, rows);
 };
 
+export interface ScoringExportStudent {
+  alias: string;
+  fullName?: string | null;
+  isAbsent?: boolean;
+  scores?: Record<string, number>;
+}
+
+interface ScoringExportContext {
+  className?: string | null;
+  subject?: string | null;
+  students?: ScoringExportStudent[];
+}
+
+const getTaskEntries = (exam: Exam) =>
+  exam.sections.flatMap((section, sectionIndex) =>
+    section.tasks.map((task, taskIndex) => ({
+      section,
+      task,
+      label: `${sectionIndex + 1}.${taskIndex + 1}`,
+      header: `${sectionIndex + 1}.${taskIndex + 1} ${task.title} (${formatNumber(task.maxPoints)} P.)`,
+    })),
+  );
+
+const getScoringStudents = (students?: ScoringExportStudent[]) =>
+  students && students.length > 0
+    ? students
+    : [
+        {
+          alias: "S01",
+          fullName: "",
+          isAbsent: false,
+          scores: {},
+        },
+      ];
+
+const columnName = (columnIndex: number) => {
+  let index = columnIndex + 1;
+  let name = "";
+  while (index > 0) {
+    const remainder = (index - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    index = Math.floor((index - 1) / 26);
+  }
+  return name;
+};
+
+const quoteFormulaText = (value: string) => `"${value.replace(/"/g, "\"\"")}"`;
+
+const buildGradeFormula = (referenceCell: string, exam: Exam, totalMaxPoints: number) => {
+  const bands = [...getEffectiveGradeBands(exam.gradeScale, totalMaxPoints)]
+    .filter((band) => Number.isFinite(band.lowerBound))
+    .sort((left, right) => right.lowerBound - left.lowerBound);
+
+  return bands.reduceRight(
+    (fallback, band) => `IF(${referenceCell}>=${Number(band.lowerBound.toFixed(4))},${quoteFormulaText(band.label)},${fallback})`,
+    quoteFormulaText(""),
+  );
+};
+
+const buildScoringRows = (exam: Exam, context?: ScoringExportContext) => {
+  const tasks = getTaskEntries(exam);
+  const students = getScoringStudents(context?.students);
+  const totalMaxPoints = tasks.reduce((sum, entry) => sum + entry.task.maxPoints, 0);
+  const firstTaskColumn = 3;
+  const totalColumn = firstTaskColumn + tasks.length;
+  const maxColumn = totalColumn + 1;
+  const percentColumn = maxColumn + 1;
+  const gradeColumn = percentColumn + 1;
+
+  const rows = students.map((student, studentIndex) => {
+    const rowNumber = studentIndex + 2;
+    const firstTaskCell = `${columnName(firstTaskColumn)}${rowNumber}`;
+    const lastTaskCell = `${columnName(Math.max(firstTaskColumn, firstTaskColumn + tasks.length - 1))}${rowNumber}`;
+    const totalCell = `${columnName(totalColumn)}${rowNumber}`;
+    const maxCell = `${columnName(maxColumn)}${rowNumber}`;
+    const percentCell = `${columnName(percentColumn)}${rowNumber}`;
+    const gradeReference =
+      getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? totalCell : percentCell;
+
+    return {
+      Schuelercode: student.alias,
+      Schuelername: student.fullName ?? "",
+      Anwesend: student.isAbsent ? "nein" : "ja",
+      ...Object.fromEntries(
+        tasks.map((entry) => [
+          entry.header,
+          student.scores && Object.prototype.hasOwnProperty.call(student.scores, entry.task.id)
+            ? student.scores[entry.task.id]
+            : "",
+        ]),
+      ),
+      Gesamtpunkte: `=SUM(${firstTaskCell}:${lastTaskCell})`,
+      MaxPunkte: totalMaxPoints,
+      Prozent: `=IF(${maxCell}>0,${totalCell}/${maxCell}*100,0)`,
+      Note: `=${buildGradeFormula(gradeReference, exam, totalMaxPoints)}`,
+    };
+  });
+
+  return {
+    rows,
+    tasks,
+    students,
+    totalMaxPoints,
+    totalColumn,
+    maxColumn,
+    percentColumn,
+    gradeColumn,
+  };
+};
+
+export const exportScoringSheetCsv = (exam: Exam, context?: ScoringExportContext) => {
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Punktetabelle");
+  void downloadCsvFile(`${safePrefix}_Punktetabelle.csv`, buildScoringRows(exam, context).rows);
+};
+
+export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportContext) => {
+  const XLSX = await import("xlsx");
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Punktetabelle");
+  const scoring = buildScoringRows(exam, context);
+  const headers = scoring.rows.length > 0 ? Object.keys(scoring.rows[0]) : [];
+  const data = [
+    headers,
+    ...scoring.rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? "")),
+  ];
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+  scoring.students.forEach((_student, index) => {
+    const rowNumber = index + 2;
+    [
+      { column: scoring.totalColumn, formula: String(scoring.rows[index].Gesamtpunkte).slice(1), type: "n" },
+      { column: scoring.percentColumn, formula: String(scoring.rows[index].Prozent).slice(1), type: "n" },
+      { column: scoring.gradeColumn, formula: String(scoring.rows[index].Note).slice(1), type: "s" },
+    ].forEach(({ column, formula, type }) => {
+      const cellRef = `${columnName(column)}${rowNumber}`;
+      worksheet[cellRef] = {
+        ...(worksheet[cellRef] ?? {}),
+        t: type,
+        f: formula,
+      };
+    });
+  });
+
+  worksheet["!cols"] = headers.map((header, index) => ({
+    wch: index < 3 ? 16 : Math.min(38, Math.max(12, header.length + 2)),
+  }));
+
+  const taskSheet = XLSX.utils.json_to_sheet(
+    scoring.tasks.map((entry) => ({
+      AufgabenID: entry.task.id,
+      Bereich: entry.section.title,
+      Aufgabe: entry.task.title,
+      MaxPunkte: entry.task.maxPoints,
+      Beschreibung: entry.task.description,
+      Erwartung: entry.task.expectation,
+      Hinweis: entry.section.note,
+    })),
+  );
+
+  const summary = calculateScoringSheetSummary(exam, scoring.totalMaxPoints);
+  const scaleSheet = XLSX.utils.json_to_sheet(summary);
+
+  const infoSheet = XLSX.utils.aoa_to_sheet([
+    ["Titel", exam.meta.title],
+    ["Fach", context?.subject || exam.meta.subject],
+    ["Klasse/Kurs", context?.className || exam.meta.course],
+    ["Datum", exam.meta.examDate],
+    ["Hinweis", "Punkte in der Tabelle eintragen. Gesamtpunkte, Prozent und Note werden über Tabellenformeln berechnet."],
+    ["CSV-Einschraenkung", "CSV kann nur ein Blatt speichern. ODS enthält zusätzlich Aufgaben und Notenschlüssel."],
+  ]);
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Punkte eintragen");
+  XLSX.utils.book_append_sheet(workbook, taskSheet, "Aufgaben");
+  XLSX.utils.book_append_sheet(workbook, scaleSheet, "Notenschluessel");
+  XLSX.utils.book_append_sheet(workbook, infoSheet, "Hinweise");
+
+  const output = XLSX.write(workbook, { bookType: "ods", type: "array" });
+  const blob = new Blob([output], {
+    type: "application/vnd.oasis.opendocument.spreadsheet",
+  });
+
+  return saveBlobWithDialog(`${safePrefix}_Punktetabelle.ods`, blob, {
+    description: "ODS-Tabellendatei",
+    accept: {
+      "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
+    },
+  });
+};
+
+const calculateScoringSheetSummary = (exam: Exam, totalMaxPoints: number) => {
+  const rangeDigits = getGradeScaleRangeDigits(exam, totalMaxPoints);
+  return getGradeScaleRanges(exam, totalMaxPoints).map((range) => ({
+    Note: range.label,
+    Untergrenze: Number(range.lowerBound.toFixed(rangeDigits)),
+    Obergrenze: Number(range.upperBound.toFixed(rangeDigits)),
+    Modus: getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? "Punkte" : "Prozent",
+    GesamtMaxPunkte: totalMaxPoints,
+  }));
+};
+
 export const renderPrintDocument = (reports: PrintPayload[]) =>
   reports
     .map(({ exam, summary, identity, options }, reportIndex) => {

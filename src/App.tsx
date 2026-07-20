@@ -97,6 +97,8 @@ import {
   downloadCsvFile,
   exportClassOverviewCsv,
   exportGradeScaleCsv,
+  exportScoringSheetCsv,
+  exportScoringSheetOds,
   exportStudentExamCsv,
   openBatchPrintWindow,
   openClassOverviewPrintWindow,
@@ -3556,6 +3558,30 @@ function App() {
     exportGradeScaleCsv(displayExam, summary, activeStudentRecord?.alias ?? displayExam.meta.title);
   };
 
+  const getScoringExportStudents = () =>
+    activeGroup?.students.map((student) => ({
+      alias: student.alias,
+      fullName: "",
+      isAbsent: student.isAbsent,
+      scores: getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null).taskScores,
+    }));
+
+  const handleExportScoringCsv = () => {
+    exportScoringSheetCsv(exam, {
+      subject: activeGroup?.subject ?? exam.meta.subject,
+      className: activeGroup?.className ?? exam.meta.course,
+      students: getScoringExportStudents(),
+    });
+  };
+
+  const handleExportScoringOds = () => {
+    void exportScoringSheetOds(exam, {
+      subject: activeGroup?.subject ?? exam.meta.subject,
+      className: activeGroup?.className ?? exam.meta.course,
+      students: getScoringExportStudents(),
+    });
+  };
+
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
   const printWithoutDetailsLabel = activeStudentRecord
     ? `Leerer EWH (${activeStudentRecord.alias})`
@@ -3571,6 +3597,8 @@ function App() {
     ? `Klassenübersicht als CSV (${activeGroup.className})`
     : "Klassenübersicht als CSV";
   const exportCsvGradeScaleLabel = "Notenbereiche als CSV";
+  const exportScoringCsvLabel = activeGroup ? `Punktetabelle CSV (${activeGroup.className})` : "Punktetabelle CSV";
+  const exportScoringOdsLabel = activeGroup ? `Punktetabelle ODS (${activeGroup.className})` : "Punktetabelle ODS";
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
       ? assessmentLocked
@@ -4683,6 +4711,8 @@ function App() {
                   onExportCsvClass={activeGroup ? () => void handleExportClassCsv() : undefined}
                   onExportCsvClassOverview={activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
                   onExportCsvGradeScale={handleExportGradeScaleCsv}
+                  onExportScoringCsv={handleExportScoringCsv}
+                  onExportScoringOds={handleExportScoringOds}
                   printLabel={printLabel}
                   printWithoutDetailsLabel={printWithoutDetailsLabel}
                   printGradeScaleLabel={printGradeScaleLabel}
@@ -4692,6 +4722,8 @@ function App() {
                   exportCsvClassLabel={exportCsvClassLabel}
                   exportCsvClassOverviewLabel={exportCsvClassOverviewLabel}
                   exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
+                  exportScoringCsvLabel={exportScoringCsvLabel}
+                  exportScoringOdsLabel={exportScoringOdsLabel}
                   printHint={printHint}
                 />
               </div>
