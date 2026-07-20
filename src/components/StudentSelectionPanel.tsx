@@ -96,7 +96,7 @@ export const StudentSelectionPanel = ({
         subtitle="Im Arbeitsbereich erscheinen Schülercodes. Klarnamen werden nur lokal entschlüsselt."
       >
         {activeGroup ? (
-          <div className="surface-muted mb-4 rounded-3xl p-4">
+          <div className="surface-muted mb-4 rounded-2xl p-4">
             <button
               type="button"
               className={`security-key-trigger ${isSelectedGroupUnlocked ? "is-unlocked" : "is-locked"}`}

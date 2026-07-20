@@ -59,7 +59,7 @@ export const ImportExportControls = ({
   };
 
   return (
-    <Card title="Drucken / Import / Export" subtitle={printHint}>
+    <Card title="Drucken und exportieren" subtitle={printHint}>
       <div className="space-y-4">
         <div className="surface-muted rounded-3xl p-4">
           <p className="label">PDF / Druck</p>
@@ -93,7 +93,7 @@ export const ImportExportControls = ({
           </div>
         </div>
         <div className="surface-muted rounded-3xl p-4">
-          <p className="label">CSV / Datenexport</p>
+          <p className="label">CSV-Export</p>
           <div className="mt-3 flex flex-wrap gap-3">
             {onExportCsvStudent && (
               <button type="button" className="button-secondary gap-2" onClick={onExportCsvStudent}>
@@ -143,7 +143,7 @@ export const ImportExportControls = ({
                 }}
               >
                 <DownloadIcon />
-                Arbeitsstand-Backup exportieren
+                Speicherort wählen und Backup sichern
               </button>
               <label className="button-secondary cursor-pointer gap-2">
                 <UploadIcon />
@@ -152,6 +152,9 @@ export const ImportExportControls = ({
               </label>
             </div>
           </div>
+          <p className="status-note mt-3 text-xs leading-5">
+            In Chromium-basierten Browsern öffnet sich ein Systemdialog zur Ordnerwahl. Andere Browser nutzen den normalen Download-Dialog.
+          </p>
         </div>
       </div>
     </Card>

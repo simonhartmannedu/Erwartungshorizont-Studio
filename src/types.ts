@@ -6,6 +6,7 @@ export type GradeScaleRecommendedStage = "sek1" | "sek2";
 export type ThemeMode = "light" | "dark";
 export type GroupAccessMode = "generated" | "manual";
 export type VisualTheme =
+  | "pdf-report"
   | "earth-paper"
   | "nrw-trikolore"
   | "waldmeister-schorle"
@@ -17,6 +18,7 @@ export type VisualTheme =
 
 export interface ExamMeta {
   schoolYear: string;
+  subject: string;
   gradeLevel: string;
   course: string;
   teacher: string;
@@ -161,6 +163,7 @@ export interface ExpectationArchiveEntry {
   examId: string;
   examTitle: string;
   schoolYear: string;
+  subject: string;
   gradeLevel: string;
   course: string;
   teacher: string;

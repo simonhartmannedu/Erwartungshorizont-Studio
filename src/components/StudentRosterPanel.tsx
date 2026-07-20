@@ -577,6 +577,7 @@ export const StudentRosterPanel = ({
                           title="Lerngruppe entfernen"
                           variant="soft"
                           className="px-3 py-2 text-xs"
+                          showTooltip={false}
                         >
                           <TrashIcon />
                           Entfernen
@@ -626,17 +627,13 @@ export const StudentRosterPanel = ({
                             ) : null}
                           </div>
                           <div className="surface-elevated rounded-3xl border p-4">
-                            <p className="label">Listenmodus</p>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                              <div className="surface-muted rounded-2xl p-3">
-                                <p className="label">Sortieren</p>
-                                <p className="themed-muted mt-1 text-sm">Nach Code, Klarname, Nachname oder Vorname.</p>
-                              </div>
-                              <div className="surface-muted rounded-2xl p-3">
-                                <p className="label">Reihenfolge</p>
-                                <p className="themed-muted mt-1 text-sm">Oben, unten oder direkt löschen.</p>
-                              </div>
-                            </div>
+                            <p className="label">Aktive Tabellenaktion</p>
+                            <p className="themed-strong text-sm font-semibold">
+                              {selectedStudentRecord ? getStudentDisplayLabel(selectedStudentRecord, namesByStudentId) : "Noch kein Schüler ausgewählt"}
+                            </p>
+                            <p className="themed-muted mt-2 text-sm leading-6">
+                              Tabellenzeilen wählen den Schüler für den EWH-Editor aus. Die Spaltenüberschriften sortieren die Liste.
+                            </p>
                           </div>
                         </div>
                         {group.students.length === 0 ? (
@@ -696,7 +693,7 @@ export const StudentRosterPanel = ({
                                           <div className="flex justify-end gap-2">
                                             <button
                                               type="button"
-                                              className={`px-3 py-2 text-xs ${
+                                              className={`gap-1 px-3 py-2 text-xs ${
                                                 viewedStudent?.groupId === group.id && viewedStudent.studentId === student.id
                                                   ? "button-primary"
                                                   : "button-secondary"
@@ -707,26 +704,33 @@ export const StudentRosterPanel = ({
                                               onClick={() => openStudentPerformanceView(group.id, student.id)}
                                             >
                                               <EyeIcon className="h-4 w-4" />
+                                              Ansicht
                                             </button>
                                             <button
                                               type="button"
                                               className="button-secondary px-3 py-2 text-xs"
+                                              title={`${student.alias} nach oben verschieben`}
+                                              aria-label={`${student.alias} nach oben verschieben`}
                                               onClick={() => moveStudent(group, student.id, "up")}
                                               disabled={index === 0}
                                             >
-                                              ↑
+                                              ↑ Hoch
                                             </button>
                                             <button
                                               type="button"
                                               className="button-secondary px-3 py-2 text-xs"
+                                              title={`${student.alias} nach unten verschieben`}
+                                              aria-label={`${student.alias} nach unten verschieben`}
                                               onClick={() => moveStudent(group, student.id, "down")}
                                               disabled={index === group.students.length - 1}
                                             >
-                                              ↓
+                                              ↓ Runter
                                             </button>
                                             <button
                                               type="button"
                                               className="button-soft px-3 py-2 text-xs"
+                                              title={`${student.alias} löschen`}
+                                              aria-label={`${student.alias} löschen`}
                                               onClick={() =>
                                                 setPendingStudentDelete({
                                                   groupId: group.id,
@@ -800,7 +804,7 @@ export const StudentRosterPanel = ({
                       }}
                     >
                       <DownloadIcon />
-                      Arbeitsstand-Backup exportieren
+                      Speicherort wählen und Backup sichern
                     </button>
                     <label className="button-secondary w-full cursor-pointer gap-2 sm:w-auto">
                       <UploadIcon />

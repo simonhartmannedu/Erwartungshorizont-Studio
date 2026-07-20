@@ -12,6 +12,9 @@ export const ExamHeaderForm = ({ meta, onChange, disabled = false }: Props) => (
     <Field label="Schuljahr">
       <input className="field" value={meta.schoolYear} disabled={disabled} onChange={(e) => onChange("schoolYear", e.target.value)} />
     </Field>
+    <Field label="Fach">
+      <input className="field" value={meta.subject} disabled={disabled} onChange={(e) => onChange("subject", e.target.value)} />
+    </Field>
     <Field label="Jahrgang">
       <input className="field" value={meta.gradeLevel} disabled={disabled} onChange={(e) => onChange("gradeLevel", e.target.value)} />
     </Field>

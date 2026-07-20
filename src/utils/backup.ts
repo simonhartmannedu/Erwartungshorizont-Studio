@@ -21,10 +21,23 @@ export interface EncryptedAppBackup {
   payload: Awaited<ReturnType<typeof encryptText>>;
 }
 
+export interface EncryptedSchoolYearWorkspaceArchive {
+  kind: "ewh-schoolyear-workspace-archive";
+  version: 1;
+  exportedAt: string;
+  schoolYear: string;
+  payload: Awaited<ReturnType<typeof encryptText>>;
+}
+
 interface AppBackupPayload {
   draftBundle: DraftBundle;
   studentDatabase: StudentDatabase;
   archiveEntries: ExpectationArchiveEntry[];
+}
+
+interface SchoolYearWorkspaceArchivePayload {
+  draftBundle: DraftBundle;
+  studentDatabase: StudentDatabase;
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -50,23 +63,51 @@ export const isEncryptedAppBackup = (value: unknown): value is EncryptedAppBacku
   typeof value.payload.iv === "string" &&
   typeof value.payload.salt === "string";
 
+export const isEncryptedSchoolYearWorkspaceArchive = (
+  value: unknown,
+): value is EncryptedSchoolYearWorkspaceArchive =>
+  isPlainObject(value) &&
+  value.kind === "ewh-schoolyear-workspace-archive" &&
+  value.version === 1 &&
+  typeof value.exportedAt === "string" &&
+  typeof value.schoolYear === "string" &&
+  isPlainObject(value.payload) &&
+  typeof value.payload.ciphertext === "string" &&
+  typeof value.payload.iv === "string" &&
+  typeof value.payload.salt === "string";
+
 export const createEncryptedStudentDatabaseBackup = async (
   database: StudentDatabase,
   passphrase: string,
+  exportedAt = new Date().toISOString(),
 ): Promise<EncryptedStudentDatabaseBackup> => ({
   kind: "ewh-student-database-backup",
   version: 1,
-  exportedAt: new Date().toISOString(),
+  exportedAt,
   payload: await encryptText(JSON.stringify(database), passphrase),
 });
 
 export const createEncryptedAppBackup = async (
   payload: AppBackupPayload,
   passphrase: string,
+  exportedAt = new Date().toISOString(),
 ): Promise<EncryptedAppBackup> => ({
   kind: "ewh-app-backup",
   version: 1,
-  exportedAt: new Date().toISOString(),
+  exportedAt,
+  payload: await encryptText(JSON.stringify(payload), passphrase),
+});
+
+export const createEncryptedSchoolYearWorkspaceArchive = async (
+  payload: SchoolYearWorkspaceArchivePayload,
+  passphrase: string,
+  schoolYear: string,
+  exportedAt = new Date().toISOString(),
+): Promise<EncryptedSchoolYearWorkspaceArchive> => ({
+  kind: "ewh-schoolyear-workspace-archive",
+  version: 1,
+  exportedAt,
+  schoolYear,
   payload: await encryptText(JSON.stringify(payload), passphrase),
 });
 
@@ -111,7 +152,7 @@ export const buildAppBackupFilename = (exportedAt: string) => {
   const valueByType = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
   const datePart = `${valueByType.year}-${valueByType.month}-${valueByType.day}`;
   const timePart = `${valueByType.hour}-${valueByType.minute}-${valueByType.second}`;
-  return `arbeitsstand-backup-${datePart}_${timePart}.backup.json`;
+  return `vollbackup-arbeitsstand-${datePart}_${timePart}.backup.json`;
 };
 
 const sanitizeFilenamePart = (value: string) =>
@@ -142,7 +183,30 @@ export const buildAppBackupFilenameForClass = (exportedAt: string, className?: s
   const datePart = `${valueByType.year}-${valueByType.month}-${valueByType.day}`;
   const timePart = `${valueByType.hour}-${valueByType.minute}-${valueByType.second}`;
   const classPart = className ? sanitizeFilenamePart(className) : "ohne_klasse";
-  return `arbeitsstand-backup-${classPart}-${datePart}_${timePart}.backup.json`;
+  return `vollbackup-arbeitsstand-${classPart}-${datePart}_${timePart}.backup.json`;
+};
+
+export const buildSchoolYearArchiveFilename = (schoolYear: string, exportedAt: string) => {
+  const exportedAtDate = new Date(exportedAt);
+  const timestamp = Number.isNaN(exportedAtDate.getTime())
+    ? new Date()
+    : exportedAtDate;
+
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(timestamp);
+
+  const valueByType = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const datePart = `${valueByType.year}-${valueByType.month}-${valueByType.day}`;
+  const timePart = `${valueByType.hour}-${valueByType.minute}-${valueByType.second}`;
+  const schoolYearPart = sanitizeFilenamePart(schoolYear) || "ohne_schuljahr";
+  return `schuljahr-archiv-${schoolYearPart}-${datePart}_${timePart}.backup.json`;
 };
 
 export const parseStudentDatabaseBackup = async (
@@ -198,6 +262,40 @@ export const parseAppBackup = async (
     draftBundle,
     studentDatabase,
     archiveEntries,
+  };
+};
+
+export const parseSchoolYearWorkspaceArchive = async (
+  value: unknown,
+  passphrase: string,
+): Promise<SchoolYearWorkspaceArchivePayload & { schoolYear: string; exportedAt: string }> => {
+  if (!isEncryptedSchoolYearWorkspaceArchive(value)) {
+    throw new Error("Die Schuljahr-Archivdatei ist ungültig.");
+  }
+
+  const decrypted = await decryptText(value.payload, passphrase);
+  const parsed = JSON.parse(decrypted) as unknown;
+
+  if (!isPlainObject(parsed)) {
+    throw new Error("Die Schuljahr-Archivdatei enthält keinen gültigen Arbeitsstand.");
+  }
+
+  const draftBundle = parseDraftBundle(JSON.stringify(parsed.draftBundle));
+  const studentDatabase = parsed.studentDatabase;
+
+  if (!draftBundle) {
+    throw new Error("Die Schuljahr-Archivdatei enthält keine gültigen Klassenarbeiten.");
+  }
+
+  if (!isStudentDatabase(studentDatabase)) {
+    throw new Error("Die Schuljahr-Archivdatei enthält keine gültige Schülerdatenbank.");
+  }
+
+  return {
+    draftBundle,
+    studentDatabase,
+    schoolYear: value.schoolYear,
+    exportedAt: value.exportedAt,
   };
 };
 

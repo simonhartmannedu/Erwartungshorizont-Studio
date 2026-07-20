@@ -193,21 +193,20 @@ const profiles: BuilderSubjectProfile[] = [
       ],
       subjectBullets: [
         "Standardsicherung NRW stellt für Englisch GOSt Operatoren, Konstruktionshinweise, Bewertungsraster, Zieltextformate und Hinweise zum Hörverstehen bereit.",
-        "Seit dem Zentralabitur ab 2025 gehört das Aufgabenformat Hörverstehen verbindlich zum fachlichen Bezugsrahmen; schulinterne Klausuren in GOSt müssen diese Entwicklung mitdenken.",
+        "Seit dem Zentralabitur ab 2025 gehört Hörverstehen zum fachlichen Bezugsrahmen; Klausuren unter Abiturbedingungen kombinieren Hörverstehen, Sprachmittlung und Schreiben/Leseverstehen mit insgesamt 200 Punkten.",
       ],
       planningBullets: [
-        "Sinnvolle Oberstufenstruktur: reading/listening/mediation input, writing task, sprachliche Leistung als eigener Bewertungsblock.",
+        "Sinnvolle Q-Phase-Struktur: vor Q2.2 häufig 150 oder 160 Punkte je nach Kombination; Q2.2/Vorabitur unter Abiturbedingungen 200 Punkte; EF kann niedriger skaliert werden.",
         "Wenn die Klausur eine Kommunikationsprüfung ersetzt, sollte der Erwartungshorizont statt schriftlicher Teilaufgaben auf speaking performance umgestellt werden.",
       ],
       caution:
         "Die konkrete Aufgabenart hängt von Halbjahr, Kursart und Kernlehrplanbindung ab. Für Klausuren und Kommunikationsprüfungen gelten fachbezogene Vorgaben von Standardsicherung NRW.",
       preset: {
-        totalPoints: 120,
+        totalPoints: 150,
         sections: [
-          { title: "Rezeption und Input", weight: 30, description: "Reading, listening oder mediation als materialgebundene Basis." },
-          { title: "Writing Task", weight: 35, description: "Textproduktion mit klarer operatorengeleiteter Aufgabenstellung." },
-          { title: "Language Performance", weight: 25, description: "Range, accuracy, register, coherence und vocabulary." },
-          { title: "Transfer / Reflection", weight: 10, description: "Comment, re-creation, mediation focus oder contextual transfer." },
+          { title: "Hörverstehen / Input", weight: 26.67, description: "Hörverstehen oder materialgebundene Rezeption." },
+          { title: "Schreiben / Leseverstehen · Inhalt", weight: 29.33, description: "Inhaltliche Leistung im integrierten Schreibteil." },
+          { title: "Darstellungsleistung / Sprache", weight: 44, description: "Range, accuracy, register, coherence und vocabulary." },
         ],
       },
       sources: [

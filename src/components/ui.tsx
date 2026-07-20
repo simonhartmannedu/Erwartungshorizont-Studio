@@ -292,6 +292,7 @@ export const IconButton = ({
   variant = "secondary",
   className = "",
   disabled = false,
+  showTooltip = true,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -299,20 +300,24 @@ export const IconButton = ({
   variant?: "secondary" | "soft";
   className?: string;
   disabled?: boolean;
+  showTooltip?: boolean;
 }) => (
   <span className="tooltip-anchor inline-flex">
     <button
       type="button"
       onClick={onClick}
       aria-label={title}
+      title={title}
       disabled={disabled}
       className={`${variant === "soft" ? "button-soft gap-2" : "button-secondary gap-2"} ${className}`}
     >
       {children}
     </button>
-    <span className="app-tooltip" aria-hidden="true">
-      {title}
-    </span>
+    {showTooltip ? (
+      <span className="app-tooltip" aria-hidden="true">
+        {title}
+      </span>
+    ) : null}
   </span>
 );
 

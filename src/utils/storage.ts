@@ -22,8 +22,8 @@ const normalizeExamDraft = (exam: Exam): Exam => ({
   ...exam,
   id: exam.id || crypto.randomUUID(),
   meta: {
-    ...createEmptyExamMeta(),
-    ...(exam.meta ?? {}),
+        ...createEmptyExamMeta(),
+        ...(exam.meta ?? {}),
   },
   gradeScale: {
     ...exam.gradeScale,
@@ -165,7 +165,10 @@ export const parseArchiveEntries = (raw: string | null): ExpectationArchiveEntry
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isArchiveEntry);
+    return parsed.filter(isArchiveEntry).map((entry) => ({
+      ...entry,
+      subject: entry.subject ?? entry.examSnapshot.meta.subject ?? "",
+    }));
   } catch {
     return [];
   }
@@ -378,14 +381,17 @@ export const saveTheme = (theme: ThemeMode) => {
 export const loadVisualTheme = (): VisualTheme => {
   const raw = window.localStorage.getItem(VISUAL_THEME_KEY);
   switch (raw) {
+    case "pdf-report":
     case "nrw-trikolore":
     case "waldmeister-schorle":
     case "blaubeer-pommesbude":
     case "flieder-feierabend":
     case "beamtensalon":
+    case "barrierefrei":
+    case "video-tutorial":
       return raw;
     default:
-      return "earth-paper";
+      return "pdf-report";
   }
 };
 

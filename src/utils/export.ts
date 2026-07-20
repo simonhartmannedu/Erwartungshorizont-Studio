@@ -7,12 +7,97 @@ import { SecurityTokenCard } from "./securityTokens";
 
 export const downloadJson = (exam: Exam) => {
   const blob = new Blob([JSON.stringify(exam, null, 2)], { type: "application/json" });
+  void saveBlobWithDialog(`${exam.meta.title || "bewertungsraster"}.json`, blob, {
+    description: "JSON-Datei",
+    accept: { "application/json": [".json"] },
+  });
+};
+
+type FileSaveResult = "saved" | "downloaded" | "cancelled";
+type BrowserFileHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+type BrowserSaveFilePicker = (options?: {
+  suggestedName?: string;
+  types?: Array<{
+    description: string;
+    accept: Record<string, string[]>;
+  }>;
+  excludeAcceptAllOption?: boolean;
+}) => Promise<BrowserFileHandle>;
+type SavePickerOptions = {
+  description: string;
+  accept: Record<string, string[]>;
+};
+type PreparedFileSave = {
+  save: (blob: Blob) => Promise<FileSaveResult>;
+};
+
+const getSaveFilePicker = () => {
+  const candidate = window as Window & { showSaveFilePicker?: BrowserSaveFilePicker };
+  return typeof candidate.showSaveFilePicker === "function"
+    ? candidate.showSaveFilePicker.bind(window)
+    : null;
+};
+
+const downloadBlob = (filename: string, blob: Blob): FileSaveResult => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${exam.meta.title || "bewertungsraster"}.json`;
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+  return "downloaded";
+};
+
+export const prepareFileSave = async (
+  filename: string,
+  options: SavePickerOptions,
+): Promise<PreparedFileSave | null> => {
+  const picker = getSaveFilePicker();
+  if (!picker) {
+    return {
+      save: async (blob) => downloadBlob(filename, blob),
+    };
+  }
+
+  try {
+    const handle = await picker({
+      suggestedName: filename,
+      types: [options],
+      excludeAcceptAllOption: false,
+    });
+    return {
+      save: async (blob) => {
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return "saved";
+      },
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return null;
+    }
+
+    console.warn("System-Speicherdialog nicht verfügbar, nutze Browser-Download.", error);
+    return {
+      save: async (blob) => downloadBlob(filename, blob),
+    };
+  }
+};
+
+export const saveBlobWithDialog = async (
+  filename: string,
+  blob: Blob,
+  options: SavePickerOptions,
+) => {
+  const target = await prepareFileSave(filename, options);
+  if (!target) return "cancelled" as const;
+  return target.save(blob);
 };
 
 interface PrintIdentity {
@@ -153,6 +238,12 @@ const buildPrintActivationScript = (waitForImages = false) => `
 
     const ensureToolbar = () => {
       if (document.getElementById("manual-print-button")) return;
+      if (!document.getElementById("manual-print-button-print-style")) {
+        const style = document.createElement("style");
+        style.id = "manual-print-button-print-style";
+        style.textContent = "@media print { #manual-print-button { display: none !important; visibility: hidden !important; } }";
+        document.head.appendChild(style);
+      }
       const button = document.createElement("button");
       button.id = "manual-print-button";
       button.type = "button";
@@ -172,6 +263,16 @@ const buildPrintActivationScript = (waitForImages = false) => `
       button.addEventListener("click", triggerPrint);
       document.body.appendChild(button);
     };
+
+    window.addEventListener("beforeprint", () => {
+      const button = document.getElementById("manual-print-button");
+      if (button) button.hidden = true;
+    });
+
+    window.addEventListener("afterprint", () => {
+      const button = document.getElementById("manual-print-button");
+      if (button) button.hidden = false;
+    });
 
     const afterReady = async () => {
       ensureToolbar();
@@ -326,14 +427,12 @@ const renderCompactTaskColumns = (overview: ClassOverviewData) => {
   `;
 };
 
-export const downloadDataFile = (filename: string, payload: unknown) => {
+export const downloadDataFile = async (filename: string, payload: unknown) => {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  return saveBlobWithDialog(filename, blob, {
+    description: "JSON-Backup",
+    accept: { "application/json": [".json"] },
+  });
 };
 
 const escapeCsvCell = (value: string | number | boolean | null | undefined) => {
@@ -342,11 +441,11 @@ const escapeCsvCell = (value: string | number | boolean | null | undefined) => {
   return `"${escaped}"`;
 };
 
-export const downloadCsvFile = (
+export const downloadCsvFile = async (
   filename: string,
   rows: Array<Record<string, string | number | boolean | null | undefined>>,
 ) => {
-  if (rows.length === 0) return;
+  if (rows.length === 0) return "cancelled" as const;
 
   const headers = Array.from(
     rows.reduce((set, row) => {
@@ -361,12 +460,10 @@ export const downloadCsvFile = (
   ].join("\r\n");
 
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  return saveBlobWithDialog(filename, blob, {
+    description: "CSV-Datei",
+    accept: { "text/csv": [".csv"] },
+  });
 };
 
 export const exportStudentExamCsv = (
@@ -414,7 +511,7 @@ export const exportStudentExamCsv = (
   );
 
   const safePrefix = sanitizeFilenamePart(identity?.alias || exam.meta.title || "SuS");
-  downloadCsvFile(`${safePrefix}_Bewertungsbogen.csv`, rows);
+  void downloadCsvFile(`${safePrefix}_Bewertungsbogen.csv`, rows);
 };
 
 export const exportGradeScaleCsv = (
@@ -429,7 +526,7 @@ export const exportGradeScaleCsv = (
   const rangeDigits = getGradeScaleRangeDigits(exam, summary.totalMaxPoints);
   const safePrefix = sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche");
 
-  downloadCsvFile(
+  void downloadCsvFile(
     `${safePrefix}_Notenbereiche.csv`,
     ranges.map((range) => ({
       Note: range.label,
@@ -507,7 +604,7 @@ export const exportClassOverviewCsv = (
     })),
   ];
 
-  downloadCsvFile(`${safePrefix}_Klassenuebersicht.csv`, rows);
+  void downloadCsvFile(`${safePrefix}_Klassenuebersicht.csv`, rows);
 };
 
 export const renderPrintDocument = (reports: PrintPayload[]) =>

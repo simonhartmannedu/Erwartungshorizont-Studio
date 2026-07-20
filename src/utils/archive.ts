@@ -39,6 +39,7 @@ export const buildArchiveEntryFromExam = (exam: Exam): ExpectationArchiveEntry =
     examId: exam.id,
     examTitle: exam.meta.title,
     schoolYear: exam.meta.schoolYear,
+    subject: exam.meta.subject,
     gradeLevel: exam.meta.gradeLevel,
     course: exam.meta.course,
     teacher: exam.meta.teacher,
@@ -58,7 +59,10 @@ export const mergeArchiveEntries = (
 ) => {
   const map = new Map<string, ExpectationArchiveEntry>();
   [...existing, ...incoming].forEach((entry) => {
-    map.set(entry.id, entry);
+    map.set(entry.id, {
+      ...entry,
+      subject: entry.subject ?? entry.examSnapshot.meta.subject ?? "",
+    });
   });
 
   return [...map.values()].sort((a, b) => {
@@ -86,6 +90,7 @@ export const isArchiveEntry = (value: unknown): value is ExpectationArchiveEntry
     typeof candidate.id === "string" &&
     typeof candidate.examTitle === "string" &&
     typeof candidate.schoolYear === "string" &&
+    (typeof candidate.subject === "string" || candidate.subject === undefined) &&
     typeof candidate.gradeLevel === "string" &&
     typeof candidate.examDate === "string" &&
     typeof candidate.sectionCount === "number" &&

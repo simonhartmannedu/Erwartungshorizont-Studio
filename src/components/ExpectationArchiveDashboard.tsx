@@ -26,6 +26,7 @@ export const ExpectationArchiveDashboard = ({
 }: Props) => {
   const [search, setSearch] = useState("");
   const [yearFilter, setYearFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [sortBy, setSortBy] = useState<"savedAt" | "grade" | "title" | "points">("savedAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -34,6 +35,11 @@ export const ExpectationArchiveDashboard = ({
 
   const years = useMemo(
     () => [...new Set(entries.map((entry) => entry.schoolYear).filter(Boolean))].sort().reverse(),
+    [entries],
+  );
+
+  const subjects = useMemo(
+    () => [...new Set(entries.map((entry) => entry.subject).filter(Boolean))].sort((left, right) => left.localeCompare(right, "de-DE")),
     [entries],
   );
 
@@ -51,6 +57,7 @@ export const ExpectationArchiveDashboard = ({
           entry.examTitle,
           entry.summaryText,
           entry.teacher,
+          entry.subject,
           entry.course,
         ]
           .join(" ")
@@ -60,6 +67,7 @@ export const ExpectationArchiveDashboard = ({
       return (
         matchesSearch &&
         (!yearFilter || entry.schoolYear === yearFilter) &&
+        (!subjectFilter || entry.subject === subjectFilter) &&
         (!gradeFilter || entry.gradeLevel === gradeFilter)
       );
     });
@@ -86,7 +94,7 @@ export const ExpectationArchiveDashboard = ({
           return directionFactor * (new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
       }
     });
-  }, [entries, gradeFilter, search, sortBy, sortDirection, yearFilter]);
+  }, [entries, gradeFilter, search, sortBy, sortDirection, subjectFilter, yearFilter]);
 
   const handleSort = (nextSortBy: typeof sortBy) => {
     if (sortBy === nextSortBy) {
@@ -176,9 +184,9 @@ export const ExpectationArchiveDashboard = ({
       title="Erwartungshorizont-Archiv"
       subtitle="Gespeicherte Bewertungsbögen zum Wiederverwenden, Öffnen oder Duplizieren."
     >
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
+      <div className="mb-5 grid gap-3 md:grid-cols-5">
         <Field label="Suche">
-          <input className="field" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Titel, Lehrkraft, Kurs ..." />
+          <input className="field" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Titel, Fach, Lehrkraft, Kurs ..." />
         </Field>
         <Field label="Schuljahr">
           <select className="field" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
@@ -186,6 +194,16 @@ export const ExpectationArchiveDashboard = ({
             {years.map((year) => (
               <option key={year} value={year}>
                 {year}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Fach">
+          <select className="field" value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
+            <option value="">Alle</option>
+            {subjects.map((subject) => (
+              <option key={subject} value={subject}>
+                {subject}
               </option>
             ))}
           </select>
@@ -222,7 +240,7 @@ export const ExpectationArchiveDashboard = ({
         </Field>
       </div>
 
-      <div className="surface-muted mb-5 grid gap-3 rounded-3xl p-4 sm:grid-cols-3">
+      <div className="surface-muted mb-5 grid gap-3 rounded-3xl p-4 sm:grid-cols-4">
         <div>
           <p className="label">Einträge</p>
           <p className="themed-strong text-xl font-semibold">{filteredEntries.length}</p>
@@ -230,6 +248,10 @@ export const ExpectationArchiveDashboard = ({
         <div>
           <p className="label">Schuljahre</p>
           <p className="themed-strong text-xl font-semibold">{years.length}</p>
+        </div>
+        <div>
+          <p className="label">Fächer</p>
+          <p className="themed-strong text-xl font-semibold">{subjects.length}</p>
         </div>
         <div>
           <p className="label">Klassenstufen</p>
@@ -282,7 +304,8 @@ export const ExpectationArchiveDashboard = ({
                 <Fragment key={entry.id}>
                   <tr className="align-top" style={{ borderTop: "1px solid var(--app-border-default)" }}>
                     <td className="px-4 py-3" style={{ color: "var(--app-text)" }}>
-                      <p className="font-semibold" style={{ color: "var(--app-text-strong)" }}>{entry.gradeLevel} · {entry.course}</p>
+                      <p className="font-semibold" style={{ color: "var(--app-text-strong)" }}>{entry.subject || "Ohne Fach"}</p>
+                      <p>{entry.gradeLevel} · {entry.course}</p>
                       <p>{entry.schoolYear}</p>
                       <p>{entry.examDate}</p>
                     </td>
