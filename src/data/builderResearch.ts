@@ -56,12 +56,20 @@ const GENERAL_SOURCES: BuilderSourceLink[] = [
 const subjectPage = (label: string, url: string): BuilderSourceLink => ({ label, url });
 
 export const BUILDER_SUBJECT_OPTIONS = [
+  "Biologie",
+  "Chemie",
   "Deutsch",
   "Englisch",
-  "Mathematik",
+  "Französisch",
+  "Geographie",
   "Geschichte",
-  "Chemie",
   "Informatik",
+  "Lateinisch",
+  "Mathematik",
+  "Philosophie",
+  "Physik",
+  "Sozialwissenschaften",
+  "Spanisch",
 ] as const;
 
 const profiles: BuilderSubjectProfile[] = [

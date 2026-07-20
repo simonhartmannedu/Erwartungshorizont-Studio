@@ -30,7 +30,22 @@ export type GuidedBuilderTarget = "current" | "new";
 type DecisionMode = "templates" | "pdf" | "manual";
 type StageFilter = BuilderSchoolStage | "all";
 type FocusFilter = ExamTemplateDefinition["focus"] | "all";
-type SubjectThemeKey = "deutsch" | "englisch" | "mathematik" | "geschichte" | "chemie" | "informatik" | "default";
+type SubjectThemeKey =
+  | "deutsch"
+  | "englisch"
+  | "franzoesisch"
+  | "spanisch"
+  | "lateinisch"
+  | "mathematik"
+  | "geschichte"
+  | "geographie"
+  | "sozialwissenschaften"
+  | "philosophie"
+  | "biologie"
+  | "chemie"
+  | "physik"
+  | "informatik"
+  | "default";
 type SubjectIconName = "book" | "speech" | "calculator" | "history" | "flask" | "code" | "template";
 
 interface SubjectTheme {
@@ -118,6 +133,24 @@ const SUBJECT_THEMES: Record<SubjectThemeKey, SubjectTheme> = {
     pastel: "#D9EAFE",
     accent: "#3B73C8",
   },
+  franzoesisch: {
+    key: "franzoesisch",
+    icon: "speech",
+    pastel: "#E0F2FE",
+    accent: "#0369A1",
+  },
+  spanisch: {
+    key: "spanisch",
+    icon: "speech",
+    pastel: "#FFE4E6",
+    accent: "#BE123C",
+  },
+  lateinisch: {
+    key: "lateinisch",
+    icon: "book",
+    pastel: "#F3E8FF",
+    accent: "#7E22CE",
+  },
   mathematik: {
     key: "mathematik",
     icon: "calculator",
@@ -130,11 +163,41 @@ const SUBJECT_THEMES: Record<SubjectThemeKey, SubjectTheme> = {
     pastel: "#FCE8B2",
     accent: "#B7791F",
   },
+  geographie: {
+    key: "geographie",
+    icon: "history",
+    pastel: "#DBEAFE",
+    accent: "#2563EB",
+  },
+  sozialwissenschaften: {
+    key: "sozialwissenschaften",
+    icon: "history",
+    pastel: "#EDE9FE",
+    accent: "#6D28D9",
+  },
+  philosophie: {
+    key: "philosophie",
+    icon: "book",
+    pastel: "#E5E7EB",
+    accent: "#4B5563",
+  },
+  biologie: {
+    key: "biologie",
+    icon: "flask",
+    pastel: "#DCFCE7",
+    accent: "#15803D",
+  },
   chemie: {
     key: "chemie",
     icon: "flask",
     pastel: "#D7F3E3",
     accent: "#2F8F62",
+  },
+  physik: {
+    key: "physik",
+    icon: "calculator",
+    pastel: "#E0E7FF",
+    accent: "#4338CA",
   },
   informatik: {
     key: "informatik",
@@ -154,9 +217,17 @@ const getSubjectTheme = (subject: string) => {
   const normalized = normalizeText(subject);
   if (normalized.includes("deutsch")) return SUBJECT_THEMES.deutsch;
   if (normalized.includes("englisch") || normalized.includes("english")) return SUBJECT_THEMES.englisch;
+  if (normalized.includes("franz")) return SUBJECT_THEMES.franzoesisch;
+  if (normalized.includes("span")) return SUBJECT_THEMES.spanisch;
+  if (normalized.includes("latein")) return SUBJECT_THEMES.lateinisch;
   if (normalized.includes("mathematik") || normalized.includes("math")) return SUBJECT_THEMES.mathematik;
   if (normalized.includes("geschichte") || normalized.includes("history")) return SUBJECT_THEMES.geschichte;
+  if (normalized.includes("geographie") || normalized.includes("erdkunde")) return SUBJECT_THEMES.geographie;
+  if (normalized.includes("sozialwissenschaft")) return SUBJECT_THEMES.sozialwissenschaften;
+  if (normalized.includes("philosophie")) return SUBJECT_THEMES.philosophie;
+  if (normalized.includes("biologie")) return SUBJECT_THEMES.biologie;
   if (normalized.includes("chemie") || normalized.includes("science")) return SUBJECT_THEMES.chemie;
+  if (normalized.includes("physik")) return SUBJECT_THEMES.physik;
   if (normalized.includes("informatik") || normalized.includes("computer")) return SUBJECT_THEMES.informatik;
   return SUBJECT_THEMES.default;
 };
@@ -326,6 +397,7 @@ const getTemplateSearchText = (template: ExamTemplateDefinition) =>
     `${template.totalPoints} Punkte`,
     template.description,
     template.pedagogicalHint,
+    template.standardsNote ?? "",
     ...template.previewSections.flatMap((section) => [section.title, `${section.points} Punkte`, ...section.tasks]),
   ]
     .join(" ")
@@ -680,24 +752,18 @@ export const GuidedExamBuilder = ({
         <span className="template-subject-mark" aria-hidden="true">
           <SubjectThemeIcon icon={subjectTheme.icon} />
         </span>
-        <span className="flex flex-wrap gap-2">
-          {index === 0 && <span className="template-badge template-badge-strong">Beste Auswahl</span>}
-          <span className="template-badge template-subject-badge">{template.subject}</span>
-          <span className="template-badge">{stageLabel(template.schoolStage)}</span>
-          <span className="template-badge">{focusLabel(template.focus)}</span>
-          <span className="template-badge">{formatNumber(template.totalPoints)} P.</span>
-        </span>
-        <span className="block">
-          <span className="template-result-title">{template.title}</span>
+        <span className="template-result-main">
+          <span className="template-result-title-row">
+            <span className="template-result-title">{template.title}</span>
+            {index === 0 && <span className="template-badge template-badge-strong">Beste Auswahl</span>}
+          </span>
           <span className="template-result-copy">{template.description}</span>
         </span>
-        <span className="template-result-sections">
-          {template.previewSections.slice(0, 3).map((section) => (
-            <span key={section.title}>
-              <strong>{section.title}</strong>
-              <small>{section.points} P.</small>
-            </span>
-          ))}
+        <span className="template-result-meta">
+          <span>{template.subject}</span>
+          <span>{stageLabel(template.schoolStage)}</span>
+          <span>{focusLabel(template.focus)}</span>
+          <strong>{formatNumber(template.totalPoints)} P.</strong>
         </span>
       </button>
     );
@@ -711,7 +777,8 @@ export const GuidedExamBuilder = ({
           <h2 className="themed-strong mt-2 text-2xl font-semibold">Vorlage finden, prüfen, öffnen</h2>
           <p className="themed-muted mt-2 max-w-3xl text-sm leading-6">
             Suche direkt nach Fach, Stufe, Punkteumfang oder Prüfungsformat. Die passende Struktur landet sofort im
-            EWH-Editor und kann dort weiter angepasst werden.
+            EWH-Editor und kann dort weiter angepasst werden. Vor dem Einsatz bitte mit den aktuellen Vorgaben der
+            Standardsicherung NRW abgleichen.
           </p>
         </div>
         <div className="template-decision-count">
@@ -837,6 +904,12 @@ export const GuidedExamBuilder = ({
                   </div>
                   <h3 className="themed-strong text-xl font-semibold">{selectedTemplate.title}</h3>
                   <p className="themed-muted mt-2 text-sm leading-6">{selectedTemplate.pedagogicalHint}</p>
+                  {selectedTemplate.standardsNote ? (
+                    <div className="template-standards-note">
+                      <InfoIcon className="h-4 w-4" />
+                      <p>{selectedTemplate.standardsNote}</p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="template-section-list">
@@ -848,26 +921,26 @@ export const GuidedExamBuilder = ({
                       sectionPointValue + 20,
                     );
                     return (
-                    <div key={section.title} className="template-section-meter">
-                      <div className="flex items-center justify-between gap-3">
-                        <strong>{section.title}</strong>
-                        <span>{formatNumber(sectionPointValue)} P.</span>
+                      <div key={section.title} className="template-section-meter">
+                        <div className="flex items-center justify-between gap-3">
+                          <strong>{section.title}</strong>
+                          <span>{formatNumber(sectionPointValue)} P.</span>
+                        </div>
+                        <input
+                          className="template-section-slider"
+                          type="range"
+                          min={POINT_STEP}
+                          max={sliderMax}
+                          step={POINT_STEP}
+                          value={sectionPointValue}
+                          style={{
+                            "--template-slider-fill": `${Math.min(100, (sectionPointValue / sliderMax) * 100)}%`,
+                          } as CSSProperties}
+                          aria-label={`${section.title} Punkte`}
+                          onChange={(event) => updateTemplateSectionPoint(index, Number(event.target.value))}
+                        />
+                        <p>{section.tasks.join(" · ")}</p>
                       </div>
-                      <input
-                        className="template-section-slider"
-                        type="range"
-                        min={POINT_STEP}
-                        max={sliderMax}
-                        step={POINT_STEP}
-                        value={sectionPointValue}
-                        style={{
-                          "--template-slider-fill": `${Math.min(100, (sectionPointValue / sliderMax) * 100)}%`,
-                        } as CSSProperties}
-                        aria-label={`${section.title} Punkte`}
-                        onChange={(event) => updateTemplateSectionPoint(index, Number(event.target.value))}
-                      />
-                      <p>{section.tasks.join(" · ")}</p>
-                    </div>
                     );
                   })}
                 </div>

@@ -83,8 +83,19 @@ const distributePoints = (total: number, count: number) => {
   return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
 };
 
+const templateSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
 interface TemplateTaskSeed {
   title: string;
+  points?: number;
   description: string;
   expectation: string;
 }
@@ -108,6 +119,7 @@ interface TemplateBlueprint {
   shortLabel: string;
   description: string;
   pedagogicalHint: string;
+  standardsNote?: string;
   metaTitle: string;
   unit: string;
   notes: string;
@@ -127,6 +139,7 @@ export interface ExamTemplateDefinition {
   shortLabel: string;
   description: string;
   pedagogicalHint: string;
+  standardsNote?: string;
   previewSections: Array<{
     title: string;
     points: number;
@@ -134,6 +147,25 @@ export interface ExamTemplateDefinition {
   }>;
   build: () => Exam;
 }
+
+const resolveTaskPoints = (section: TemplateSectionSeed) => {
+  const explicitTotal = section.tasks.reduce((sum, task) => sum + (typeof task.points === "number" ? task.points : 0), 0);
+  const implicitTasks = section.tasks.filter((task) => typeof task.points !== "number");
+
+  if (implicitTasks.length === 0) {
+    return section.tasks.map((task) => task.points ?? 0);
+  }
+
+  const distributed = distributePoints(Math.max(0, section.points - explicitTotal), implicitTasks.length);
+  let distributedIndex = 0;
+
+  return section.tasks.map((task) => {
+    if (typeof task.points === "number") return task.points;
+    const points = distributed[distributedIndex] ?? 0;
+    distributedIndex += 1;
+    return points;
+  });
+};
 
 const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDefinition => ({
   id: blueprint.id,
@@ -145,6 +177,7 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
   shortLabel: blueprint.shortLabel,
   description: blueprint.description,
   pedagogicalHint: blueprint.pedagogicalHint,
+  standardsNote: blueprint.standardsNote,
   previewSections: blueprint.sections.map((section) => ({
     title: section.title,
     points: section.points,
@@ -158,24 +191,498 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
       gradeLevel: blueprint.gradeLevel,
       course: blueprint.course,
     }),
-    sections: blueprint.sections.map((section) =>
-      createSection(
+    sections: blueprint.sections.map((section) => {
+      const taskPoints = resolveTaskPoints(section);
+      return createSection(
         section.title,
         roundToTwo((section.points / blueprint.totalPoints) * 100),
         section.description,
         section.note,
         section.tasks.map((task, index) =>
-          createTask(
-            task.title,
-            distributePoints(section.points, section.tasks.length)[index],
-            section.title,
-            task.description,
-            task.expectation,
-          ),
+          createTask(task.title, taskPoints[index] ?? 0, section.title, task.description, task.expectation),
         ),
-      ),
-    ),
+      );
+    }),
   }),
+});
+
+const additionalModernForeignLanguages = [
+  { subject: "Französisch", short: "F" },
+  { subject: "Spanisch", short: "S" },
+] as const;
+
+const additionalClassicalLanguages = [
+  { subject: "Lateinisch", short: "L" },
+] as const;
+
+const additionalMaterialSubjects = [
+  { subject: "Geographie", short: "Geo" },
+  { subject: "Sozialwissenschaften", short: "Sowi" },
+  { subject: "Philosophie", short: "Phil" },
+] as const;
+
+const createModernForeignLanguageSek1Blueprint = ({ subject, short }: { subject: string; short: string }): TemplateBlueprint => ({
+  id: `${templateSlug(subject)}-sek1-kompetenzen`,
+  subject,
+  schoolStage: "sek1",
+  focus: "general",
+  title: `${subject} Sek I · Kompetenzorientierte Klassenarbeit`,
+  shortLabel: `${short} Sek I`,
+  description: "Sek-I-Vorlage mit Rezeption, Sprache, Schreiben und sprachlicher Leistung.",
+  pedagogicalHint:
+    "Als Startstruktur für moderne Fremdsprachen: Rezeptionsaufgabe, kontrollierte Sprache und produktiver Schreibteil bleiben getrennt.",
+  metaTitle: `${subject}-Klassenarbeit Sek I`,
+  unit: "Rezeption, Sprache und Schreiben",
+  notes:
+    "Sek-I-Vorlage moderne Fremdsprache. Kompetenzschwerpunkt, Textsorte und genaue Punkteverteilung an Jahrgang, Lehrwerk und Fachkonferenz anpassen.",
+  gradeLevel: "8",
+  course: "8",
+  totalPoints: 100,
+  sections: [
+    {
+      title: "Teil A: Rezeption",
+      points: 30,
+      description: "Lese-, Hör- oder Sprachmittlungsaufgabe als materialgebundener Auftakt.",
+      note: "Den Teil je nach Klassenarbeit auf Lesen, Hören oder Sprachmittlung zuschneiden.",
+      tasks: [
+        {
+          title: "Globalverstehen",
+          description: "Hauptaussage, Situation und kommunikative Absicht erfassen.",
+          expectation: "Das Gesamtverständnis des Materials ist sicher erkennbar.",
+        },
+        {
+          title: "Detailverstehen",
+          description: "Relevante Einzelinformationen korrekt entnehmen und zuordnen.",
+          expectation: "Details werden präzise, materialnah und nicht geraten wiedergegeben.",
+        },
+      ],
+    },
+    {
+      title: "Teil B: Sprache",
+      points: 20,
+      description: "Kontrollierte Sprachverwendung in Grammatik und Wortschatz.",
+      note: "Typisch sind Formenbildung, Satzbau, Wortschatz im Kontext oder Umformung.",
+      tasks: [
+        {
+          title: "Grammatik",
+          description: "Zielstrukturen passend und korrekt anwenden.",
+          expectation: "Die Sprachstrukturen werden sicher gebildet und funktional eingesetzt.",
+        },
+        {
+          title: "Wortschatz",
+          description: "Wortschatz im Kontext verstehen und passend verwenden.",
+          expectation: "Die Wortwahl ist verständlich, thematisch passend und korrekt.",
+        },
+      ],
+    },
+    {
+      title: "Teil C: Schreiben",
+      points: 25,
+      description: "Produktive Schreibaufgabe mit Inhalt, Aufbau und Textsortenbezug.",
+      note: "Textsorten wie E-Mail, Nachricht, Blogeintrag, Kommentar oder Dialog anpassen.",
+      tasks: [
+        {
+          title: "Inhalt",
+          description: "Die Schreibaufgabe vollständig und adressatenbezogen umsetzen.",
+          expectation: "Alle geforderten Aspekte sind sinnvoll bearbeitet.",
+        },
+        {
+          title: "Aufbau und Textsorte",
+          description: "Den Text logisch gliedern und textsortengerecht gestalten.",
+          expectation: "Der Text ist klar strukturiert und passt zur Schreibsituation.",
+        },
+      ],
+    },
+    {
+      title: "Teil D: Sprachliche Leistung",
+      points: 25,
+      description: "Sprachrichtigkeit, Ausdruck, Kohärenz und formale Sicherheit.",
+      note: "Sprachliche Leistung getrennt vom Inhalt des Schreibteils ausweisen.",
+      tasks: [
+        {
+          title: "Korrektheit",
+          description: "Grammatik, Rechtschreibung und Satzbau bewerten.",
+          expectation: "Die sprachliche Form bleibt verständlich und überwiegend korrekt.",
+        },
+        {
+          title: "Ausdruck und Kohärenz",
+          description: "Wortschatz, Verknüpfungen und Leseführung bewerten.",
+          expectation: "Die Darstellung ist zusammenhängend und angemessen formuliert.",
+        },
+      ],
+    },
+  ],
+});
+
+const createClassicalLanguageBlueprint = (
+  { subject, short }: { subject: string; short: string },
+  stage: BuilderSchoolStage,
+  focus: TemplateFocus,
+): TemplateBlueprint => ({
+  id: `${templateSlug(subject)}-${focus === "abitur" ? "abitur" : stage}-textarbeit`,
+  subject,
+  schoolStage: stage,
+  focus,
+  title: `${subject} ${focus === "abitur" ? "Abitur" : stage === "sek1" ? "Sek I" : "Sek II"} · Textarbeit`,
+  shortLabel: `${short} ${focus === "abitur" ? "Abi" : stage === "sek1" ? "Sek I" : "Sek II"}`,
+  description: "Vorlage für Texterschließung, Übersetzung, Interpretation und Sprach-/Sachwissen.",
+  pedagogicalHint:
+    "Für alte Sprachen als Startstruktur: Übersetzung und Interpretation getrennt bewerten, Sprachwissen und Darstellung sichtbar halten.",
+  metaTitle: `${subject}-${focus === "abitur" ? "Abiturtraining" : "Klausur"}`,
+  unit: "Texterschließung, Übersetzung und Interpretation",
+  notes:
+    "Vorlage für alte Sprachen. Aufgabenart, Übersetzungsanteil, Hilfsmittel und konkrete Punkteverteilung an Standardsicherung, Kernlehrplan und Fachkonferenz anpassen.",
+  gradeLevel: focus === "abitur" ? "Q2" : stage === "sek1" ? "9" : "Q1",
+  course: focus === "abitur" ? "GK / LK" : stage === "sek1" ? "9" : "GK",
+  totalPoints: focus === "abitur" || stage === "sek2" ? 120 : 100,
+  sections: [
+    {
+      title: "Teil A: Texterschließung",
+      points: focus === "abitur" || stage === "sek2" ? 25 : 20,
+      description: "Ausgangstext vorentlasten, Sinnabschnitte sichern und sprachliche Signale nutzen.",
+      note: "Material, Vokabelhilfen und Operatorik konkret eintragen.",
+      tasks: [
+        {
+          title: "Vorerschließung",
+          description: "Inhalt, Situation, Formen oder Strukturmerkmale erschließen.",
+          expectation: "Die Erschließung bereitet die Übersetzung fachlich tragfähig vor.",
+        },
+      ],
+    },
+    {
+      title: "Teil B: Übersetzung",
+      points: focus === "abitur" || stage === "sek2" ? 45 : 40,
+      description: "Text angemessen und sprachlich korrekt ins Deutsche übertragen.",
+      note: "Bewertungskriterien der Fachkonferenz und ggf. Fehlergewichtung eintragen.",
+      tasks: [
+        {
+          title: "Sinn und Struktur übertragen",
+          description: "Textinhalt, Satzbau und sprachliche Beziehungen sachgerecht übersetzen.",
+          expectation: "Die Übersetzung ist verständlich, textnah und grammatisch abgesichert.",
+        },
+      ],
+    },
+    {
+      title: "Teil C: Interpretation und Kultur",
+      points: focus === "abitur" || stage === "sek2" ? 35 : 25,
+      description: "Text deuten, sprachlich analysieren und kulturhistorisch einordnen.",
+      note: "Autor, Gattung, Thema und Halbjahresbezug ergänzen.",
+      tasks: [
+        {
+          title: "Analyse und Deutung",
+          description: "Sprache, Aufbau, Figuren, Argumentation oder Motive untersuchen.",
+          expectation: "Deutungen sind textbezogen, fachsprachlich und nachvollziehbar.",
+        },
+        {
+          title: "Sachwissen anwenden",
+          description: "Kulturelles, historisches oder literarisches Wissen funktional einbinden.",
+          expectation: "Sachwissen unterstützt die Interpretation und bleibt aufgabenbezogen.",
+        },
+      ],
+    },
+    {
+      title: "Teil D: Darstellung",
+      points: focus === "abitur" || stage === "sek2" ? 15 : 15,
+      description: "Struktur, Fachsprache und sprachliche Qualität der deutschen Darstellung.",
+      note: "Darstellungsleistung getrennt ausweisen, wenn die Fachvorgabe dies verlangt.",
+      tasks: [
+        {
+          title: "Fachsprache und Kohärenz",
+          description: "Gedankengang, Fachbegriffe und sprachliche Richtigkeit bewerten.",
+          expectation: "Die Darstellung ist klar, präzise und fachlich angemessen.",
+        },
+      ],
+    },
+  ],
+});
+
+const createModernForeignLanguageSek2Blueprint = ({ subject, short }: { subject: string; short: string }): TemplateBlueprint => ({
+  id: `${templateSlug(subject)}-sek2-sprachmittlung-schreiben`,
+  subject,
+  schoolStage: "sek2",
+  focus: "general",
+  title: `${subject} Sek II · Sprachmittlung + Schreiben`,
+  shortLabel: `${short} Sek II`,
+  description: "GOSt-Startvorlage moderne Fremdsprache: Sprachmittlung 50 + Schreiben/Leseverstehen 110.",
+  pedagogicalHint:
+    "Für moderne Fremdsprachen in der Q-Phase: Sprachmittlung getrennt bewerten, Schreibteil separat mit Inhalt und Darstellungsleistung führen.",
+  standardsNote:
+    "Moderne Fremdsprachen NRW ab Abitur 2025: Sprachmittlung 50 Punkte, Schreiben/Leseverstehen 110 Punkte. Vor Einsatz mit der aktuellen Fachseite abgleichen.",
+  metaTitle: `${subject}-Klausur GOSt`,
+  unit: "Sprachmittlung und Schreiben/Leseverstehen",
+  notes:
+    "GOSt-Vorlage moderne Fremdsprache. Zieltextformat, Material, Kursart und aktuelle Fachvorgaben der Standardsicherung NRW prüfen.",
+  gradeLevel: "Q1 / Q2",
+  course: "GK / LK",
+  totalPoints: 160,
+  sections: [
+    {
+      title: "Teil A: Sprachmittlung",
+      points: 50,
+      description: "Isolierter Teil Sprachmittlung.",
+      note: "50 Punkte: 20 Inhalt und 30 Darstellungsleistung/sprachliche Leistung.",
+      tasks: [
+        {
+          title: "Inhalt",
+          points: 20,
+          description: "Relevante Informationen situations- und adressatengerecht auswählen.",
+          expectation: "Der Zieltext vermittelt die relevanten Inhalte korrekt und zweckbezogen.",
+        },
+        {
+          title: "Darstellungsleistung / Sprache",
+          points: 30,
+          description: "Zieltextformat, Register, Struktur und sprachliche Angemessenheit bewerten.",
+          expectation: "Sprache und Textgestaltung passen zur Kommunikationssituation.",
+        },
+      ],
+    },
+    {
+      title: "Teil B: Schreiben / Leseverstehen · Inhalt",
+      points: 44,
+      description: "Inhaltliche Leistung im integrierten Schreibteil.",
+      note: "Teilaufgaben an Material, Operatoren und Zieltextformat anpassen.",
+      tasks: [
+        {
+          title: "Textverständnis",
+          points: 12,
+          description: "Zentrale Aspekte des Ausgangstextes sichern.",
+          expectation: "Das Textverständnis ist korrekt, knapp und materialbezogen.",
+        },
+        {
+          title: "Analyse",
+          points: 17,
+          description: "Aussage, Perspektive, Struktur oder Sprache analysieren.",
+          expectation: "Die Analyse ist textnah, kohärent und fachlich präzise.",
+        },
+        {
+          title: "Commentaire / production",
+          points: 15,
+          description: "Eine bewertende, produktive oder weiterführende Schreibaufgabe bearbeiten.",
+          expectation: "Die Bearbeitung ist differenziert, adressatenbezogen und begründet.",
+        },
+      ],
+    },
+    {
+      title: "Teil C: Darstellungsleistung / Sprache",
+      points: 66,
+      description: "Sprachliche Leistung im integrierten Schreiben/Leseverstehen.",
+      note: "Nicht mit der Sprachmittlung verrechnen.",
+      tasks: [
+        {
+          title: "Kommunikative Textgestaltung",
+          points: 22,
+          description: "Textaufbau, Leserführung, Textsortenbezug und Kohärenz bewerten.",
+          expectation: "Der Text ist funktional strukturiert und kommunikativ passend.",
+        },
+        {
+          title: "Ausdruck / sprachliche Mittel",
+          points: 22,
+          description: "Wortschatz, Eigenständigkeit, Variation und Satzbau bewerten.",
+          expectation: "Die sprachlichen Mittel sind angemessen, variabel und aufgabenbezogen.",
+        },
+        {
+          title: "Sprachrichtigkeit",
+          points: 22,
+          description: "Wortschatz, Grammatik, Orthografie und Zeichensetzung bewerten.",
+          expectation: "Fehler beeinträchtigen die Kommunikation nicht wesentlich.",
+        },
+      ],
+    },
+  ],
+});
+
+const createModernForeignLanguageAbiturBlueprint = ({ subject, short }: { subject: string; short: string }): TemplateBlueprint => ({
+  ...createModernForeignLanguageSek2Blueprint({ subject, short }),
+  id: `${templateSlug(subject)}-abitur-vorabitur`,
+  focus: "abitur",
+  title: `${subject} Abitur · Vorabitur`,
+  shortLabel: `${short} Abi`,
+  description: "Abiturnahe Vorlage moderne Fremdsprache: Hörverstehen 40 + Sprachmittlung 50 + Schreiben/Leseverstehen 110.",
+  pedagogicalHint:
+    "Für Q2/Vorabitur unter Abiturbedingungen: Hörverstehen, Sprachmittlung und Schreiben/Leseverstehen getrennt bewerten.",
+  standardsNote:
+    "Moderne Fremdsprachen NRW ab Abitur 2025: 40 Hörverstehen + 50 Sprachmittlung + 110 Schreiben/Leseverstehen = 200 Punkte. Fachseite vor Einsatz prüfen.",
+  metaTitle: `${subject}-Vorabitur / Abiturtraining`,
+  unit: "Hörverstehen, Sprachmittlung und Schreiben/Leseverstehen",
+  gradeLevel: "Q2",
+  totalPoints: 200,
+  sections: [
+    {
+      title: "Teil A: Hörverstehen",
+      points: 40,
+      description: "Isolierter Teil Hörverstehen.",
+      note: "Bei Abiturbedingungen zuerst bearbeiten und einsammeln.",
+      tasks: [
+        {
+          title: "Hörverstehen",
+          description: "Globale und detaillierte Informationen aus Hörmaterialien erfassen.",
+          expectation: "Antworten bilden die Hörinformationen korrekt und aufgabenbezogen ab.",
+        },
+      ],
+    },
+    ...createModernForeignLanguageSek2Blueprint({ subject, short }).sections,
+  ],
+});
+
+const createMaterialBasedSek2Blueprint = (
+  { subject, short }: { subject: string; short: string },
+  focus: TemplateFocus,
+): TemplateBlueprint => ({
+  id: `${templateSlug(subject)}-${focus === "abitur" ? "abitur" : "sek2"}-material`,
+  subject,
+  schoolStage: "sek2",
+  focus,
+  title: `${subject} ${focus === "abitur" ? "Abitur" : "Sek II"} · Material und Urteil`,
+  shortLabel: `${short} ${focus === "abitur" ? "Abi" : "Sek II"}`,
+  description: "Vorlage für materialgebundene Analyse, Einordnung, Urteil und Darstellung.",
+  pedagogicalHint:
+    "Für gesellschafts- und geisteswissenschaftliche Klausuren: Materialanalyse, Sachwissen und Urteil sauber trennen.",
+  metaTitle: `${subject}-${focus === "abitur" ? "Vorabitur / Abiturtraining" : "Klausur GOSt"}`,
+  unit: "Materialanalyse, Einordnung und Urteil",
+  notes:
+    "GOSt-Startvorlage. Aufgabenart, Operatoren, Materialbasis, Hilfsmittel und konkrete Punkteverteilung an die aktuelle Standardsicherung-Fachseite und Fachkonferenz anpassen.",
+  gradeLevel: focus === "abitur" ? "Q2" : "Q1",
+  course: "GK / LK",
+  totalPoints: focus === "abitur" ? 120 : 110,
+  sections: [
+    {
+      title: "Teil A: Materialanalyse",
+      points: focus === "abitur" ? 40 : 35,
+      description: "Material formal, inhaltlich und fachmethodisch erschließen.",
+      note: "Materialart, Operatoren und Analysefokus konkret eintragen.",
+      tasks: [
+        {
+          title: "Material erschließen",
+          description: "Aussagen, Struktur, Perspektive oder Daten des Materials erfassen.",
+          expectation: "Die Analyse bleibt materialnah und fachmethodisch korrekt.",
+        },
+        {
+          title: "Fachmethodisch auswerten",
+          description: "Material mit passenden Fachbegriffen und Verfahren untersuchen.",
+          expectation: "Die Auswertung nutzt fachliche Kategorien sicher und nachvollziehbar.",
+        },
+      ],
+    },
+    {
+      title: "Teil B: Einordnung und Sachwissen",
+      points: focus === "abitur" ? 35 : 30,
+      description: "Fachliche Zusammenhänge darstellen und Material einordnen.",
+      note: "Theorien, Modelle, Raumbezug, politische Konzepte oder philosophische Positionen eintragen.",
+      tasks: [
+        {
+          title: "Einordnen",
+          description: "Material in fachliche Zusammenhänge, Modelle oder Problemfelder einbetten.",
+          expectation: "Die Einordnung ist sachlich richtig und fachlich relevant.",
+        },
+        {
+          title: "Zusammenhänge erklären",
+          description: "Ursachen, Folgen, Positionen oder Strukturen differenziert darstellen.",
+          expectation: "Zusammenhänge werden klar, fachsprachlich und begründet entfaltet.",
+        },
+      ],
+    },
+    {
+      title: "Teil C: Urteil und Transfer",
+      points: focus === "abitur" ? 25 : 25,
+      description: "Begründetes Sachurteil, Werturteil oder Transfer entwickeln.",
+      note: "Urteilskriterien explizit ausweisen.",
+      tasks: [
+        {
+          title: "Beurteilen",
+          description: "Eine fachliche Fragestellung kriteriengeleitet beurteilen.",
+          expectation: "Das Urteil ist differenziert, begründet und an Analyse/Sachwissen rückgebunden.",
+        },
+        {
+          title: "Transfer herstellen",
+          description: "Ergebnisse auf neue Kontexte, Positionen oder Problemfelder übertragen.",
+          expectation: "Der Transfer bleibt fachlich tragfähig und nicht bloß assoziativ.",
+        },
+      ],
+    },
+    {
+      title: "Teil D: Darstellung",
+      points: focus === "abitur" ? 20 : 20,
+      description: "Struktur, Fachsprache, Kohärenz und sprachliche Richtigkeit.",
+      note: "Darstellungsleistung als eigenen Block sichtbar halten, wenn die Fachvorgabe dies vorsieht.",
+      tasks: [
+        {
+          title: "Fachsprache und Struktur",
+          description: "Gedankengang, Fachbegriffe und sprachliche Form bewerten.",
+          expectation: "Die Darstellung ist stringent, präzise und fachsprachlich angemessen.",
+        },
+      ],
+    },
+  ],
+});
+
+const createScienceSekBlueprint = (subject: "Biologie" | "Physik", stage: BuilderSchoolStage): TemplateBlueprint => ({
+  id: `${templateSlug(subject)}-${stage}-fachwissen-auswertung`,
+  subject,
+  schoolStage: stage,
+  focus: "general",
+  title: `${subject} ${stage === "sek1" ? "Sek I" : "Sek II"} · Fachwissen und Auswertung`,
+  shortLabel: `${subject.slice(0, 3)} ${stage === "sek1" ? "Sek I" : "Sek II"}`,
+  description: "Vorlage mit Fachwissen, Material-/Datenanalyse und Transfer.",
+  pedagogicalHint:
+    "Für naturwissenschaftliche Arbeiten: Fachkonzepte, Auswertung und begründeter Transfer bleiben getrennt sichtbar.",
+  metaTitle: `${subject}-${stage === "sek1" ? "Lernüberprüfung" : "Klausur GOSt"}`,
+  unit: "Fachwissen, Auswertung und Transfer",
+  notes:
+    "Naturwissenschaftliche Startvorlage. Experimente, Hilfsmittel, Formelsammlung und Punkteverteilung an Jahrgang, Kursart und Fachkonferenz anpassen.",
+  gradeLevel: stage === "sek1" ? "9" : "Q1",
+  course: stage === "sek1" ? "9" : "GK",
+  totalPoints: stage === "sek1" ? 90 : 120,
+  sections: [
+    {
+      title: "Teil A: Fachwissen",
+      points: stage === "sek1" ? 30 : 30,
+      description: "Begriffe, Konzepte, Modelle und Grundlagen anwenden.",
+      note: "Fachbegriffe und Modellgrenzen sichtbar machen.",
+      tasks: [
+        {
+          title: "Konzepte anwenden",
+          description: "Fachwissen passend zur Aufgabenstellung einsetzen.",
+          expectation: "Grundideen werden korrekt, fachsprachlich und zielgerichtet genutzt.",
+        },
+      ],
+    },
+    {
+      title: "Teil B: Auswertung",
+      points: stage === "sek1" ? 30 : 45,
+      description: "Material, Daten, Diagramme oder Versuchsinformationen auswerten.",
+      note: "Beobachtung, Beschreibung und Deutung getrennt lesbar halten.",
+      tasks: [
+        {
+          title: "Material auswerten",
+          description: "Daten, Diagramme oder Experimente sachgerecht erschließen.",
+          expectation: "Relevante Informationen werden korrekt erfasst und fachlich gedeutet.",
+        },
+        {
+          title: "Zusammenhänge erklären",
+          description: "Fachliche Ursachen, Wirkungen oder Modellzusammenhänge erläutern.",
+          expectation: "Erklärungen sind fachlich stimmig und materialgebunden.",
+        },
+      ],
+    },
+    {
+      title: "Teil C: Transfer und Bewertung",
+      points: stage === "sek1" ? 30 : 45,
+      description: "Konzepte auf neue Kontexte übertragen und begründet bewerten.",
+      note: "Kontext, Modellannahmen oder Anwendungsbezug konkretisieren.",
+      tasks: [
+        {
+          title: "Transfer",
+          description: "Bekannte Konzepte auf eine neue Situation anwenden.",
+          expectation: "Der Transfer zeigt vernetztes Fachverständnis.",
+        },
+        {
+          title: "Begründen oder bewerten",
+          description: "Aussagen, Ergebnisse oder Anwendungen fachlich beurteilen.",
+          expectation: "Bewertungen sind begründet und fachlich belastbar.",
+        },
+      ],
+    },
+  ],
 });
 
 const sek1Blueprints: TemplateBlueprint[] = [
@@ -693,6 +1200,10 @@ const sek1Blueprints: TemplateBlueprint[] = [
       },
     ],
   },
+  ...additionalModernForeignLanguages.map(createModernForeignLanguageSek1Blueprint),
+  ...additionalClassicalLanguages.map((language) => createClassicalLanguageBlueprint(language, "sek1", "general")),
+  createScienceSekBlueprint("Biologie", "sek1"),
+  createScienceSekBlueprint("Physik", "sek1"),
 ];
 
 const sek2Blueprints: TemplateBlueprint[] = [
@@ -797,33 +1308,35 @@ const sek2Blueprints: TemplateBlueprint[] = [
     subject: "Englisch",
     schoolStage: "sek2",
     focus: "general",
-    title: "Englisch Sek II · Klausur",
+    title: "Englisch Sek II · Hörverstehen + Schreiben",
     shortLabel: "E Sek II",
-    description: "GOSt-Vorlage mit abiturorientierter 150-Punkte-Struktur für Q-Phase-Klausuren vor Q2.2.",
-    pedagogicalHint: "Die Struktur folgt der Standardsicherung-Logik für Q-Phase-Englisch: Hörverstehen plus Schreiben/Leseverstehen ergibt 150 Punkte. EF und schulinterne Klausuren können niedriger skaliert werden.",
+    description: "GOSt-Vorlage mit 150-Punkte-Struktur: Hörverstehen 40 + Schreiben/Leseverstehen 110.",
+    pedagogicalHint: "Diese Vorlage ist nur für die Kombination Hörverstehen plus Schreiben/Leseverstehen gedacht. Für Sprachmittlung muss die 160-Punkte-Vorlage genutzt werden.",
+    standardsNote:
+      "NRW moderne Fremdsprachen ab Abitur 2025: Hörverstehen 40 Punkte; Schreiben/Leseverstehen 110 Punkte, davon 44 Inhalt und 66 Darstellungsleistung/sprachliche Leistung.",
     metaTitle: "Englisch-Klausur GOSt",
-    unit: "Input, writing task and language performance",
+    unit: "Listening, writing task and language performance",
     notes:
-      "GOSt-Vorlage Englisch. Inputteil kann als reading, listening oder mediation angelegt werden; language performance bleibt getrennt sichtbar.",
+      "GOSt-Vorlage Englisch nach Standardsicherung NRW: Hörverstehen 40 BE/Punkte, Schreiben/Leseverstehen integriert 110 Punkte. Nicht für Sprachmittlung verwenden; dafür gibt es die getrennte 160-Punkte-Vorlage.",
     gradeLevel: "Q1",
     course: "GK",
     totalPoints: 150,
     sections: [
       {
-        title: "Teil A: Hörverstehen / Input",
+        title: "Teil A: Hörverstehen",
         points: 40,
-        description: "Hörverstehen oder materialgebundener Rezeptionsauftakt.",
-        note: "Für Klausuren ohne Hörverstehen kann dieser Block im Editor umbenannt oder niedriger gewichtet werden.",
+        description: "Isolierter Klausurteil Hörverstehen.",
+        note: "Bei Hörverstehen wird dieser Teil zuerst bearbeitet und vor den weiteren Teilen eingesammelt.",
         tasks: [
           {
-            title: "Comprehension",
+            title: "Listening comprehension",
             description: "Core ideas and relevant information from the material identify.",
             expectation: "The response shows secure understanding of the source material.",
           },
           {
-            title: "Analysis of input",
-            description: "Perspective, message or strategy of the material explain.",
-            expectation: "Analytical points are text-based and clearly phrased.",
+            title: "Listening tasks",
+            description: "Closed, semi-open or short-answer tasks as required complete.",
+            expectation: "Responses are precise and map correctly onto the listening items.",
           },
         ],
       },
@@ -831,45 +1344,169 @@ const sek2Blueprints: TemplateBlueprint[] = [
         title: "Teil B: Schreiben / Leseverstehen · Inhalt",
         points: 44,
         description: "Inhaltliche Leistung der operatorengeleiteten Textarbeit.",
-        note: "Geeignet für comment, article, speech, analysis, re-creation oder mediation product.",
+        note: "Im Abitur 44 Punkte Inhalt; Teilaufgaben können je nach Aufgabenstellung variieren.",
         tasks: [
           {
-            title: "Task fulfilment",
-            description: "All required aspects of the writing task address appropriately.",
-            expectation: "The product responds fully and purposefully to the task.",
+            title: "Comprehension",
+            points: 12,
+            description: "Summarise or select central aspects of the source text.",
+            expectation: "The response secures source understanding accurately and concisely.",
           },
           {
-            title: "Structure and coherence",
-            description: "Build a logically organised and reader-oriented text.",
-            expectation: "The text is clearly structured and coherent throughout.",
+            title: "Analysis",
+            points: 17,
+            description: "Analyse message, perspective, strategy or language of the source.",
+            expectation: "The analysis is text-based, coherent and conceptually precise.",
           },
           {
-            title: "Audience and register",
-            description: "Adapt style and tone to the intended audience and text type.",
-            expectation: "Register and communicative purpose fit the task well.",
+            title: "Evaluation / re-creation",
+            points: 15,
+            description: "Develop an evaluative, creative or context-based final task.",
+            expectation: "The final response is differentiated, task-related and well reasoned.",
           },
         ],
       },
       {
         title: "Teil C: Darstellungsleistung / Sprache",
         points: 66,
-        description: "Range, accuracy, register and cohesion separately assess.",
-        note: "Der Sprachblock sollte nicht im Inhaltsblock aufgehen.",
+        description: "Sprachliche Leistung im integrierten Schreiben/Leseverstehen.",
+        note: "66 Punkte: kommunikative Textgestaltung 22, Ausdruck/sprachliche Mittel 22, Sprachrichtigkeit 22.",
         tasks: [
           {
-            title: "Accuracy",
-            description: "Assess grammar, sentence structure and formal correctness.",
-            expectation: "Language is largely accurate and supports communication.",
+            title: "Communicative text design",
+            points: 22,
+            description: "Assess audience orientation, text type, structure, coherence and use of references.",
+            expectation: "The text is coherent, purposeful and functionally structured.",
           },
           {
-            title: "Range and precision",
-            description: "Assess vocabulary range, idiomatic use and precision.",
-            expectation: "Language use is differentiated and appropriate.",
+            title: "Range / linguistic resources",
+            points: 22,
+            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
+            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
           },
           {
-            title: "Cohesion and style",
-            description: "Assess linking, flow and stylistic control of the text.",
-            expectation: "The text is coherent, readable and stylistically controlled.",
+            title: "Sprachrichtigkeit: Wortschatz",
+            points: 9,
+            description: "Lexical accuracy according to the NRW orientation grid.",
+            expectation: "Lexical choices support comprehension and do not distort meaning.",
+          },
+          {
+            title: "Sprachrichtigkeit: Grammatik",
+            points: 9,
+            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
+            expectation: "Grammar supports communication and does not materially impair understanding.",
+          },
+          {
+            title: "Sprachrichtigkeit: Orthografie",
+            points: 4,
+            description: "Spelling and punctuation according to the NRW orientation grid.",
+            expectation: "Orthography and punctuation remain functional for comprehension.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "englisch-sek2-sprachmittlung-schreiben",
+    subject: "Englisch",
+    schoolStage: "sek2",
+    focus: "general",
+    title: "Englisch Sek II · Sprachmittlung + Schreiben",
+    shortLabel: "E Sek II Mediation",
+    description: "GOSt-Vorlage mit 160-Punkte-Struktur: Sprachmittlung 50 + Schreiben/Leseverstehen 110.",
+    pedagogicalHint:
+      "Für Klausuren mit Mediation: Sprachmittlung hat eigene 20 Inhalt + 30 Darstellungsleistung. Der Schreib-/Analyseteil behält separat 44 Inhalt + 66 Darstellungsleistung.",
+    standardsNote:
+      "NRW moderne Fremdsprachen ab Abitur 2025: Sprachmittlung 50 Punkte (20 Inhalt, 30 Darstellungsleistung/sprachliche Leistung) plus Schreiben/Leseverstehen 110 Punkte.",
+    metaTitle: "Englisch-Klausur GOSt · Sprachmittlung",
+    unit: "Mediation and integrated writing/reading",
+    notes:
+      "GOSt-Vorlage Englisch nach Standardsicherung NRW: Sprachmittlung 50 Punkte getrennt bewerten; Schreiben/Leseverstehen integriert 110 Punkte. Keine gemeinsame Darstellungsleistung über beide Klausurteile bilden.",
+    gradeLevel: "Q1 / Q2",
+    course: "GK / LK",
+    totalPoints: 160,
+    sections: [
+      {
+        title: "Teil A: Sprachmittlung",
+        points: 50,
+        description: "Isolierter Klausurteil Sprachmittlung auf Basis eines deutschsprachigen Sach- oder Gebrauchstextes.",
+        note: "50 Punkte: 20 Inhalt und 30 Darstellungsleistung/sprachliche Leistung.",
+        tasks: [
+          {
+            title: "Mediation content",
+            points: 20,
+            description: "Select and transfer relevant information for the target situation.",
+            expectation: "The mediation product is accurate, purposeful and audience-oriented.",
+          },
+          {
+            title: "Mediation language / text construction",
+            points: 30,
+            description: "Assess target-text format, addressee orientation, register, structure and language.",
+            expectation: "Language and text construction support the communicative mediation task.",
+          },
+        ],
+      },
+      {
+        title: "Teil B: Schreiben / Leseverstehen · Inhalt",
+        points: 44,
+        description: "Inhaltliche Leistung im integrierten Schreiben/Leseverstehen.",
+        note: "Die Teilaufgaben können je nach konkreter Aufgabenstellung variieren.",
+        tasks: [
+          {
+            title: "Comprehension",
+            points: 12,
+            description: "Summarise or select central aspects of the source text.",
+            expectation: "The response secures source understanding accurately and concisely.",
+          },
+          {
+            title: "Analysis",
+            points: 17,
+            description: "Analyse message, perspective, strategy or language of the source.",
+            expectation: "The analysis is text-based, coherent and conceptually precise.",
+          },
+          {
+            title: "Evaluation / re-creation",
+            points: 15,
+            description: "Develop an evaluative, creative or context-based final task.",
+            expectation: "The final response is differentiated, task-related and well reasoned.",
+          },
+        ],
+      },
+      {
+        title: "Teil C: Darstellungsleistung / Sprache",
+        points: 66,
+        description: "Sprachliche Leistung im integrierten Schreiben/Leseverstehen.",
+        note: "Nicht mit der Mediation-Darstellungsleistung verrechnen.",
+        tasks: [
+          {
+            title: "Communicative text design",
+            points: 22,
+            description: "Assess audience orientation, text type, structure, coherence and use of references.",
+            expectation: "The text is coherent, purposeful and functionally structured.",
+          },
+          {
+            title: "Range / linguistic resources",
+            points: 22,
+            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
+            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
+          },
+          {
+            title: "Sprachrichtigkeit: Wortschatz",
+            points: 9,
+            description: "Lexical accuracy according to the NRW orientation grid.",
+            expectation: "Lexical choices support comprehension and do not distort meaning.",
+          },
+          {
+            title: "Sprachrichtigkeit: Grammatik",
+            points: 9,
+            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
+            expectation: "Grammar supports communication and does not materially impair understanding.",
+          },
+          {
+            title: "Sprachrichtigkeit: Orthografie",
+            points: 4,
+            description: "Spelling and punctuation according to the NRW orientation grid.",
+            expectation: "Orthography and punctuation remain functional for comprehension.",
           },
         ],
       },
@@ -1192,6 +1829,11 @@ const sek2Blueprints: TemplateBlueprint[] = [
       },
     ],
   },
+  ...additionalModernForeignLanguages.map(createModernForeignLanguageSek2Blueprint),
+  ...additionalClassicalLanguages.map((language) => createClassicalLanguageBlueprint(language, "sek2", "general")),
+  ...additionalMaterialSubjects.map((subject) => createMaterialBasedSek2Blueprint(subject, "general")),
+  createScienceSekBlueprint("Biologie", "sek2"),
+  createScienceSekBlueprint("Physik", "sek2"),
 ];
 
 const abiturBlueprints: TemplateBlueprint[] = [
@@ -1290,6 +1932,8 @@ const abiturBlueprints: TemplateBlueprint[] = [
     shortLabel: "E Abi",
     description: "Abiturnahe Englischvorlage mit Hörverstehen, Sprachmittlung und Schreiben/Leseverstehen nach 200-Punkte-Logik.",
     pedagogicalHint: "Gedacht für Q2.2, Vorabitur und Klausuren unter Abiturbedingungen: 40 Punkte Hörverstehen, 50 Punkte Sprachmittlung, 110 Punkte Schreiben/Leseverstehen.",
+    standardsNote:
+      "NRW moderne Fremdsprachen ab Abitur 2025: Q2.2/Abitur fortgeführt und LK verpflichtend 40 Hörverstehen + 50 Sprachmittlung + 110 Schreiben/Leseverstehen = 200 Punkte.",
     metaTitle: "Englisch-Vorabitur / Abiturtraining",
     unit: "Abiturorientierter Input und writing task",
     notes:
@@ -1324,11 +1968,13 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Mediation content",
+            points: 20,
             description: "Select and transfer relevant information for the target situation.",
             expectation: "The mediation product is accurate, purposeful and audience-oriented.",
           },
           {
             title: "Mediation language",
+            points: 30,
             description: "Use appropriate register, structure and language for the target text.",
             expectation: "Language and text construction support the communicative task.",
           },
@@ -1342,16 +1988,19 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Comprehension",
+            points: 12,
             description: "Summarise or select central aspects of the source text.",
             expectation: "The response secures source understanding accurately and concisely.",
           },
           {
             title: "Analysis",
+            points: 17,
             description: "Analyse message, perspective, strategy or language of the source.",
             expectation: "The analysis is text-based, coherent and conceptually precise.",
           },
           {
             title: "Evaluation / re-creation",
+            points: 15,
             description: "Develop an evaluative, creative or context-based final task.",
             expectation: "The final response is differentiated, task-related and well reasoned.",
           },
@@ -1361,17 +2010,37 @@ const abiturBlueprints: TemplateBlueprint[] = [
         title: "Teil D: Darstellungsleistung / Sprache",
         points: 66,
         description: "Sprachliche Leistung im integrierten Schreiben/Leseverstehen.",
-        note: "Standardsicherung weist diesen Bereich mit 66 Punkten aus.",
+        note: "66 Punkte: kommunikative Textgestaltung 22, Ausdruck/sprachliche Mittel 22, Sprachrichtigkeit 22.",
         tasks: [
           {
             title: "Communicative text design",
-            description: "Assess audience orientation, text type, structure and coherence.",
+            points: 22,
+            description: "Assess audience orientation, text type, structure, coherence and use of references.",
             expectation: "The text is coherent, purposeful and functionally structured.",
           },
           {
-            title: "Range and accuracy",
-            description: "Assess vocabulary, grammar, sentence structure and orthography.",
-            expectation: "Language is accurate, differentiated and appropriate to the task.",
+            title: "Range / linguistic resources",
+            points: 22,
+            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
+            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
+          },
+          {
+            title: "Sprachrichtigkeit: Wortschatz",
+            points: 9,
+            description: "Lexical accuracy according to the NRW orientation grid.",
+            expectation: "Lexical choices support comprehension and do not distort meaning.",
+          },
+          {
+            title: "Sprachrichtigkeit: Grammatik",
+            points: 9,
+            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
+            expectation: "Grammar supports communication and does not materially impair understanding.",
+          },
+          {
+            title: "Sprachrichtigkeit: Orthografie",
+            points: 4,
+            description: "Spelling and punctuation according to the NRW orientation grid.",
+            expectation: "Orthography and punctuation remain functional for comprehension.",
           },
         ],
       },
@@ -1382,23 +2051,26 @@ const abiturBlueprints: TemplateBlueprint[] = [
     subject: "Mathematik",
     schoolStage: "sek2",
     focus: "abitur",
-    title: "Mathematik Abitur · Vorabitur / Abiturnah",
-    shortLabel: "M Abi",
-    description: "Abiturnahe Mathevorlage mit hilfsmittelfreiem Teil, abiturtypischem Hauptteil und Reflexion.",
-    pedagogicalHint: "Die Struktur passt für Q2 und Vorabitur, gerade wenn hilfsmittelfreie Kompetenzen und abiturtypische Modellierung getrennt bewertet werden sollen.",
+    title: "Mathematik Abitur · Grundkurs 2026+",
+    shortLabel: "M Abi GK",
+    description: "Abiturstruktur NRW Grundkurs: Teil A 25 + Analysis 25 + Geometrie 15 + Stochastik 15 = 80 Punkte.",
+    pedagogicalHint:
+      "Für GK-Abiturtraining ab 2026: Teil A ohne Hilfsmittel, Teil B mit Analysis, vektorieller Geometrie und Stochastik nach NRW-Punktverteilung.",
+    standardsNote:
+      "NRW Mathematik Abitur ab 2026: GK 80 Punkte; Teil A 25, Analysis 25, Vektorielle Geometrie 15, Stochastik 15. Gesamtarbeitszeit 255 Minuten.",
     metaTitle: "Mathematik-Vorabitur / Abiturtraining",
-    unit: "Hilfsmittelfrei, Abiturteil und Reflexion",
+    unit: "Abitur GK: Teil A und Teil B",
     notes:
-      "Abiturorientierte Mathematik-Vorlage. Für TeX- oder LaTeX-Rendering gibt es im aktuellen System noch keinen Math-Renderer; Aufgaben werden als Klartext gepflegt.",
+      "Abiturorientierte Mathematik-GK-Vorlage nach Standardsicherung NRW ab Prüfungsjahr 2026. Teil A ohne Hilfsmittel; Hilfsmittel werden erst nach Abgabe von Teil A genutzt.",
     gradeLevel: "Q2",
-    course: "GK / LK",
-    totalPoints: 120,
+    course: "GK",
+    totalPoints: 80,
     sections: [
       {
         title: "Teil A: Hilfsmittelfrei",
-        points: 30,
-        description: "Abiturnahe Grundkompetenzen ohne Hilfsmittel.",
-        note: "Kurzaufgaben und sichere Standardverfahren bündeln.",
+        points: 25,
+        description: "Fünf Aufgaben ohne Hilfsmittel einschließlich Auswahlzeit.",
+        note: "Teil A muss vor Ausgabe von CAS/MMS bzw. WTR und Formelsammlung abgegeben werden.",
         tasks: [
           {
             title: "Grundkompetenzen",
@@ -1413,43 +2085,120 @@ const abiturBlueprints: TemplateBlueprint[] = [
         ],
       },
       {
-        title: "Teil B: Abiturteil",
-        points: 60,
-        description: "Mehrschrittige abiturtypische Aufgaben aus Analysis, Geometrie oder Stochastik.",
-        note: "Für GK/LK und Hilfsmittelsetting vor Ort differenzieren.",
+        title: "Teil B1: Analysis",
+        points: 25,
+        description: "Analysis-Aufgabe mit Hilfsmitteln.",
+        note: "Teil B im GK umfasst insgesamt 55 Punkte; Analysis ist mit 25 Punkten ausgewiesen.",
         tasks: [
           {
             title: "Ansatz und Modellierung",
             description: "Ein abiturtypisches Problem strukturieren und mathematisch fassen.",
             expectation: "Der mathematische Zugang ist passend gewählt und begründet.",
           },
+        ],
+      },
+      {
+        title: "Teil B2: Vektorielle Geometrie",
+        points: 15,
+        description: "Geometrie-Aufgabe mit Hilfsmitteln.",
+        note: "NRW-GK-Verteilung ab 2026: vektorielle Geometrie 15 Punkte.",
+        tasks: [
           {
-            title: "Verfahren und Berechnung",
-            description: "Die gewählten Schritte sicher und vollständig durchführen.",
-            expectation: "Rechnungen und Verfahren bleiben konsistent und fachlich korrekt.",
-          },
-          {
-            title: "Interpretation",
-            description: "Ergebnisse fachlich und kontextbezogen deuten.",
-            expectation: "Die Deutung zeigt Verständnis für Modell und Resultat.",
+            title: "Geometrische Verfahren",
+            description: "Vektoren, Geraden, Ebenen oder Abstands- und Lagebeziehungen bearbeiten.",
+            expectation: "Lösungswege sind formal korrekt, begründet und nachvollziehbar.",
           },
         ],
       },
       {
-        title: "Teil C: Reflexion und Begründung",
-        points: 30,
-        description: "Lösungswege prüfen, begründen und abiturtypisch reflektieren.",
-        note: "Auch Grenzfälle, Plausibilitätsprüfung oder Verfahrensvergleich passen hier.",
+        title: "Teil B3: Stochastik",
+        points: 15,
+        description: "Stochastik-Aufgabe mit Hilfsmitteln.",
+        note: "NRW-GK-Verteilung ab 2026: Stochastik 15 Punkte.",
         tasks: [
           {
-            title: "Begründung",
-            description: "Mathematische Aussagen logisch herleiten oder absichern.",
-            expectation: "Begründungen sind schlüssig und präzise formuliert.",
+            title: "Stochastische Verfahren",
+            description: "Wahrscheinlichkeitsmodelle, Verteilungen oder statistische Entscheidungen bearbeiten.",
+            expectation: "Rechnungen, Deutungen und Begründungen passen zum stochastischen Modell.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "mathematik-abitur-lk",
+    subject: "Mathematik",
+    schoolStage: "sek2",
+    focus: "abitur",
+    title: "Mathematik Abitur · Leistungskurs 2026+",
+    shortLabel: "M Abi LK",
+    description: "Abiturstruktur NRW Leistungskurs: Teil A 30 + Analysis 30 + Geometrie 20 + Stochastik 20 = 100 Punkte.",
+    pedagogicalHint:
+      "Für LK-Abiturtraining ab 2026: Teil A ohne Hilfsmittel, Teil B mit Analysis, vektorieller Geometrie und Stochastik nach NRW-Punktverteilung.",
+    standardsNote:
+      "NRW Mathematik Abitur ab 2026: LK 100 Punkte; Teil A 30, Analysis 30, Vektorielle Geometrie 20, Stochastik 20. Gesamtarbeitszeit 300 Minuten.",
+    metaTitle: "Mathematik-LK-Vorabitur / Abiturtraining",
+    unit: "Abitur LK: Teil A und Teil B",
+    notes:
+      "Abiturorientierte Mathematik-LK-Vorlage nach Standardsicherung NRW ab Prüfungsjahr 2026. Teil A ohne Hilfsmittel; Hilfsmittel werden erst nach Abgabe von Teil A genutzt.",
+    gradeLevel: "Q2",
+    course: "LK",
+    totalPoints: 100,
+    sections: [
+      {
+        title: "Teil A: Hilfsmittelfrei",
+        points: 30,
+        description: "Sechs Aufgaben ohne Hilfsmittel einschließlich Auswahlzeit.",
+        note: "Teil A muss vor Ausgabe von CAS/MMS bzw. WTR und Formelsammlung abgegeben werden.",
+        tasks: [
+          {
+            title: "Grundkompetenzen",
+            description: "Zentrale Verfahren, Umformungen oder Grundbegriffe ohne Hilfsmittel anwenden.",
+            expectation: "Die hilfsmittelfreien Grundlagen werden routiniert und korrekt bearbeitet.",
           },
           {
-            title: "Plausibilisierung",
-            description: "Ergebnisse prüfen, bewerten und alternative Zugänge reflektieren.",
-            expectation: "Die Reflexion geht über reine Ergebnisnennung hinaus.",
+            title: "Darstellung",
+            description: "Zwischenschritte sauber und formal korrekt notieren.",
+            expectation: "Die Notation ist präzise und der Lösungsweg klar nachvollziehbar.",
+          },
+        ],
+      },
+      {
+        title: "Teil B1: Analysis",
+        points: 30,
+        description: "Analysis-Aufgabe mit Hilfsmitteln.",
+        note: "NRW-LK-Verteilung ab 2026: Analysis 30 Punkte.",
+        tasks: [
+          {
+            title: "Ansatz, Berechnung und Interpretation",
+            description: "Ein Analysis-Problem strukturieren, lösen und interpretieren.",
+            expectation: "Der mathematische Zugang ist passend, vollständig und fachlich begründet.",
+          },
+        ],
+      },
+      {
+        title: "Teil B2: Vektorielle Geometrie",
+        points: 20,
+        description: "Geometrie-Aufgabe mit Hilfsmitteln.",
+        note: "NRW-LK-Verteilung ab 2026: vektorielle Geometrie 20 Punkte.",
+        tasks: [
+          {
+            title: "Geometrische Verfahren",
+            description: "Vektoren, Geraden, Ebenen oder Abstands- und Lagebeziehungen bearbeiten.",
+            expectation: "Lösungswege sind formal korrekt, begründet und nachvollziehbar.",
+          },
+        ],
+      },
+      {
+        title: "Teil B3: Stochastik",
+        points: 20,
+        description: "Stochastik-Aufgabe mit Hilfsmitteln.",
+        note: "NRW-LK-Verteilung ab 2026: Stochastik 20 Punkte.",
+        tasks: [
+          {
+            title: "Stochastische Verfahren",
+            description: "Wahrscheinlichkeitsmodelle, Verteilungen oder statistische Entscheidungen bearbeiten.",
+            expectation: "Rechnungen, Deutungen und Begründungen passen zum stochastischen Modell.",
           },
         ],
       },
@@ -1536,11 +2285,14 @@ const abiturBlueprints: TemplateBlueprint[] = [
     title: "Chemie Abitur · Vorabitur / Abiturnah",
     shortLabel: "C Abi",
     description: "Abiturnahe Chemievorlage mit Fachwissen, Auswertung und Transfer/Modellierung.",
-    pedagogicalHint: "Passend für Q2, Vorabitur und klausurnahe Abiturvorbereitung mit Blick auf Formelsammlung und fachsprachliche Präzision.",
+    pedagogicalHint:
+      "Passend für Q2, Vorabitur und klausurnahe Abiturvorbereitung. Im Zentralabitur ab 2025 werden vier Aufgaben bereitgestellt, von denen drei bearbeitet werden.",
+    standardsNote:
+      "NRW Chemie Abitur ab 2025: Schule erhält vier Aufgaben, Prüflinge wählen drei. Formelsammlung bzw. zulässiger fachspezifischer Auszug ist ab 2025 verpflichtend.",
     metaTitle: "Chemie-Vorabitur / Abiturtraining",
     unit: "Abiturorientierte Auswertung und Modellierung",
     notes:
-      "Abiturorientierte Chemie-Vorlage. Formelsammlung, Hilfsmittel und experimentelle Anteile an die aktuellen Abiturvorgaben der Fachkonferenz anpassen.",
+      "Abiturorientierte Chemie-Vorlage. Auswahl 3 aus 4 dokumentieren; Formelsammlung, Hilfsmittel und experimentelle Anteile an die aktuellen Abiturvorgaben der Fachkonferenz anpassen.",
     gradeLevel: "Q2",
     course: "GK / LK",
     totalPoints: 120,
@@ -1596,6 +2348,128 @@ const abiturBlueprints: TemplateBlueprint[] = [
             title: "Bewerten",
             description: "Ergebnisse chemisch einordnen und Entscheidungen begründen.",
             expectation: "Bewertungen sind argumentativ sauber und fachlich abgesichert.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "biologie-abitur-auswahl",
+    subject: "Biologie",
+    schoolStage: "sek2",
+    focus: "abitur",
+    title: "Biologie Abitur · 3 aus 4",
+    shortLabel: "Bio Abi",
+    description: "Abiturnahe Biologievorlage für das NRW-Auswahlmodell: vier Aufgaben gestellt, drei bewertet.",
+    pedagogicalHint:
+      "Die Vorlage bildet die drei tatsächlich bearbeiteten Aufgaben ab. Die vierte, nicht gewählte Aufgabe wird in den Notizen dokumentiert, aber nicht bepunktet.",
+    standardsNote:
+      "NRW Biologie Abitur ab 2025: Schule erhält für GK und LK jeweils vier Aufgaben; Prüflinge wählen drei Aufgaben zur Bearbeitung aus.",
+    metaTitle: "Biologie-Vorabitur / Abiturtraining",
+    unit: "Abiturorientierte Aufgabenwahl",
+    notes:
+      "Abiturorientierte Biologie-Vorlage. Auswahl 3 aus 4 dokumentieren und die drei bearbeiteten Aufgaben nach den aktuellen fachlichen Vorgaben ausarbeiten.",
+    gradeLevel: "Q2",
+    course: "GK / LK",
+    totalPoints: 120,
+    sections: [
+      {
+        title: "Gewählte Aufgabe 1",
+        points: 40,
+        description: "Erste bearbeitete Abituraufgabe.",
+        note: "Original-Aufgabentitel und Inhaltsfeld eintragen.",
+        tasks: [
+          {
+            title: "Material erschließen und fachlich auswerten",
+            description: "Materialien, Daten, Modelle oder Experimente biologisch erschließen.",
+            expectation: "Auswertung und Fachsprache sind korrekt, materialgebunden und nachvollziehbar.",
+          },
+        ],
+      },
+      {
+        title: "Gewählte Aufgabe 2",
+        points: 40,
+        description: "Zweite bearbeitete Abituraufgabe.",
+        note: "Original-Aufgabentitel und Inhaltsfeld eintragen.",
+        tasks: [
+          {
+            title: "Zusammenhänge erklären und anwenden",
+            description: "Biologische Konzepte auf den Aufgabenkontext anwenden.",
+            expectation: "Erklärungen sind fachlich präzise und vernetzen Material mit Konzeptwissen.",
+          },
+        ],
+      },
+      {
+        title: "Gewählte Aufgabe 3",
+        points: 40,
+        description: "Dritte bearbeitete Abituraufgabe.",
+        note: "Die nicht gewählte vierte Aufgabe in der Klausurnotiz dokumentieren.",
+        tasks: [
+          {
+            title: "Transfer und Bewertung",
+            description: "Ergebnisse übertragen, beurteilen oder begründet bewerten.",
+            expectation: "Transfer- und Bewertungsleistungen sind fachlich abgesichert und differenziert.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "physik-abitur-auswahl",
+    subject: "Physik",
+    schoolStage: "sek2",
+    focus: "abitur",
+    title: "Physik Abitur · 3 aus 4",
+    shortLabel: "Phy Abi",
+    description: "Abiturnahe Physikvorlage für das NRW-Auswahlmodell: vier Aufgaben gestellt, drei bewertet.",
+    pedagogicalHint:
+      "Die Vorlage bildet die drei tatsächlich bearbeiteten Aufgaben ab. Die vierte, nicht gewählte Aufgabe wird in den Notizen dokumentiert, aber nicht bepunktet.",
+    standardsNote:
+      "NRW Physik Abitur ab 2025: Schule erhält für GK und LK jeweils vier Aufgaben; Prüflinge wählen drei Aufgaben zur Bearbeitung aus. Formelsammlung verpflichtend ab 2027, freiwillig ab 2025.",
+    metaTitle: "Physik-Vorabitur / Abiturtraining",
+    unit: "Abiturorientierte Aufgabenwahl",
+    notes:
+      "Abiturorientierte Physik-Vorlage. Auswahl 3 aus 4 dokumentieren und die drei bearbeiteten Aufgaben nach den aktuellen fachlichen Vorgaben ausarbeiten.",
+    gradeLevel: "Q2",
+    course: "GK / LK",
+    totalPoints: 120,
+    sections: [
+      {
+        title: "Gewählte Aufgabe 1",
+        points: 40,
+        description: "Erste bearbeitete Abituraufgabe.",
+        note: "Original-Aufgabentitel und Inhaltsfeld eintragen.",
+        tasks: [
+          {
+            title: "Problem erfassen und modellieren",
+            description: "Physikalische Situation, Größen und Modelle strukturieren.",
+            expectation: "Der Modellansatz ist fachlich passend und nachvollziehbar begründet.",
+          },
+        ],
+      },
+      {
+        title: "Gewählte Aufgabe 2",
+        points: 40,
+        description: "Zweite bearbeitete Abituraufgabe.",
+        note: "Original-Aufgabentitel und Inhaltsfeld eintragen.",
+        tasks: [
+          {
+            title: "Berechnen und auswerten",
+            description: "Daten, Diagramme oder Experimente quantitativ und qualitativ auswerten.",
+            expectation: "Rechenwege, Einheiten, Deutung und Messwertbezug sind fachlich korrekt.",
+          },
+        ],
+      },
+      {
+        title: "Gewählte Aufgabe 3",
+        points: 40,
+        description: "Dritte bearbeitete Abituraufgabe.",
+        note: "Die nicht gewählte vierte Aufgabe in der Klausurnotiz dokumentieren.",
+        tasks: [
+          {
+            title: "Begründen und bewerten",
+            description: "Physikalische Aussagen, Grenzen des Modells oder Anwendungen bewerten.",
+            expectation: "Begründungen sind fachsprachlich präzise und fachlich tragfähig.",
           },
         ],
       },
@@ -1674,6 +2548,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
       },
     ],
   },
+  ...additionalModernForeignLanguages.map(createModernForeignLanguageAbiturBlueprint),
+  ...additionalClassicalLanguages.map((language) => createClassicalLanguageBlueprint(language, "sek2", "abitur")),
+  ...additionalMaterialSubjects.map((subject) => createMaterialBasedSek2Blueprint(subject, "abitur")),
 ];
 
 export const createReadingExamTemplate = (): Exam => ({

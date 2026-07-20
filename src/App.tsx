@@ -139,11 +139,14 @@ import {
   ArchiveIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CloseIcon,
   DashboardIcon,
   FullscreenExitIcon,
   FullscreenIcon,
   GroupIcon,
+  InfoIcon,
   LoadingIcon,
+  MinusIcon,
   SaveIcon,
   MoonIcon,
   PaletteIcon,
@@ -266,9 +269,50 @@ const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
 const DEMO_SEED_VERSION = "student-demo-v2";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
+const APP_CONTENT_SCALE_KEY = "ewh-app-content-scale";
+const FIRST_RUN_GUIDE_DISMISSED_KEY = "ewh-first-run-guide-dismissed";
+const APP_CONTENT_SCALE_MIN = 0.85;
+const APP_CONTENT_SCALE_MAX = 1.15;
+const APP_CONTENT_SCALE_STEP = 0.1;
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 const shouldForceDemoSeed = runtimeQuery.get("resetDemo") === "1" || runtimeQuery.get("freshDemo") === "1";
+
+const clampAppContentScale = (value: number) =>
+  Math.min(APP_CONTENT_SCALE_MAX, Math.max(APP_CONTENT_SCALE_MIN, value));
+
+const loadAppContentScale = () => {
+  try {
+    const raw = Number(window.localStorage.getItem(APP_CONTENT_SCALE_KEY));
+    return Number.isFinite(raw) ? clampAppContentScale(raw) : 1;
+  } catch {
+    return 1;
+  }
+};
+
+const saveAppContentScale = (scale: number) => {
+  try {
+    window.localStorage.setItem(APP_CONTENT_SCALE_KEY, String(scale));
+  } catch {
+    // Display controls should still work for the active session when storage is unavailable.
+  }
+};
+
+const hasDismissedFirstRunGuide = () => {
+  try {
+    return window.localStorage.getItem(FIRST_RUN_GUIDE_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+const markFirstRunGuideDismissed = () => {
+  try {
+    window.localStorage.setItem(FIRST_RUN_GUIDE_DISMISSED_KEY, "1");
+  } catch {
+    // The overlay can still be closed for the active session.
+  }
+};
 
 const getStoredDemoSeedVersion = () => {
   try {
@@ -310,6 +354,55 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "builder", label: "EWH-Editor" },
   { id: "archive", label: "EWH-Archiv" },
   { id: "backup", label: "Backup" },
+];
+
+const firstRunGuideSteps: {
+  tabId: TabId;
+  title: string;
+  eyebrow: string;
+  body: string;
+  actionLabel: string;
+}[] = [
+  {
+    tabId: "groups",
+    eyebrow: "1. Grundlage",
+    title: "Lege zuerst deine Lerngruppe an",
+    body:
+      "Importiere Namen, entsperre sensible Bewertungsdaten nur bei Bedarf und wähle die Klasse aus, für die du korrigierst.",
+    actionLabel: "Lerngruppen öffnen",
+  },
+  {
+    tabId: "guidedBuilder",
+    eyebrow: "2. Startpunkt",
+    title: "Starte mit Template oder PDF",
+    body:
+      "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Das nimmt neuen Nutzern die Entscheidung ab, wo sie beginnen sollen.",
+    actionLabel: "Templates öffnen",
+  },
+  {
+    tabId: "builder",
+    eyebrow: "3. Korrektur",
+    title: "Bearbeite Erwartungen, Punkte und Notenlogik",
+    body:
+      "Im Editor entsteht der eigentliche Erwartungshorizont. Abschnittsnavigation, Skalierung und Notentabelle bleiben nah an der Arbeit.",
+    actionLabel: "Editor öffnen",
+  },
+  {
+    tabId: "archive",
+    eyebrow: "4. Wiederverwendung",
+    title: "Speichere fertige Horizonte im Archiv",
+    body:
+      "Das Archiv macht alte Arbeiten wiederverwendbar und reduziert späteres Suchen in Dateien oder Browser-Downloads.",
+    actionLabel: "Archiv öffnen",
+  },
+  {
+    tabId: "backup",
+    eyebrow: "5. Sicherheit",
+    title: "Sichere Arbeitsstände regelmäßig",
+    body:
+      "Backups und Wiederherstellungspunkte schützen lokale Browserdaten, bevor du geräteübergreifend oder im Schuljahrarchiv arbeitest.",
+    actionLabel: "Backup öffnen",
+  },
 ];
 
 const getTabButtonId = (tabId: TabId) => `app-tab-${tabId}`;
@@ -791,7 +884,12 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
+  const [appContentScale, setAppContentScale] = useState(() => loadAppContentScale());
+  const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
+  const [guideStepIndex, setGuideStepIndex] = useState(0);
   const appShellRef = useRef<HTMLDivElement | null>(null);
+  const guideDialogRef = useRef<HTMLDivElement | null>(null);
+  const guideTitleRef = useRef<HTMLHeadingElement | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string>("");
   const [activeStudentId, setActiveStudentId] = useState<string>("");
   const [storageReady, setStorageReady] = useState(false);
@@ -1026,6 +1124,15 @@ function App() {
   }, [visualTheme]);
 
   useEffect(() => {
+    saveAppContentScale(appContentScale);
+  }, [appContentScale]);
+
+  useEffect(() => {
+    if (!guideOpen) return;
+    window.requestAnimationFrame(() => guideTitleRef.current?.focus());
+  }, [guideOpen]);
+
+  useEffect(() => {
     const syncFullscreenState = () => {
       setIsAppFullscreen(Boolean(document.fullscreenElement));
     };
@@ -1047,6 +1154,72 @@ function App() {
     }
 
     void (appShellRef.current ?? document.documentElement).requestFullscreen();
+  };
+
+  const adjustAppContentScale = (direction: -1 | 1) => {
+    setAppContentScale((current) => {
+      const nextScale = clampAppContentScale(
+        Math.round((current + direction * APP_CONTENT_SCALE_STEP) * 100) / 100,
+      );
+      return nextScale;
+    });
+  };
+
+  const openUserGuide = () => {
+    setGuideStepIndex(0);
+    setGuideOpen(true);
+  };
+
+  const closeUserGuide = (dismissPermanently = false) => {
+    if (dismissPermanently) {
+      markFirstRunGuideDismissed();
+    }
+    setGuideOpen(false);
+  };
+
+  const activateGuideStepTarget = (tabId: TabId) => {
+    setActiveTab(tabId);
+    setGuideOpen(false);
+    window.requestAnimationFrame(() => focusTabButton(tabId));
+  };
+
+  const handleGuideKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      closeUserGuide(false);
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const dialog = guideDialogRef.current;
+    if (!dialog) return;
+
+    const focusableElements = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => !element.hasAttribute("disabled") && element.offsetParent !== null);
+
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (!focusableElements.includes(activeElement as HTMLElement)) {
+      event.preventDefault();
+      (event.shiftKey ? lastElement : firstElement).focus();
+      return;
+    }
+
+    if (event.shiftKey && activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
   };
 
   const focusTabButton = (tabId: TabId) => {
@@ -3429,6 +3602,11 @@ function App() {
     gradeLabel: summary.grade.label,
     gradeVerbalLabel: summary.grade.verbalLabel,
   });
+  const activeGuideStep = firstRunGuideSteps[guideStepIndex] ?? firstRunGuideSteps[0];
+  const guideProgressLabel = `${guideStepIndex + 1} / ${firstRunGuideSteps.length}`;
+  const contentScalePercent = Math.round(appContentScale * 100);
+  const canShrinkContent = appContentScale > APP_CONTENT_SCALE_MIN;
+  const canGrowContent = appContentScale < APP_CONTENT_SCALE_MAX;
 
   if (storageError) {
     return (
@@ -3501,11 +3679,128 @@ function App() {
   }
 
   return (
-    <div ref={appShellRef} className="app-shell min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+    <div
+      ref={appShellRef}
+      className="app-shell min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8"
+      style={{ "--app-content-scale": appContentScale } as CSSProperties}
+    >
       {confettiBurstKey > 0 ? (
         <CelebrationOverlay burstKey={confettiBurstKey} onComplete={() => setConfettiBurstKey(0)} />
       ) : null}
-      <div className="mx-auto max-w-[1880px]">
+      {guideOpen ? (
+        <div className="guide-overlay fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6" role="presentation">
+          <div
+            ref={guideDialogRef}
+            className="guide-panel panel w-full max-w-2xl border p-5 shadow-2xl sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="first-run-guide-title"
+            aria-describedby="first-run-guide-description"
+            onKeyDown={handleGuideKeyDown}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="hero-kicker mb-3">{activeGuideStep.eyebrow}</p>
+                <h2
+                  ref={guideTitleRef}
+                  id="first-run-guide-title"
+                  className="themed-strong text-2xl font-semibold"
+                  tabIndex={-1}
+                >
+                  {activeGuideStep.title}
+                </h2>
+              </div>
+              <IconButton
+                onClick={() => closeUserGuide(false)}
+                title="Einführung schließen"
+                className="px-2.5 py-2"
+              >
+                <CloseIcon />
+              </IconButton>
+            </div>
+
+            <p id="first-run-guide-description" className="themed-muted mt-4 text-sm leading-6">
+              {activeGuideStep.body}
+            </p>
+
+            <div className="guide-step-card mt-5 rounded-2xl border p-4">
+              <div className="flex items-center gap-3">
+                <span className="guide-step-icon" aria-hidden="true">
+                  <TabIcon id={activeGuideStep.tabId} />
+                </span>
+                <div>
+                  <p className="label">Direkt zum Bereich</p>
+                  <p className="themed-strong text-sm font-semibold">
+                    {tabs.find((tab) => tab.id === activeGuideStep.tabId)?.label}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button-primary mt-4 w-full gap-2 sm:w-auto"
+                onClick={() => activateGuideStepTarget(activeGuideStep.tabId)}
+              >
+                <TabIcon id={activeGuideStep.tabId} />
+                {activeGuideStep.actionLabel}
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="guide-progress" aria-label={`Schritt ${guideProgressLabel}`}>
+                {firstRunGuideSteps.map((step, index) => (
+                  <button
+                    key={step.tabId}
+                    type="button"
+                    className={`guide-progress-dot ${index === guideStepIndex ? "guide-progress-dot-active" : ""}`}
+                    aria-label={`Schritt ${index + 1}: ${step.title}`}
+                    aria-current={index === guideStepIndex ? "step" : undefined}
+                    onClick={() => setGuideStepIndex(index)}
+                  />
+                ))}
+              </div>
+              <span className="themed-muted text-xs font-semibold">{guideProgressLabel}</span>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                className="button-secondary justify-center gap-2"
+                onClick={() => closeUserGuide(true)}
+              >
+                Nicht mehr anzeigen
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="button-secondary flex-1 justify-center sm:flex-none"
+                  onClick={() => setGuideStepIndex((current) => Math.max(0, current - 1))}
+                  disabled={guideStepIndex === 0}
+                >
+                  Zurück
+                </button>
+                {guideStepIndex < firstRunGuideSteps.length - 1 ? (
+                  <button
+                    type="button"
+                    className="button-primary flex-1 justify-center sm:flex-none"
+                    onClick={() => setGuideStepIndex((current) => Math.min(firstRunGuideSteps.length - 1, current + 1))}
+                  >
+                    Weiter
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="button-primary flex-1 justify-center sm:flex-none"
+                    onClick={() => closeUserGuide(true)}
+                  >
+                    Fertig
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <div className="app-content-zoom mx-auto max-w-[1880px]">
         <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-4xl">
             <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
@@ -3532,7 +3827,7 @@ function App() {
                 Visual Theme
               </span>
               <select
-                className="field"
+                className="field header-control"
                 value={visualTheme}
                 onChange={(event) => setVisualTheme(event.target.value as VisualTheme)}
               >
@@ -3545,22 +3840,52 @@ function App() {
             </label>
             <button
               type="button"
-              className="button-secondary w-full gap-2 sm:w-auto sm:self-end"
+              className="button-secondary header-control w-full gap-2 sm:w-auto sm:self-end"
               onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
             >
               {theme === "light" ? <MoonIcon /> : <SunIcon />}
               {theme === "light" ? "Dark Mode" : "Light Mode"}
             </button>
+            <div className="display-controls w-full sm:w-auto sm:self-end" aria-label="Ansicht anpassen">
+              <IconButton
+                onClick={() => adjustAppContentScale(-1)}
+                title="Inhalt kleiner anzeigen"
+                className="display-control-button"
+                disabled={!canShrinkContent}
+              >
+                <MinusIcon />
+              </IconButton>
+              <span className="display-scale-value" aria-live="polite" aria-label={`Inhaltsgröße ${contentScalePercent} Prozent`}>
+                {contentScalePercent}%
+              </span>
+              <IconButton
+                onClick={() => adjustAppContentScale(1)}
+                title="Inhalt größer anzeigen"
+                className="display-control-button"
+                disabled={!canGrowContent}
+              >
+                <PlusIcon />
+              </IconButton>
+              <button
+                type="button"
+                className="button-secondary header-control display-fullscreen-button gap-2"
+                onClick={toggleAppFullscreen}
+                disabled={!document.fullscreenEnabled}
+                title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+                aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+              >
+                {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                <span>{isAppFullscreen ? "Vollbild aus" : "Vollbild"}</span>
+              </button>
+            </div>
             <button
               type="button"
-              className="button-secondary w-full gap-2 sm:w-auto sm:self-end"
-              onClick={toggleAppFullscreen}
-              disabled={!document.fullscreenEnabled}
-              title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
-              aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+              className="button-secondary header-control w-full gap-2 sm:w-auto sm:self-end"
+              onClick={openUserGuide}
+              title="Kurze Einführung öffnen"
             >
-              {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              {isAppFullscreen ? "Vollbild aus" : "Vollbild"}
+              <InfoIcon />
+              Hilfe
             </button>
           </div>
         </header>
@@ -3798,7 +4123,13 @@ function App() {
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+        <div
+          className={`grid gap-6 ${
+            activeTab === "guidedBuilder"
+              ? "xl:grid-cols-[320px_minmax(0,1fr)]"
+              : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+          }`}
+        >
           <aside>
             <StudentSelectionPanel
               database={studentDatabase}
@@ -4367,22 +4698,24 @@ function App() {
             )}
           </main>
 
-          <aside className="space-y-6 xl:sticky xl:top-6 self-start">
-            <SummaryPanel
-              summary={summary}
-              studentLabel={activeStudentLiveLabel}
-              studentLabelTitle={activeStudentLiveLabelTitle}
-              locked={assessmentLocked}
-              correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
-            />
-            {activeTab === "builder" && activeWorkspace ? (
-              <EditorToc
-                sections={displayExam.sections}
-                showPointSubsections={!pointsAndGradeSectionCollapsed}
+          {activeTab !== "guidedBuilder" ? (
+            <aside className="space-y-6 xl:sticky xl:top-6 self-start">
+              <SummaryPanel
+                summary={summary}
+                studentLabel={activeStudentLiveLabel}
+                studentLabelTitle={activeStudentLiveLabelTitle}
+                locked={assessmentLocked}
+                correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
               />
-            ) : null}
-            {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
-          </aside>
+              {activeTab === "builder" && activeWorkspace ? (
+                <EditorToc
+                  sections={displayExam.sections}
+                  showPointSubsections={!pointsAndGradeSectionCollapsed}
+                />
+              ) : null}
+              {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
+            </aside>
+          ) : null}
         </div>
         <AppFooter />
       </div>
