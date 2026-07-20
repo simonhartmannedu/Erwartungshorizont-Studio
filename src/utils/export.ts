@@ -666,7 +666,11 @@ const buildGradeFormula = (referenceCell: string, exam: Exam, totalMaxPoints: nu
   );
 };
 
-const buildScoringRows = (exam: Exam, context?: ScoringExportContext) => {
+const buildScoringRows = (
+  exam: Exam,
+  context?: ScoringExportContext,
+  options?: { dataStartRow?: number },
+) => {
   const tasks = getTaskEntries(exam);
   const students = getScoringStudents(context?.students);
   const totalMaxPoints = tasks.reduce((sum, entry) => sum + entry.task.maxPoints, 0);
@@ -675,9 +679,10 @@ const buildScoringRows = (exam: Exam, context?: ScoringExportContext) => {
   const maxColumn = totalColumn + 1;
   const percentColumn = maxColumn + 1;
   const gradeColumn = percentColumn + 1;
+  const dataStartRow = options?.dataStartRow ?? 2;
 
   const rows = students.map((student, studentIndex) => {
-    const rowNumber = studentIndex + 2;
+    const rowNumber = studentIndex + dataStartRow;
     const firstTaskCell = `${columnName(firstTaskColumn)}${rowNumber}`;
     const lastTaskCell = `${columnName(Math.max(firstTaskColumn, firstTaskColumn + tasks.length - 1))}${rowNumber}`;
     const totalCell = `${columnName(totalColumn)}${rowNumber}`;
@@ -722,19 +727,43 @@ export const exportScoringSheetCsv = (exam: Exam, context?: ScoringExportContext
   void downloadCsvFile(`${safePrefix}_Punktetabelle.csv`, buildScoringRows(exam, context).rows);
 };
 
-export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportContext) => {
-  const XLSX = await import("xlsx");
-  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Punktetabelle");
-  const scoring = buildScoringRows(exam, context);
+const createScoringWorkbook = (
+  XLSX: typeof import("xlsx"),
+  exam: Exam,
+  context?: ScoringExportContext,
+) => {
+  const dataStartRow = 6;
+  const scoring = buildScoringRows(exam, context, { dataStartRow });
   const headers = scoring.rows.length > 0 ? Object.keys(scoring.rows[0]) : [];
+  const lastColumn = Math.max(0, headers.length - 1);
+  const lastColumnName = columnName(lastColumn);
+  const metaLine = [
+    `Fach: ${context?.subject || exam.meta.subject || "-"}`,
+    `Klasse/Kurs: ${context?.className || exam.meta.course || "-"}`,
+    `Datum: ${exam.meta.examDate || "-"}`,
+    `Max: ${formatNumber(scoring.totalMaxPoints)} Punkte`,
+    `Modus: ${getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? "Punkte" : "Prozent"}`,
+  ].join("   |   ");
   const data = [
+    [exam.meta.title || "Punktetabelle"],
+    [metaLine],
+    ["Punkte direkt in den Aufgaben-Spalten eintragen. Gesamtpunkte, Prozent und Note werden automatisch berechnet."],
+    [],
     headers,
     ...scoring.rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? "")),
   ];
   const worksheet = XLSX.utils.aoa_to_sheet(data);
+  worksheet["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastColumn } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastColumn } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: lastColumn } },
+  ];
+  worksheet["!autofilter"] = {
+    ref: `A5:${lastColumnName}${Math.max(dataStartRow, dataStartRow + scoring.students.length - 1)}`,
+  };
 
   scoring.students.forEach((_student, index) => {
-    const rowNumber = index + 2;
+    const rowNumber = index + dataStartRow;
     [
       { column: scoring.totalColumn, formula: String(scoring.rows[index].Gesamtpunkte).slice(1), type: "n" },
       { column: scoring.percentColumn, formula: String(scoring.rows[index].Prozent).slice(1), type: "n" },
@@ -742,20 +771,55 @@ export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportC
     ].forEach(({ column, formula, type }) => {
       const cellRef = `${columnName(column)}${rowNumber}`;
       worksheet[cellRef] = {
-        ...(worksheet[cellRef] ?? {}),
+        ...(type === "n" ? { v: 0 } : { v: "" }),
         t: type,
         f: formula,
+        z: type === "n" ? (column === scoring.percentColumn ? "0.0" : "0.0") : undefined,
       };
     });
   });
 
   worksheet["!cols"] = headers.map((header, index) => ({
-    wch: index < 3 ? 16 : Math.min(38, Math.max(12, header.length + 2)),
+    wch:
+      index === 0
+        ? 16
+        : index === 1
+          ? 24
+          : index === 2
+            ? 10
+            : index >= scoring.totalColumn
+              ? 12
+              : Math.min(18, Math.max(11, header.length / 2)),
   }));
+  worksheet["!rows"] = [
+    { hpt: 24 },
+    { hpt: 18 },
+    { hpt: 30 },
+    { hpt: 8 },
+    { hpt: 30 },
+    ...scoring.students.map(() => ({ hpt: 22 })),
+  ];
+  worksheet["!margins"] = { left: 0.35, right: 0.35, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+
+  Array.from({ length: headers.length }, (_, index) => `${columnName(index)}5`).forEach((cellRef) => {
+    if (worksheet[cellRef]) worksheet[cellRef].z = "@";
+  });
+  scoring.students.forEach((_student, studentIndex) => {
+    const rowNumber = studentIndex + dataStartRow;
+    scoring.tasks.forEach((_entry, taskIndex) => {
+      const cellRef = `${columnName(3 + taskIndex)}${rowNumber}`;
+      if (worksheet[cellRef]) worksheet[cellRef].z = "0.0";
+    });
+    [`${columnName(scoring.totalColumn)}${rowNumber}`, `${columnName(scoring.maxColumn)}${rowNumber}`].forEach((cellRef) => {
+      if (worksheet[cellRef]) worksheet[cellRef].z = "0.0";
+    });
+    const percentCell = `${columnName(scoring.percentColumn)}${rowNumber}`;
+    if (worksheet[percentCell]) worksheet[percentCell].z = "0.0";
+  });
 
   const taskSheet = XLSX.utils.json_to_sheet(
     scoring.tasks.map((entry) => ({
-      AufgabenID: entry.task.id,
+      Nr: entry.label,
       Bereich: entry.section.title,
       Aufgabe: entry.task.title,
       MaxPunkte: entry.task.maxPoints,
@@ -764,18 +828,27 @@ export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportC
       Hinweis: entry.section.note,
     })),
   );
+  taskSheet["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 30 }, { wch: 10 }, { wch: 42 }, { wch: 48 }, { wch: 38 }];
+  taskSheet["!rows"] = [{ hpt: 24 }];
 
   const summary = calculateScoringSheetSummary(exam, scoring.totalMaxPoints);
   const scaleSheet = XLSX.utils.json_to_sheet(summary);
+  scaleSheet["!cols"] = [{ wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
+  scaleSheet["!rows"] = [{ hpt: 24 }];
 
   const infoSheet = XLSX.utils.aoa_to_sheet([
+    ["EWH Punktetabelle"],
     ["Titel", exam.meta.title],
     ["Fach", context?.subject || exam.meta.subject],
     ["Klasse/Kurs", context?.className || exam.meta.course],
     ["Datum", exam.meta.examDate],
-    ["Hinweis", "Punkte in der Tabelle eintragen. Gesamtpunkte, Prozent und Note werden über Tabellenformeln berechnet."],
-    ["CSV-Einschraenkung", "CSV kann nur ein Blatt speichern. ODS enthält zusätzlich Aufgaben und Notenschlüssel."],
+    ["Ausfüllen", "Nur die Aufgaben-Spalten in 'Punkte eintragen' bearbeiten. Gesamtpunkte, Prozent und Note sind Formeln."],
+    ["ODS", "Empfohlen für Tabellenkalkulationen, weil mehrere Blätter, Formeln, Breiten und Zeilenhöhen erhalten bleiben."],
+    ["CSV", "CSV kann nur ein Blatt speichern und hat keine verlässliche Gestaltung."],
   ]);
+  infoSheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+  infoSheet["!cols"] = [{ wch: 18 }, { wch: 96 }];
+  infoSheet["!rows"] = [{ hpt: 24 }];
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Punkte eintragen");
@@ -783,7 +856,14 @@ export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportC
   XLSX.utils.book_append_sheet(workbook, scaleSheet, "Notenschluessel");
   XLSX.utils.book_append_sheet(workbook, infoSheet, "Hinweise");
 
-  const output = XLSX.write(workbook, { bookType: "ods", type: "array" });
+  return workbook;
+};
+
+export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportContext) => {
+  const XLSX = await import("xlsx");
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Punktetabelle");
+  const workbook = createScoringWorkbook(XLSX, exam, context);
+  const output = XLSX.write(workbook, { bookType: "ods", type: "array", cellStyles: true, compression: true });
   const blob = new Blob([output], {
     type: "application/vnd.oasis.opendocument.spreadsheet",
   });
@@ -792,6 +872,23 @@ export const exportScoringSheetOds = async (exam: Exam, context?: ScoringExportC
     description: "ODS-Tabellendatei",
     accept: {
       "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
+    },
+  });
+};
+
+export const exportScoringSheetXlsx = async (exam: Exam, context?: ScoringExportContext) => {
+  const XLSX = await import("xlsx");
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Punktetabelle");
+  const workbook = createScoringWorkbook(XLSX, exam, context);
+  const output = XLSX.write(workbook, { bookType: "xlsx", type: "array", cellStyles: true, compression: true });
+  const blob = new Blob([output], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  return saveBlobWithDialog(`${safePrefix}_Punktetabelle.xlsx`, blob, {
+    description: "Excel-Arbeitsmappe",
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
     },
   });
 };
