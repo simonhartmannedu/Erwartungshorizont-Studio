@@ -99,6 +99,7 @@ import {
   exportGradeScaleCsv,
   exportScoringSheetCsv,
   exportScoringSheetOds,
+  exportScoringSheetXlsx,
   exportStudentExamCsv,
   openBatchPrintWindow,
   openClassOverviewPrintWindow,
@@ -3582,6 +3583,14 @@ function App() {
     });
   };
 
+  const handleExportScoringXlsx = () => {
+    void exportScoringSheetXlsx(exam, {
+      subject: activeGroup?.subject ?? exam.meta.subject,
+      className: activeGroup?.className ?? exam.meta.course,
+      students: getScoringExportStudents(),
+    });
+  };
+
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
   const printWithoutDetailsLabel = activeStudentRecord
     ? `Leerer EWH (${activeStudentRecord.alias})`
@@ -3599,6 +3608,7 @@ function App() {
   const exportCsvGradeScaleLabel = "Notenbereiche als CSV";
   const exportScoringCsvLabel = activeGroup ? `Punktetabelle CSV (${activeGroup.className})` : "Punktetabelle CSV";
   const exportScoringOdsLabel = activeGroup ? `Punktetabelle ODS (${activeGroup.className})` : "Punktetabelle ODS";
+  const exportScoringXlsxLabel = activeGroup ? `Punktetabelle XLSX (${activeGroup.className})` : "Punktetabelle XLSX";
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
       ? assessmentLocked
@@ -4713,6 +4723,7 @@ function App() {
                   onExportCsvGradeScale={handleExportGradeScaleCsv}
                   onExportScoringCsv={handleExportScoringCsv}
                   onExportScoringOds={handleExportScoringOds}
+                  onExportScoringXlsx={handleExportScoringXlsx}
                   printLabel={printLabel}
                   printWithoutDetailsLabel={printWithoutDetailsLabel}
                   printGradeScaleLabel={printGradeScaleLabel}
@@ -4724,6 +4735,7 @@ function App() {
                   exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
                   exportScoringCsvLabel={exportScoringCsvLabel}
                   exportScoringOdsLabel={exportScoringOdsLabel}
+                  exportScoringXlsxLabel={exportScoringXlsxLabel}
                   printHint={printHint}
                 />
               </div>

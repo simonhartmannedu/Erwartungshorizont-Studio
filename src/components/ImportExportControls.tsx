@@ -14,6 +14,7 @@ interface Props {
   onExportCsvGradeScale?: () => void;
   onExportScoringCsv?: () => void;
   onExportScoringOds?: () => void;
+  onExportScoringXlsx?: () => void;
   onImportBackup: (file: File, passphrase: string) => void;
   onExportBackup: (passphrase: string) => Promise<boolean>;
   printLabel?: string;
@@ -27,6 +28,7 @@ interface Props {
   exportCsvGradeScaleLabel?: string;
   exportScoringCsvLabel?: string;
   exportScoringOdsLabel?: string;
+  exportScoringXlsxLabel?: string;
   printHint?: string;
 }
 
@@ -44,6 +46,7 @@ export const ImportExportControls = ({
   onExportCsvGradeScale,
   onExportScoringCsv,
   onExportScoringOds,
+  onExportScoringXlsx,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
@@ -55,6 +58,7 @@ export const ImportExportControls = ({
   exportCsvGradeScaleLabel,
   exportScoringCsvLabel,
   exportScoringOdsLabel,
+  exportScoringXlsxLabel,
   printHint,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
@@ -107,6 +111,12 @@ export const ImportExportControls = ({
               <button type="button" className="button-primary gap-2" onClick={onExportScoringOds}>
                 <DownloadIcon />
                 {exportScoringOdsLabel || "Punktetabelle als ODS"}
+              </button>
+            )}
+            {onExportScoringXlsx && (
+              <button type="button" className="button-secondary gap-2" onClick={onExportScoringXlsx}>
+                <DownloadIcon />
+                {exportScoringXlsxLabel || "Punktetabelle als XLSX"}
               </button>
             )}
             {onExportScoringCsv && (
