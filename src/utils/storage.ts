@@ -391,7 +391,7 @@ export const loadVisualTheme = (): VisualTheme => {
     case "video-tutorial":
       return raw;
     default:
-      return "pdf-report";
+      return "nrw-trikolore";
   }
 };
 
