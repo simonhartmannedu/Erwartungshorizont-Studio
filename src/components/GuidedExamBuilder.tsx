@@ -1,9 +1,10 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ExamTemplateDefinition } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
 import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
 import { formatNumber } from "../utils/format";
 import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
+import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
 import { ExamHeaderForm } from "./ExamHeaderForm";
 import {
   DashboardIcon,
@@ -116,7 +117,7 @@ const POINT_STEP = 0.5;
 
 const stageLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sek I" : "Sek II");
 
-const focusLabel = (focus: ExamTemplateDefinition["focus"]) => (focus === "abitur" ? "Abitur" : "Standard");
+const focusLabel = (focus: ExamTemplateDefinition["focus"]) => (focus === "abitur" ? "Vorabitur" : "Standard");
 
 const stageLongLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sekundarstufe I" : "Sekundarstufe II");
 
@@ -325,6 +326,161 @@ const createAdjustedTemplate = (template: ExamTemplateDefinition, sectionPoints:
   build: () => adjustExamToSectionPoints(template.build(), sectionPoints),
 });
 
+const polarToCartesian = (cx: number, cy: number, radius: number, angleInDegrees: number) => {
+  const radians = ((angleInDegrees - 90) * Math.PI) / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians),
+  };
+};
+
+const describeDonutSlice = (
+  cx: number,
+  cy: number,
+  innerRadius: number,
+  outerRadius: number,
+  startAngle: number,
+  endAngle: number,
+) => {
+  const angleSpan = Math.max(endAngle - startAngle, 0.001);
+  const safeEndAngle = angleSpan >= 360 ? startAngle + 359.99 : endAngle;
+  const largeArcFlag = safeEndAngle - startAngle > 180 ? 1 : 0;
+  const outerStart = polarToCartesian(cx, cy, outerRadius, startAngle);
+  const outerEnd = polarToCartesian(cx, cy, outerRadius, safeEndAngle);
+  const innerEnd = polarToCartesian(cx, cy, innerRadius, safeEndAngle);
+  const innerStart = polarToCartesian(cx, cy, innerRadius, startAngle);
+
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+    "Z",
+  ].join(" ");
+};
+
+interface TemplateAllocationSection {
+  title: string;
+  tasks: string[];
+  points: number;
+}
+
+const TemplateAllocationChart = ({
+  sections,
+  totalPoints,
+  activeIndex,
+  onActiveIndexChange,
+  onPointChange,
+}: {
+  sections: TemplateAllocationSection[];
+  totalPoints: number;
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  onPointChange: (index: number, value: number) => void;
+}) => {
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const innerRadius = 58;
+  const outerRadius = 98;
+  const safeTotal = Math.max(totalPoints, POINT_STEP);
+  let currentAngle = 0;
+  const activeSection = sections[activeIndex] ?? sections[0] ?? null;
+
+  const handleSliceKeyDown = (event: KeyboardEvent<SVGPathElement>, index: number, currentPoints: number) => {
+    if (!["ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"].includes(event.key)) return;
+
+    event.preventDefault();
+    const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
+    onActiveIndexChange(index);
+    onPointChange(index, Math.max(POINT_STEP, currentPoints + direction * POINT_STEP));
+  };
+
+  return (
+    <div className="template-allocation-chart">
+      <div className="template-donut-shell">
+        <svg className="template-donut-svg" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Punkteverteilung der Vorlage">
+          <circle className="template-donut-track" cx={cx} cy={cy} r={(innerRadius + outerRadius) / 2} />
+          {sections.map((section, index) => {
+            const points = Math.max(0, section.points);
+            const angleSpan = (points / safeTotal) * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleSpan;
+            currentAngle = endAngle;
+            const percentage = safeTotal > 0 ? (points / safeTotal) * 100 : 0;
+            const color = SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length];
+            const active = index === activeIndex;
+
+            return (
+              <path
+                key={`${section.title}-${index}`}
+                className={`template-donut-slice ${active ? "template-donut-slice-active" : ""}`}
+                d={describeDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, endAngle)}
+                fill={color}
+                role="button"
+                tabIndex={0}
+                aria-label={`${section.title}: ${formatNumber(points)} Punkte, ${formatNumber(percentage)} Prozent`}
+                onClick={() => onActiveIndexChange(index)}
+                onFocus={() => onActiveIndexChange(index)}
+                onKeyDown={(event) => handleSliceKeyDown(event, index, points)}
+              />
+            );
+          })}
+        </svg>
+        <div className="template-donut-center" aria-hidden="true">
+          <strong>{formatNumber(totalPoints)}</strong>
+          <span>Punkte</span>
+        </div>
+      </div>
+
+      {activeSection ? (
+        <div className="template-donut-active">
+          <span>{activeSection.title}</span>
+          <strong>
+            {formatNumber(activeSection.points)} P. · {formatNumber((activeSection.points / safeTotal) * 100)}%
+          </strong>
+        </div>
+      ) : null}
+
+      <div className="template-donut-legend">
+        {sections.map((section, index) => {
+          const percentage = safeTotal > 0 ? (section.points / safeTotal) * 100 : 0;
+          const color = SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length];
+          return (
+            <div
+              key={`${section.title}-control`}
+              className={`template-donut-row ${index === activeIndex ? "template-donut-row-active" : ""}`}
+            >
+              <button
+                type="button"
+                className="template-donut-row-main"
+                onClick={() => onActiveIndexChange(index)}
+                aria-label={`${section.title} markieren`}
+              >
+                <span className="template-donut-swatch" style={{ background: color }} aria-hidden="true" />
+                <span>
+                  <strong>{section.title}</strong>
+                  <small>{section.tasks.join(" · ")}</small>
+                </span>
+              </button>
+              <label className="template-donut-points">
+                <span>{formatNumber(percentage)}%</span>
+                <NumberInput
+                  className="field"
+                  value={section.points}
+                  min={POINT_STEP}
+                  step={POINT_STEP}
+                  onCommit={(value) => onPointChange(index, value)}
+                />
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const SubjectThemeIcon = ({ icon }: { icon: SubjectIconName }) => {
   const iconClass = "h-5 w-5";
 
@@ -431,6 +587,7 @@ export const GuidedExamBuilder = ({
   const [focusFilter, setFocusFilter] = useState<FocusFilter>("all");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
+  const [activeTemplateSectionIndex, setActiveTemplateSectionIndex] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>("new");
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
   const [showMetaSettings, setShowMetaSettings] = useState(false);
@@ -552,6 +709,11 @@ export const GuidedExamBuilder = ({
     setTotalPoints(selectedTemplateTotalPoints);
     setGradeScale((current) => gradeScaleFor(current, selectedTemplateTotalPoints, selectedTemplate.schoolStage));
   }, [mode, selectedTemplate?.id, selectedTemplateTotalPoints]);
+
+  useEffect(() => {
+    if (!selectedTemplate || activeTemplateSectionIndex < selectedTemplate.previewSections.length) return;
+    setActiveTemplateSectionIndex(0);
+  }, [activeTemplateSectionIndex, selectedTemplate]);
 
   useEffect(() => {
     if (mode !== "manual") return;
@@ -849,7 +1011,7 @@ export const GuidedExamBuilder = ({
               {[
                 ["all", "Alle Formate"],
                 ["general", "Standard"],
-                ["abitur", "Abitur"],
+                ["abitur", "Vorabitur"],
               ].map(([value, label]) => (
                 <button
                   key={value}
@@ -912,38 +1074,17 @@ export const GuidedExamBuilder = ({
                   ) : null}
                 </div>
 
-                <div className="template-section-list">
-                  {selectedTemplate.previewSections.map((section, index) => {
-                    const sectionPointValue = selectedTemplatePoints[index] ?? section.points;
-                    const sliderMax = Math.max(
-                      selectedTemplate.totalPoints * 1.5,
-                      selectedTemplateTotalPoints,
-                      sectionPointValue + 20,
-                    );
-                    return (
-                      <div key={section.title} className="template-section-meter">
-                        <div className="flex items-center justify-between gap-3">
-                          <strong>{section.title}</strong>
-                          <span>{formatNumber(sectionPointValue)} P.</span>
-                        </div>
-                        <input
-                          className="template-section-slider"
-                          type="range"
-                          min={POINT_STEP}
-                          max={sliderMax}
-                          step={POINT_STEP}
-                          value={sectionPointValue}
-                          style={{
-                            "--template-slider-fill": `${Math.min(100, (sectionPointValue / sliderMax) * 100)}%`,
-                          } as CSSProperties}
-                          aria-label={`${section.title} Punkte`}
-                          onChange={(event) => updateTemplateSectionPoint(index, Number(event.target.value))}
-                        />
-                        <p>{section.tasks.join(" · ")}</p>
-                      </div>
-                    );
-                  })}
-                </div>
+                <TemplateAllocationChart
+                  sections={selectedTemplate.previewSections.map((section, index) => ({
+                    title: section.title,
+                    tasks: section.tasks,
+                    points: selectedTemplatePoints[index] ?? section.points,
+                  }))}
+                  totalPoints={selectedTemplateTotalPoints}
+                  activeIndex={activeTemplateSectionIndex}
+                  onActiveIndexChange={setActiveTemplateSectionIndex}
+                  onPointChange={updateTemplateSectionPoint}
+                />
 
                 <div className="template-quick-settings">
                   <Field label="Zielpunktzahl">

@@ -2737,5 +2737,7 @@ export const createMediationExamTemplate = () => {
 export const examTemplates: ExamTemplateDefinition[] = [
   ...sek1Blueprints.map(createTemplateDefinition),
   ...sek2Blueprints.map(createTemplateDefinition),
-  ...abiturBlueprints.map(createTemplateDefinition),
+  ...abiturBlueprints
+    .filter((blueprint) => blueprint.title.includes("Vorabitur") || blueprint.title.includes("Abiturnah"))
+    .map(createTemplateDefinition),
 ];
