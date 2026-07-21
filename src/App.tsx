@@ -1,4 +1,4 @@
-import { CSSProperties, KeyboardEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   DraftBundle,
   DraftWorkspace,
@@ -95,6 +95,7 @@ import {
 } from "./utils/students";
 import {
   downloadCsvFile,
+  exportEditableExamDocx,
   exportClassOverviewCsv,
   exportGradeScaleCsv,
   exportScoringSheetCsv,
@@ -132,7 +133,6 @@ import { ImportExportControls } from "./components/ImportExportControls";
 import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
-import { CelebrationOverlay } from "./components/CelebrationOverlay";
 import { PointScaleControl } from "./components/PointScaleControl";
 import { GradeScaleRangeSection } from "./components/GradeScaleRangeSection";
 import { StudentRosterPanel } from "./components/StudentRosterPanel";
@@ -149,7 +149,6 @@ import {
   GroupIcon,
   InfoIcon,
   LoadingIcon,
-  MinusIcon,
   SaveIcon,
   MoonIcon,
   PaletteIcon,
@@ -272,34 +271,10 @@ const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
 const DEMO_SEED_VERSION = "student-demo-v2";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
-const APP_CONTENT_SCALE_KEY = "ewh-app-content-scale";
 const FIRST_RUN_GUIDE_DISMISSED_KEY = "ewh-first-run-guide-dismissed";
-const APP_CONTENT_SCALE_MIN = 0.85;
-const APP_CONTENT_SCALE_MAX = 1.15;
-const APP_CONTENT_SCALE_STEP = 0.1;
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
 const shouldForceDemoSeed = runtimeQuery.get("resetDemo") === "1" || runtimeQuery.get("freshDemo") === "1";
-
-const clampAppContentScale = (value: number) =>
-  Math.min(APP_CONTENT_SCALE_MAX, Math.max(APP_CONTENT_SCALE_MIN, value));
-
-const loadAppContentScale = () => {
-  try {
-    const raw = Number(window.localStorage.getItem(APP_CONTENT_SCALE_KEY));
-    return Number.isFinite(raw) ? clampAppContentScale(raw) : 1;
-  } catch {
-    return 1;
-  }
-};
-
-const saveAppContentScale = (scale: number) => {
-  try {
-    window.localStorage.setItem(APP_CONTENT_SCALE_KEY, String(scale));
-  } catch {
-    // Display controls should still work for the active session when storage is unavailable.
-  }
-};
 
 const hasDismissedFirstRunGuide = () => {
   try {
@@ -421,24 +396,6 @@ const visualThemeOptions: { value: VisualTheme; label: string }[] = [
   { value: "beamtensalon", label: "Beamtensalon" },
   { value: "barrierefrei", label: "Barrierefrei" },
   { value: "video-tutorial", label: "Video-Tutorial" },
-];
-
-const orbitLedConfig: ReadonlyArray<{
-  angle: string;
-  radius: string;
-  color: string;
-  delay: string;
-  duration: string;
-  scale?: string;
-}> = [
-  { angle: "0deg", radius: "8.1rem", color: "#67e8f9", delay: "-0.2s", duration: "2.6s" },
-  { angle: "45deg", radius: "8.05rem", color: "#f5c86b", delay: "-1.1s", duration: "3.1s", scale: "0.9" },
-  { angle: "90deg", radius: "8rem", color: "#7dd3fc", delay: "-0.6s", duration: "2.2s" },
-  { angle: "135deg", radius: "8.15rem", color: "#86efac", delay: "-1.8s", duration: "3.3s", scale: "0.85" },
-  { angle: "180deg", radius: "8.05rem", color: "#22d3ee", delay: "-0.9s", duration: "2.8s" },
-  { angle: "225deg", radius: "8rem", color: "#f59e0b", delay: "-1.4s", duration: "2.9s", scale: "0.88" },
-  { angle: "270deg", radius: "8.1rem", color: "#38bdf8", delay: "-0.4s", duration: "2.4s" },
-  { angle: "315deg", radius: "8.12rem", color: "#2dd4bf", delay: "-1.6s", duration: "3.4s", scale: "0.92" },
 ];
 
 const createTask = (): Task => ({
@@ -887,7 +844,6 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
-  const [appContentScale, setAppContentScale] = useState(() => loadAppContentScale());
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
   const [guideStepIndex, setGuideStepIndex] = useState(0);
   const appShellRef = useRef<HTMLDivElement | null>(null);
@@ -937,7 +893,6 @@ function App() {
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
-  const [confettiBurstKey, setConfettiBurstKey] = useState(0);
   const [loadedExamTemplates, setLoadedExamTemplates] = useState<ExamTemplateDefinition[] | null>(null);
   const completedCorrectionCelebrationKeysRef = useRef<Record<string, boolean>>({});
   const lastVersionedExamByWorkspaceRef = useRef<Record<string, string>>({});
@@ -1151,10 +1106,6 @@ function App() {
   }, [visualTheme]);
 
   useEffect(() => {
-    saveAppContentScale(appContentScale);
-  }, [appContentScale]);
-
-  useEffect(() => {
     if (!guideOpen) return;
     window.requestAnimationFrame(() => guideTitleRef.current?.focus());
   }, [guideOpen]);
@@ -1181,15 +1132,6 @@ function App() {
     }
 
     void (appShellRef.current ?? document.documentElement).requestFullscreen();
-  };
-
-  const adjustAppContentScale = (direction: -1 | 1) => {
-    setAppContentScale((current) => {
-      const nextScale = clampAppContentScale(
-        Math.round((current + direction * APP_CONTENT_SCALE_STEP) * 100) / 100,
-      );
-      return nextScale;
-    });
   };
 
   const openUserGuide = () => {
@@ -1896,7 +1838,7 @@ function App() {
   };
 
   const triggerExamCelebration = () => {
-    setConfettiBurstKey(Date.now());
+    pushNotice("success", "Korrektur abgeschlossen", "Alle ausgewählten Bewertungsbögen sind als korrigiert markiert.");
   };
 
   const removeWorkspace = (workspaceId: string) => {
@@ -3379,6 +3321,32 @@ function App() {
     await printWithResolvedIdentity();
   };
 
+  const handleExportDocx = async () => {
+    let fullName: string | null = null;
+    if (activeStudentRecord && activeGroup?.passwordVerifier) {
+      const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
+      if (!unlockedPassword) {
+        pushNotice("warning", "Klasse zuerst entsperren", "Für den editierbaren Export werden die lokalen Bewertungsdaten benötigt.");
+        return;
+      }
+      try {
+        fullName = await decryptText(activeStudentRecord.encryptedName, unlockedPassword);
+      } catch {
+        pushNotice("danger", "Klarname konnte nicht entschlüsselt werden");
+        return;
+      }
+    }
+    const latestAssessment = activeStudentId ? getStudentAssessment(studentDatabaseRef.current, activeStudentId, activeWorkspace?.id ?? null) : null;
+    const result = await exportEditableExamDocx(displayExam, summary, activeStudentRecord && activeGroup ? {
+      alias: activeStudentRecord.alias,
+      fullName,
+      subject: activeGroup.subject,
+      className: activeGroup.className,
+      teacherComment: latestAssessment?.teacherComment ?? "",
+    } : undefined);
+    if (result !== "cancelled") pushNotice("success", "Word-Dokument erstellt", "Der Bewertungsbogen kann in Word oder LibreOffice weiterbearbeitet werden.");
+  };
+
   const handlePrintWithoutDetails = async () => {
     const opened = openPrintWindow(
       displayExam,
@@ -3666,10 +3634,6 @@ function App() {
   });
   const activeGuideStep = firstRunGuideSteps[guideStepIndex] ?? firstRunGuideSteps[0];
   const guideProgressLabel = `${guideStepIndex + 1} / ${firstRunGuideSteps.length}`;
-  const contentScalePercent = Math.round(appContentScale * 100);
-  const canShrinkContent = appContentScale > APP_CONTENT_SCALE_MIN;
-  const canGrowContent = appContentScale < APP_CONTENT_SCALE_MAX;
-
   if (storageError) {
     return (
       <div className="min-h-screen px-4 py-6 lg:px-8">
@@ -3692,38 +3656,11 @@ function App() {
     return (
       <div className="min-h-screen px-4 py-6 lg:px-8">
         <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-[1880px] items-center justify-center">
-          <section className="storage-loader-shell w-full max-w-6xl">
+          <section className="storage-loader-shell w-full max-w-3xl">
             <div className="storage-loader-stage">
-              <div className="storage-loader-orbit" aria-hidden="true">
-                <div className="storage-loader-ring storage-loader-ring-primary" />
-                <div className="storage-loader-ring storage-loader-ring-secondary" />
-                <div className="storage-loader-ring storage-loader-ring-tertiary" />
-                <div className="storage-loader-leds">
-                  {orbitLedConfig.map((led) => (
-                    <span
-                      key={led.angle}
-                      className="storage-loader-led"
-                      style={
-                        {
-                          "--led-angle": led.angle,
-                          "--led-radius": led.radius,
-                          "--led-color": led.color,
-                          "--led-delay": led.delay,
-                          "--led-duration": led.duration,
-                          "--led-scale": led.scale ?? "1",
-                        } as CSSProperties
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="storage-loader-core">
-                  <span className="storage-loader-core-text">ES</span>
-                </div>
-              </div>
-
               <div className="storage-loader-copy">
                 <p className="storage-loader-kicker">Erwartungshorizont Studio</p>
-                <h1 className="storage-loader-title">Lokaler Speicher wird hochgefahren</h1>
+                <h1 className="storage-loader-title">Lokaler Speicher wird vorbereitet</h1>
                 <p className="storage-loader-text">
                   Die Anwendung initialisiert den SQLite-Speicher, prüft vorhandene Datenstände und stellt den letzten
                   Arbeitsstand wieder her.
@@ -3744,11 +3681,7 @@ function App() {
     <div
       ref={appShellRef}
       className="app-shell min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8"
-      style={{ "--app-content-scale": appContentScale } as CSSProperties}
     >
-      {confettiBurstKey > 0 ? (
-        <CelebrationOverlay burstKey={confettiBurstKey} onComplete={() => setConfettiBurstKey(0)} />
-      ) : null}
       {guideOpen ? (
         <div className="guide-overlay fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6" role="presentation">
           <div
@@ -3862,7 +3795,7 @@ function App() {
           </div>
         </div>
       ) : null}
-      <div className="app-content-zoom mx-auto max-w-[1880px]">
+      <div className="mx-auto max-w-[1880px]">
         <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-4xl">
             <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
@@ -3882,11 +3815,11 @@ function App() {
               </div>
             </div>
           </div>
-          <div className="flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-start sm:justify-end lg:w-auto">
-            <label className="block w-full sm:min-w-[220px] sm:w-auto">
+          <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto">
+            <label className="block w-full sm:min-w-[210px] sm:w-auto">
               <span className="label inline-flex items-center gap-2">
                 <PaletteIcon className="h-3.5 w-3.5" />
-                Visual Theme
+                Darstellung
               </span>
               <select
                 className="field header-control"
@@ -3902,47 +3835,26 @@ function App() {
             </label>
             <button
               type="button"
-              className="button-secondary header-control w-full gap-2 sm:w-auto sm:self-end"
+              className="button-secondary header-control w-full gap-2 sm:w-auto"
               onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
             >
               {theme === "light" ? <MoonIcon /> : <SunIcon />}
-              {theme === "light" ? "Dark Mode" : "Light Mode"}
+              {theme === "light" ? "Dunkel" : "Hell"}
             </button>
-            <div className="display-controls w-full sm:w-auto sm:self-end" aria-label="Ansicht anpassen">
-              <IconButton
-                onClick={() => adjustAppContentScale(-1)}
-                title="Inhalt kleiner anzeigen"
-                className="display-control-button"
-                disabled={!canShrinkContent}
-              >
-                <MinusIcon />
-              </IconButton>
-              <span className="display-scale-value" aria-live="polite" aria-label={`Inhaltsgröße ${contentScalePercent} Prozent`}>
-                {contentScalePercent}%
-              </span>
-              <IconButton
-                onClick={() => adjustAppContentScale(1)}
-                title="Inhalt größer anzeigen"
-                className="display-control-button"
-                disabled={!canGrowContent}
-              >
-                <PlusIcon />
-              </IconButton>
-              <button
-                type="button"
-                className="button-secondary header-control display-fullscreen-button gap-2"
-                onClick={toggleAppFullscreen}
-                disabled={!document.fullscreenEnabled}
-                title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
-                aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
-              >
-                {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-                <span>{isAppFullscreen ? "Vollbild aus" : "Vollbild"}</span>
-              </button>
-            </div>
             <button
               type="button"
-              className="button-secondary header-control w-full gap-2 sm:w-auto sm:self-end"
+              className="button-secondary header-control w-full gap-2 sm:w-auto"
+              onClick={toggleAppFullscreen}
+              disabled={!document.fullscreenEnabled}
+              title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+              aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
+            >
+              {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              <span>{isAppFullscreen ? "Vollbild aus" : "Vollbild"}</span>
+            </button>
+            <button
+              type="button"
+              className="button-secondary header-control w-full gap-2 sm:w-auto"
               onClick={openUserGuide}
               title="Kurze Einführung öffnen"
             >
@@ -4747,6 +4659,7 @@ function App() {
                   onImportBackup={handleImportDatabase}
                   onExportBackup={handleExportDatabase}
                   onPrint={handlePrint}
+                  onExportDocx={handleExportDocx}
                   onPrintWithoutDetails={handlePrintWithoutDetails}
                   onPrintGradeScale={handlePrintGradeScale}
                   onPrintClass={activeGroup ? handlePrintClass : undefined}

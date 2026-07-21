@@ -12,6 +12,7 @@
     "test:regression": "rm -rf .regression-dist && tsc -p tsconfig.regression.json && printf '{\"type\":\"commonjs\"}' > .regression-dist/package.json && node regression/run.cjs"
   },
   "dependencies": {
+    "docx": "^9.7.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sql.js": "^1.14.1",
