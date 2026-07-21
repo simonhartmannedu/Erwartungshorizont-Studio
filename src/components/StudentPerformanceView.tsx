@@ -34,12 +34,15 @@ type CompetenceEntry = {
 };
 
 interface Props {
+  viewId?: string;
+  headingId?: string;
   database: StudentDatabase;
   group: StudentGroup;
   student: StudentRecord;
   studentLabel: string;
   studentFullName?: string | null;
   workspaces: DraftWorkspace[];
+  onClose?: () => void;
 }
 
 const clampPercentage = (value: number) => Math.min(Math.max(value, 0), 100);
@@ -359,12 +362,15 @@ const RadarGraph = ({
 };
 
 export const StudentPerformanceView = ({
+  viewId,
+  headingId,
   database,
   group,
   student,
   studentLabel,
   studentFullName = null,
   workspaces,
+  onClose,
 }: Props) => {
   const [showGroupComparison, setShowGroupComparison] = useState(false);
   const [isViewFullscreen, setIsViewFullscreen] = useState(false);
@@ -422,16 +428,21 @@ export const StudentPerformanceView = ({
   };
 
   return (
-    <div ref={viewRef} className="student-performance-view rounded-[28px] border p-4 sm:p-5">
+    <div id={viewId} ref={viewRef} className="student-performance-view rounded-[28px] border p-4 sm:p-5">
       <div className="student-performance-header flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="label">Konferenzansicht</p>
-          <h3 className="themed-strong text-lg font-semibold">{studentLabel}</h3>
+          <h3 id={headingId} className="themed-strong text-lg font-semibold" tabIndex={-1}>{studentLabel}</h3>
           <p className="themed-muted mt-1 text-sm">
             Einzelansicht mit ausschließlich den Ergebnissen dieses Schülercodes.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {onClose ? (
+            <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={onClose}>
+              Zurück zur Liste
+            </button>
+          ) : null}
           <Badge tone="slate">{entries.length} Klausuren</Badge>
           <Badge tone={scoredEntries.length > 0 ? "emerald" : "amber"}>{scoredEntries.length} mit Daten</Badge>
           <Badge tone={scoredCompetences.length > 0 ? "emerald" : "amber"}>{scoredCompetences.length} Bereiche</Badge>

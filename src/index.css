@@ -4279,3 +4279,31 @@
     align-items: start;
   }
 }
+
+/* Institutional application redesign: calm, dense, and document-led. */
+@media screen {
+  body, .app-shell, .app-shell:fullscreen { background-image: none; }
+  .panel { border-radius: .75rem; border-color: var(--app-border-default); box-shadow: 0 1px 2px color-mix(in srgb, var(--app-text-strong) 7%, transparent); backdrop-filter: none; }
+  .panel:hover { border-color: var(--app-border-default); box-shadow: 0 1px 2px color-mix(in srgb, var(--app-text-strong) 7%, transparent); }
+  .field, .button-primary, .button-secondary, .button-soft, .workspace-mobile-trigger, .editor-toc-link { border-radius: .45rem; }
+  .field { padding: .62rem .75rem; box-shadow: none; }
+  .button-primary, .button-secondary, .button-soft { min-height: 2.35rem; padding: .5rem .75rem; font-size: .82rem; box-shadow: none; }
+  .button-primary:hover, .button-secondary:hover, .button-soft:hover, .workspace-tab:hover, .editor-toc-link:hover { box-shadow: none; transform: none; }
+  .label { margin-bottom: .38rem; font-size: .67rem; letter-spacing: .1em; }
+  .hero-kicker, .school-year-pill, .badge-slate, .badge-amber, .badge-rose, .badge-emerald { border-radius: .25rem; box-shadow: none; }
+  .hero-kicker { padding: .38rem .5rem; letter-spacing: .12em; }
+  .surface-muted, .surface-elevated, .surface-panel, .surface-panel-strong { background: color-mix(in srgb, var(--app-secondary-bg) 88%, var(--app-bg)); }
+  .metric-primary, .metric-accent, .themed-table-shell { border-radius: .45rem; }
+  .workspace-switcher-shell, .linked-section-block, .point-calibrator, .point-calibrator-panel, .point-preview-grid, .template-search-panel, .template-preview-panel, .template-manual-panel, .student-performance-view, .student-performance-radar, .storage-loader-shell, .app-footer-copy, .app-footer-support { border-radius: .65rem !important; box-shadow: none; }
+  .section-editor { border-left: 3px solid var(--section-accent, var(--app-field-focus)); }
+  .section-editor--a { --section-accent: #2f6f9f; } .section-editor--b { --section-accent: #16766d; } .section-editor--c { --section-accent: #9a6a16; } .section-editor--d { --section-accent: #a44b4b; }
+  .section-editor .section-editor-badge { border-radius: .25rem; background: color-mix(in srgb, var(--section-accent) 12%, var(--app-secondary-bg)); color: var(--app-text-strong); }
+  .header-actions { gap: .8rem; } .header-actions .header-control { min-height: 2.75rem; }
+  .export-choice-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .export-choice { display: inline-flex; min-height: 2.4rem; align-items: center; gap: .45rem; border: 1px solid var(--app-secondary-border); border-radius: .45rem; padding: .5rem .7rem; background: var(--app-secondary-bg); color: var(--app-secondary-text); font-size: .82rem; font-weight: 650; text-align: left; }
+  .export-choice:hover, .export-choice:focus-visible { border-color: var(--app-secondary-border-hover); background: var(--app-secondary-hover); outline: none; }
+  .export-choice-active { border-color: var(--app-field-focus); background: color-mix(in srgb, var(--app-field-focus) 12%, var(--app-secondary-bg)); color: var(--app-text-strong); }
+  .export-format-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--app-secondary-border); padding-top: 1rem; }
+  .grade-ladder-fill, .grade-ladder-marker, .storage-loader-status-dot { animation: none; }
+  @media (max-width: 639px) { .export-choice { width: 100%; } }
+}

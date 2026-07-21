@@ -167,6 +167,17 @@ export const StudentRosterPanel = ({
   }, [database.groups, viewedStudent]);
 
   useEffect(() => {
+    if (!viewedStudent) return;
+    const viewId = `student-performance-view-${viewedStudent.groupId}-${viewedStudent.studentId}`;
+    const headingId = `student-performance-heading-${viewedStudent.groupId}-${viewedStudent.studentId}`;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(viewId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(headingId)?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [viewedStudent]);
+
+  useEffect(() => {
     const unlockedGroupIdSet = new Set(unlockedGroupIds);
     setResolvedNamesByGroupId((current) =>
       Object.fromEntries(Object.entries(current).filter(([groupId]) => unlockedGroupIdSet.has(groupId))),
@@ -237,11 +248,18 @@ export const StudentRosterPanel = ({
   const openStudentPerformanceView = (groupId: string, studentId: string) => {
     selectStudent(groupId, studentId);
     setCollapsedGroupIds((current) => current.filter((entry) => entry !== groupId));
-    setViewedStudent((current) =>
-      current?.groupId === groupId && current.studentId === studentId
-        ? null
-        : { groupId, studentId },
-    );
+    setViewedStudent({ groupId, studentId });
+  };
+
+  const closeStudentPerformanceView = () => {
+    if (!viewedStudent) return;
+    const rowButtonId = `student-roster-row-${viewedStudent.groupId}-${viewedStudent.studentId}`;
+    setViewedStudent(null);
+    window.requestAnimationFrame(() => {
+      const rowButton = document.getElementById(rowButtonId);
+      rowButton?.scrollIntoView({ behavior: "smooth", block: "center" });
+      rowButton?.focus({ preventScroll: true });
+    });
   };
 
   const updateStudentDraft = (groupId: string, patch: Partial<{ alias: string; fullName: string }>) => {
@@ -665,6 +683,7 @@ export const StudentRosterPanel = ({
                                         <td className="px-4 py-3 align-top">
                                           <button
                                             type="button"
+                                            id={`student-roster-row-${group.id}-${student.id}`}
                                             className="themed-strong text-left font-semibold underline-offset-4 hover:underline"
                                             onClick={() => selectStudent(group.id, student.id)}
                                           >
@@ -757,12 +776,15 @@ export const StudentRosterPanel = ({
                           return (
                             <div className="mt-5">
                               <StudentPerformanceView
+                                viewId={`student-performance-view-${group.id}-${viewedRecord.id}`}
+                                headingId={`student-performance-heading-${group.id}-${viewedRecord.id}`}
                                 database={database}
                                 group={group}
                                 student={viewedRecord}
                                 studentLabel={getStudentDisplayLabel(viewedRecord, namesByStudentId)}
                                 studentFullName={namesByStudentId?.[viewedRecord.id] ?? null}
                                 workspaces={workspaces}
+                                onClose={closeStudentPerformanceView}
                               />
                             </div>
                           );

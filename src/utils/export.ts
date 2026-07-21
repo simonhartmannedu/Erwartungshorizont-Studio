@@ -100,6 +100,41 @@ export const saveBlobWithDialog = async (
   return target.save(blob);
 };
 
+export const exportEditableExamDocx = async (exam: Exam, summary: ExamSummary, identity?: PrintIdentity) => {
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+  const textCell = (text: string, bold = false) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const meta = [["Fach", identity?.subject || exam.meta.subject || "—"], ["Klasse", identity?.className || exam.meta.course || "—"], ["Schuljahr", exam.meta.schoolYear || "—"], ["Datum", exam.meta.examDate || "—"], ["Lehrkraft", exam.meta.teacher || "—"], ["Schüler:in", identity?.fullName || identity?.alias || "—"]];
+  const children = [
+    new Paragraph({ children: [new TextRun({ text: exam.meta.title || "Bewertungsbogen", bold: true, size: 30 })], spacing: { after: 120 } }),
+    ...(exam.meta.unit ? [new Paragraph({ children: [new TextRun({ text: exam.meta.unit, italics: true })], spacing: { after: 180 } })] : []),
+    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: meta.map(([label, value]) => new TableRow({ children: [textCell(label, true), textCell(value)] })) }),
+    new Paragraph({ children: [new TextRun({ text: "Bewertung", bold: true, size: 24 })], spacing: { before: 300, after: 100 } }),
+  ];
+  exam.sections.forEach((section, sectionIndex) => {
+    const sectionPoints = section.tasks.reduce((total, task) => total + task.maxPoints, 0);
+    children.push(new Paragraph({ children: [new TextRun({ text: `${sectionIndex + 1}. ${section.title || "Aufgabenteil"}`, bold: true, size: 22 })], spacing: { before: 220, after: 80 } }));
+    if (section.description.trim()) children.push(new Paragraph({ children: [new TextRun({ text: section.description })], spacing: { after: 80 } }));
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+      new TableRow({ children: [textCell("Aufgabe", true), textCell("Erwartung / mögliche Antwort", true), textCell("Punkte", true)] }),
+      ...section.tasks.map((task, taskIndex) => new TableRow({ children: [textCell(`${taskIndex + 1}. ${task.title || "Aufgabe"}`), textCell(task.description || "—"), textCell(`${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`)] })),
+      new TableRow({ children: [textCell("Summe", true), textCell("", true), textCell(`${formatNumber(sectionPoints)} Punkte`, true)] }),
+    ] }));
+  });
+  children.push(
+    new Paragraph({ children: [new TextRun({ text: "Ergebnis", bold: true, size: 24 })], spacing: { before: 300, after: 100 } }),
+    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [
+      new TableRow({ children: [textCell("Gesamtpunkte", true), textCell(`${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
+      new TableRow({ children: [textCell("Prozent", true), textCell(`${formatNumber(summary.finalPercentage)} %`)] }),
+      new TableRow({ children: [textCell("Note", true), textCell(`${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
+      new TableRow({ children: [textCell("Kommentar", true), textCell(identity?.teacherComment || "")] }),
+    ] }),
+  );
+  const document = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(document);
+  const filename = `${sanitizeFilenamePart(identity?.alias || exam.meta.title || "Bewertungsbogen")}_${new Date().toISOString().slice(0, 10)}.docx`;
+  return saveBlobWithDialog(filename, blob, { description: "Word-Dokument", accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] } });
+};
+
 interface PrintIdentity {
   alias: string;
   fullName?: string | null;

@@ -11,31 +11,23 @@ import { TaskTable } from "./TaskTable";
 
 const SECTION_TONES = {
   A: {
-    cardClass:
-      "border-sky-200/90 bg-[linear-gradient(180deg,rgba(240,249,255,0.94),rgba(255,255,255,0.80))] dark:border-sky-900/70 dark:bg-[linear-gradient(180deg,rgba(8,47,73,0.34),rgba(15,23,42,0.84))]",
-    badgeClass:
-      "bg-sky-100 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:ring-sky-500/20",
+    cardClass: "section-editor section-editor--a",
+    badgeClass: "section-editor-badge",
     ringClass: "ring-2 ring-sky-300/70",
   },
   B: {
-    cardClass:
-      "border-teal-200/90 bg-[linear-gradient(180deg,rgba(240,253,250,0.94),rgba(255,255,255,0.80))] dark:border-teal-900/70 dark:bg-[linear-gradient(180deg,rgba(4,47,46,0.34),rgba(15,23,42,0.84))]",
-    badgeClass:
-      "bg-teal-100 text-teal-800 ring-1 ring-teal-200 dark:bg-teal-500/15 dark:text-teal-200 dark:ring-teal-500/20",
+    cardClass: "section-editor section-editor--b",
+    badgeClass: "section-editor-badge",
     ringClass: "ring-2 ring-teal-300/70",
   },
   C: {
-    cardClass:
-      "border-amber-200/90 bg-[linear-gradient(180deg,rgba(255,251,235,0.94),rgba(255,255,255,0.80))] dark:border-amber-900/70 dark:bg-[linear-gradient(180deg,rgba(69,26,3,0.32),rgba(15,23,42,0.84))]",
-    badgeClass:
-      "bg-amber-100 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/20",
+    cardClass: "section-editor section-editor--c",
+    badgeClass: "section-editor-badge",
     ringClass: "ring-2 ring-amber-300/70",
   },
   D: {
-    cardClass:
-      "border-rose-200/90 bg-[linear-gradient(180deg,rgba(255,241,242,0.94),rgba(255,255,255,0.80))] dark:border-rose-900/70 dark:bg-[linear-gradient(180deg,rgba(76,5,25,0.32),rgba(15,23,42,0.84))]",
-    badgeClass:
-      "bg-rose-100 text-rose-800 ring-1 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-500/20",
+    cardClass: "section-editor section-editor--d",
+    badgeClass: "section-editor-badge",
     ringClass: "ring-2 ring-rose-300/70",
   },
 } as const;
