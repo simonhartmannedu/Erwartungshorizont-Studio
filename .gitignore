@@ -2,6 +2,10 @@ dist
 .regression-dist
 node_modules
 .codex
+.local-notes
+/scripts/local/
+# Local release archives are distributed outside Git.
+EWH-Studio-v*.zip
 public/.codex
 *.tsbuildinfo
 test-results

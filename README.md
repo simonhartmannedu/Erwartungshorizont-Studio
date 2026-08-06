@@ -2,7 +2,7 @@
 
 Eine lokale Browser-Anwendung für Lehrkräfte: Erwartungshorizonte erstellen, Lerngruppen organisieren, korrigieren, bewerten, archivieren und Berichte exportieren.
 
-[Demo öffnen](https://simonhartmannedu.github.io/Erwartungshorizont-Studio/) · [Modernisierungsplan](docs/modernization-plan.md) · [Architektur](docs/architecture.md)
+[Demo öffnen](https://simonhartmannedu.github.io/Erwartungshorizont-Studio/) · [Architektur](docs/architecture.md)
 
 ![Screenshot von Erwartungshorizont-Studio](erwartungshorizontstudio.png)
 
@@ -40,7 +40,7 @@ Details, Grenzen und keine Rechtsberatung: [Lizenzierung](docs/licensing.md), [O
 
 ## Entwicklungsstatus
 
-Die Anwendung wird schrittweise modernisiert. Kritische Daten-, Sicherheits- und Korrekturabläufe werden durch automatisierte Tests, Dokumentation und Reviews abgesichert. Die geplanten Etappen stehen im [Modernisierungsplan](docs/modernization-plan.md).
+Die Anwendung wird schrittweise modernisiert. Kritische Daten-, Sicherheits- und Korrekturabläufe werden durch automatisierte Tests, Dokumentation und Reviews abgesichert.
 
 ## Installation und Entwicklung
 
@@ -86,10 +86,8 @@ Beiträge sind willkommen. Bitte beachten Sie [CONTRIBUTING.md](CONTRIBUTING.md)
 - [Architektur](docs/architecture.md)
 - [Daten und Datenschutz](docs/data-and-privacy.md)
 - [Entwicklerhandbuch](docs/developer-guide.md)
-- [Modernisierungsplan](docs/modernization-plan.md)
 - [Lizenzierung](docs/licensing.md)
 - [Open Core](docs/open-core.md)
-- [GitHub-Labels](docs/github-labels.md)
 
 ## Lizenz
 
