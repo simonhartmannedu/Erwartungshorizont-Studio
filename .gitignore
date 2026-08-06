@@ -4,6 +4,17 @@ node_modules
 .codex
 public/.codex
 *.tsbuildinfo
+test-results
+playwright-report
+coverage
+.nyc_output
+*.log
+.env
+.env.local
+.env.*.local
+!.env.demo
+# Personal/local visual asset; do not commit or deploy it.
+public/signature.svg
 vite.config.js
 vite.config.d.ts
 tailwind.config.js

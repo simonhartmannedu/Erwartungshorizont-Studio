@@ -44,7 +44,13 @@ export const GradeScaleEditor = ({
 
   const applyGeneratedScale = (patch: Partial<Omit<GradeScale["generator"], "source">> = {}) => {
     const fallbackStage = scale.generator.recommendedStage ?? recommendedStage;
-    const { source: _source, ...currentGenerator } = scale.generator;
+    const currentGenerator = {
+      thresholdPercent: scale.generator.thresholdPercent,
+      accumulationMode: scale.generator.accumulationMode,
+      useHalfPoints: scale.generator.useHalfPoints,
+      showTendency: scale.generator.showTendency,
+      recommendedStage: scale.generator.recommendedStage,
+    };
     onChange(
       applyNotengeneratorGradeScale(scale, totalMaxPoints, {
         ...currentGenerator,

@@ -168,12 +168,14 @@ export const StudentRosterPanel = ({
 
   useEffect(() => {
     if (!viewedStudent) return;
+
     const viewId = `student-performance-view-${viewedStudent.groupId}-${viewedStudent.studentId}`;
     const headingId = `student-performance-heading-${viewedStudent.groupId}-${viewedStudent.studentId}`;
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(viewId)?.scrollIntoView({ behavior: "smooth", block: "start" });
       document.getElementById(headingId)?.focus({ preventScroll: true });
     });
+
     return () => window.cancelAnimationFrame(frame);
   }, [viewedStudent]);
 

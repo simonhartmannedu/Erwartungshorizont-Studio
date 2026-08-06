@@ -10,6 +10,7 @@ interface Props {
   onCancel: () => void;
   onConfirm: () => void;
   onSaveAndConfirm?: () => void;
+  saveAndConfirmLabel?: string;
   confirmLabel: string;
   cancelDisabled?: boolean;
   confirmDisabled?: boolean;
@@ -23,6 +24,7 @@ export const ConfirmDialog = ({
   onCancel,
   onConfirm,
   onSaveAndConfirm,
+  saveAndConfirmLabel = "Vorher speichern",
   confirmLabel,
   cancelDisabled = false,
   confirmDisabled = false,
@@ -43,7 +45,7 @@ export const ConfirmDialog = ({
           {onSaveAndConfirm && (
             <button type="button" className="button-secondary gap-2" onClick={onSaveAndConfirm} disabled={confirmDisabled}>
               <ArchiveIcon />
-              Vorher speichern
+              {saveAndConfirmLabel}
             </button>
           )}
           <button type="button" className="button-primary gap-2" onClick={onConfirm} disabled={confirmDisabled}>

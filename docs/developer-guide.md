@@ -17,6 +17,10 @@ The browser-only parts of the app work without Poppler or Tesseract. PDF import 
 ```bash
 npm install
 npm run dev
+npm run lint
+npm run typecheck
+npm run test
+npm run test:watch
 npm run build
 npm run build:demo
 npm run preview
@@ -27,6 +31,9 @@ npm run check:release
 Command purpose:
 
 - `npm run dev` starts the local Vite app.
+- `npm run lint` checks TypeScript/React source with ESLint.
+- `npm run typecheck` performs the TypeScript project check without bundling.
+- `npm run test` runs Vitest unit tests; `npm run test:watch` keeps them running locally.
 - `npm run build` type-checks and builds the production bundle.
 - `npm run build:demo` builds with seeded demo behavior.
 - `npm run preview` serves the built bundle.
@@ -123,6 +130,9 @@ Keep the privacy preview and consent flow intact when changing PDF import behavi
 Minimum checks for most changes:
 
 ```bash
+npm run lint
+npm run typecheck
+npm run test
 npm run build
 ```
 

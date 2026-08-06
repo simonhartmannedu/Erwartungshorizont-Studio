@@ -148,7 +148,6 @@ export const ReportSummarySection = ({
                       value={signatureDataUrl}
                       onSave={onSignatureChange}
                       onClear={() => onSignatureChange(null)}
-                      importSvgPath="/signature.svg"
                     />
                   </div>
                 ) : signatureDataUrl ? (

@@ -1,0 +1,8 @@
+# Sicherheits-, Daten- und Lizenzänderungen benötigen Review durch den Maintainer.
+* @simonhartmannedu
+/src/infrastructure/ @simonhartmannedu
+/src/utils/backup.ts @simonhartmannedu
+/src/utils/crypto.ts @simonhartmannedu
+/src/utils/storage.ts @simonhartmannedu
+/LICENSE @simonhartmannedu
+/SECURITY.md @simonhartmannedu

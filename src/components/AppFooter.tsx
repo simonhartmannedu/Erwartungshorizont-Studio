@@ -1,11 +1,14 @@
 import { CupIcon } from "./icons";
 
+export const communityLicenseLabel = "GNU Affero General Public License v3.0 (AGPL-3.0)";
+
 export const AppFooter = () => {
   const emailUser = "simonhartmann";
   const emailHost = "mailbox.org";
   const emailAddress = `${emailUser}@${emailHost}`;
   const publicBase = import.meta.env.BASE_URL;
   const licenseUrl = `${publicBase}LICENSE.txt`;
+  const sourceUrl = "https://github.com/simonhartmannedu/Erwartungshorizont-Studio";
 
   return (
     <footer className="app-footer mt-10 border-t pt-6 no-print">
@@ -26,9 +29,15 @@ export const AppFooter = () => {
             </a>
           </p>
           <p className="app-footer-text">
-            Copyright und Lizenzhinweis: Die Anwendung selbst unterliegt den Bedingungen der lokalen{" "}
+            EWH-Studio Community Core ist Open Source unter der {communityLicenseLabel}.
+            Die Lizenz erlaubt Nutzung, Änderung und Weitergabe unter ihren Bedingungen. Die Anwendung wird ohne
+            Gewähr bereitgestellt.{" "}
             <a className="app-footer-link" href={licenseUrl} target="_blank" rel="noreferrer">
-              Lizenzdatei
+              Lizenz anzeigen
+            </a>
+            {" · "}
+            <a className="app-footer-link" href={sourceUrl} target="_blank" rel="noreferrer">
+              Quellcode
             </a>
             .
           </p>

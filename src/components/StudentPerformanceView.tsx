@@ -439,7 +439,11 @@ export const StudentPerformanceView = ({
         </div>
         <div className="flex flex-wrap gap-2">
           {onClose ? (
-            <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={onClose}>
+            <button
+              type="button"
+              className="button-secondary px-3 py-2 text-xs"
+              onClick={onClose}
+            >
               Zurück zur Liste
             </button>
           ) : null}
