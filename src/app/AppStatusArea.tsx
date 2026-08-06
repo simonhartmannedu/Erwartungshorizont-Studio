@@ -1,6 +1,4 @@
-import { GlobalBackupStatus } from "../components/GlobalBackupStatus";
 import { DismissibleCallout } from "../components/ui";
-import type { BackupStatus } from "../utils/backup";
 
 export type AppNoticeTone = "info" | "warning" | "success" | "danger";
 
@@ -14,9 +12,6 @@ export type AppNotice = {
 export const getDemoModeNoticeResetKey = (workspaceId: string) => `demo-${workspaceId}`;
 
 type AppStatusAreaProps = {
-  backupStatus: BackupStatus;
-  lastBackupAt: string | null;
-  onOpenBackup: () => void;
   notice: AppNotice | null;
   isDemoModeEnabled: boolean;
   demoWorkspaceId: string;
@@ -25,19 +20,12 @@ type AppStatusAreaProps = {
 
 /** Renders global non-sensitive status information using commands owned by App. */
 export const AppStatusArea = ({
-  backupStatus,
-  lastBackupAt,
-  onOpenBackup,
   notice,
   isDemoModeEnabled,
   demoWorkspaceId,
   onResetDemoWorkspace,
 }: AppStatusAreaProps) => (
   <>
-    <div className="mb-6">
-      <GlobalBackupStatus status={backupStatus} lastBackupAt={lastBackupAt} onOpenBackup={onOpenBackup} />
-    </div>
-
     {notice ? (
       <div className="mb-6 no-print">
         <DismissibleCallout tone={notice.tone} resetKey={notice.id}>

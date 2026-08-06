@@ -10,6 +10,14 @@ import {
 
 type HomeDestination = "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 
+export type RecentWorkspace = {
+  id: string;
+  label: string;
+  meta: string;
+  updatedAt: string;
+  isActive: boolean;
+};
+
 type HomeDashboardProps = {
   activeWorkspaceLabel: string | null;
   activeWorkspaceUpdatedAt: string | null;
@@ -17,29 +25,31 @@ type HomeDashboardProps = {
   activeGroupStudentCount: number;
   workspaceCount: number;
   archiveCount: number;
-  snapshotCount: number;
   sectionCount: number;
   pointCount: number;
   correctedCount: number;
   relevantStudentCount: number;
   backupSummary: string;
   backupDetail: string;
+  recentWorkspaces: RecentWorkspace[];
   onNavigate: (destination: HomeDestination) => void;
+  onOpenWorkspace: (workspaceId: string) => void;
+  onQuickBackup: () => void;
 };
 
 const formatUpdate = (value: string | null) => {
   if (!value) return "Noch nicht bearbeitet";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Zuletzt bearbeitet";
-  return `Zuletzt bearbeitet · ${new Intl.DateTimeFormat("de-DE", {
+  return new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date)}`;
+  }).format(date);
 };
 
-/** A calm, action-focused landing page for the application. */
+/** Action-led workspace overview with a deliberately restrained information hierarchy. */
 export const HomeDashboard = ({
   activeWorkspaceLabel,
   activeWorkspaceUpdatedAt,
@@ -47,119 +57,99 @@ export const HomeDashboard = ({
   activeGroupStudentCount,
   workspaceCount,
   archiveCount,
-  snapshotCount,
   sectionCount,
   pointCount,
   correctedCount,
   relevantStudentCount,
   backupSummary,
   backupDetail,
+  recentWorkspaces,
   onNavigate,
+  onOpenWorkspace,
+  onQuickBackup,
 }: HomeDashboardProps) => {
   const hasActiveWorkspace = Boolean(activeWorkspaceLabel);
-  const correctionLabel = relevantStudentCount > 0
-    ? `${correctedCount} von ${relevantStudentCount} korrigiert`
-    : "Noch keine Korrektur offen";
+  const correctionProgress = relevantStudentCount > 0 ? Math.round((correctedCount / relevantStudentCount) * 100) : 0;
+  const today = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
   return (
     <section className="home-dashboard no-print" aria-label="Übersicht">
-      <div className="home-hero">
-        <div className="home-hero-copy">
-          <p className="home-eyebrow">Dein Arbeitsbereich</p>
-          <h2 className="home-title">Alles Wichtige.<br />Auf einen Blick.</h2>
-          <p className="home-intro">
-            Plane Erwartungshorizonte, organisiere Lerngruppen und behalte deinen Arbeitsstand im Blick.
-          </p>
-          <div className="home-hero-actions">
-            <button type="button" className="button-primary gap-2" onClick={() => onNavigate(hasActiveWorkspace ? "builder" : "guidedBuilder")}>
-              {hasActiveWorkspace ? <DashboardIcon /> : <PlusIcon />}
-              {hasActiveWorkspace ? "Weiterarbeiten" : "Ersten EWH anlegen"}
-            </button>
-            <button type="button" className="home-text-action" onClick={() => onNavigate("guidedBuilder")}>
-              Vorlage entdecken <ChevronRightIcon />
-            </button>
-          </div>
-        </div>
-        <div className="home-orbit" aria-hidden="true">
-          <div className="home-orbit-ring home-orbit-ring-outer" />
-          <div className="home-orbit-ring home-orbit-ring-inner" />
-          <div className="home-orbit-core"><DashboardIcon className="h-10 w-10" /></div>
-          <span className="home-orbit-dot home-orbit-dot-one" />
-          <span className="home-orbit-dot home-orbit-dot-two" />
-        </div>
-      </div>
-
-      <div className="home-overview-grid">
-        <article className="home-current-card">
-          <div className="home-card-heading">
-            <div>
-              <p className="home-eyebrow">Im Fokus</p>
-              <h3>{activeWorkspaceLabel ?? "Bereit für deinen ersten Erwartungshorizont"}</h3>
-            </div>
-            <span className="home-status-dot" title={hasActiveWorkspace ? "Arbeitsstand vorhanden" : "Noch kein Arbeitsstand"} />
-          </div>
-          <p className="home-current-description">
-            {hasActiveWorkspace
-              ? `${activeGroupLabel ?? "Ohne zugeordnete Lerngruppe"} · ${sectionCount} Bereiche · ${pointCount} Punkte`
-              : "Starte mit einer Vorlage oder erstelle deinen Erwartungshorizont Schritt für Schritt."}
-          </p>
-          <div className="home-current-footer">
-            <span>{formatUpdate(activeWorkspaceUpdatedAt)}</span>
-            <button type="button" className="home-arrow-button" onClick={() => onNavigate(hasActiveWorkspace ? "builder" : "guidedBuilder")} aria-label={hasActiveWorkspace ? "EWH im Editor öffnen" : "EWH-Vorlagen öffnen"}>
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </article>
-
-        <div className="home-stat-grid" aria-label="Aktuelle Zahlen">
-          <div className="home-stat-card home-stat-card-primary"><strong>{workspaceCount}</strong><span>Arbeitsstände</span></div>
-          <div className="home-stat-card"><strong>{activeGroupStudentCount}</strong><span>Lernende aktiv</span></div>
-          <div className="home-stat-card"><strong>{archiveCount}</strong><span>im Archiv</span></div>
-          <div className="home-stat-card"><strong>{snapshotCount}</strong><span>Versionen</span></div>
-        </div>
-      </div>
-
-      <div className="home-section-heading">
+      <header className="home-page-header">
         <div>
-          <p className="home-eyebrow">Schnellzugriff</p>
-          <h3>Womit möchtest du anfangen?</h3>
+          <p className="home-eyebrow">Arbeitsbereich</p>
+          <h2>Übersicht</h2>
+          <p>{today}</p>
         </div>
-        <p>Direkt zum passenden Arbeitsbereich.</p>
+        <button type="button" className="button-primary gap-2" onClick={() => onNavigate("guidedBuilder")}>
+          <PlusIcon /> Neuen EWH erstellen
+        </button>
+      </header>
+
+      <div className="home-primary-grid">
+        <article className="home-work-card">
+          <div className="home-panel-header">
+            <div><p className="home-eyebrow">Weiterarbeiten</p><h3>Aktueller Arbeitsstand</h3></div>
+            {hasActiveWorkspace ? <span className="home-live-badge"><i /> Aktiv</span> : null}
+          </div>
+          {hasActiveWorkspace ? (
+            <>
+              <button type="button" className="home-work-title" onClick={() => onNavigate("builder")}>
+                {activeWorkspaceLabel}<ChevronRightIcon />
+              </button>
+              <div className="home-work-meta">
+                <span>{activeGroupLabel ?? "Keine Lerngruppe zugeordnet"}</span>
+                <span>{sectionCount} Bereiche</span>
+                <span>{pointCount} Punkte</span>
+              </div>
+              <div className="home-work-footer"><span>Bearbeitet · {formatUpdate(activeWorkspaceUpdatedAt)}</span><button type="button" onClick={() => onNavigate("builder")}>Im Editor öffnen</button></div>
+            </>
+          ) : (
+            <div className="home-empty-state">
+              <div className="home-empty-icon"><TemplateIcon className="h-5 w-5" /></div>
+              <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage oder lege einen EWH manuell an.</p></div>
+              <button type="button" onClick={() => onNavigate("guidedBuilder")}>Vorlagen öffnen <ChevronRightIcon /></button>
+            </div>
+          )}
+        </article>
+
+        <aside className="home-status-stack" aria-label="Aktueller Status">
+          <article className="home-status-card">
+            <div className="home-status-icon"><GroupIcon className="h-4 w-4" /></div>
+            <div className="home-status-copy"><p>Korrekturstand</p><strong>{relevantStudentCount ? `${correctedCount} / ${relevantStudentCount}` : "Noch offen"}</strong><span>{activeGroupStudentCount ? `${activeGroupStudentCount} Lernende in der aktiven Gruppe` : "Keine aktive Lerngruppe"}</span></div>
+            {relevantStudentCount > 0 ? <div className="home-progress" aria-label={`${correctionProgress} Prozent korrigiert`}><i style={{ width: `${correctionProgress}%` }} /></div> : null}
+          </article>
+          <article className="home-status-card home-status-card-backup">
+            <div className="home-status-icon"><SaveIcon className="h-4 w-4" /></div>
+            <div className="home-status-copy"><p>Sicherung</p><strong>{backupSummary}</strong><span>{backupDetail}</span></div>
+            <button type="button" onClick={onQuickBackup} aria-label="Backup jetzt erstellen"><ChevronRightIcon /></button>
+          </article>
+        </aside>
       </div>
 
-      <div className="home-action-grid">
-        <button type="button" className="home-action-card home-action-card-featured" onClick={() => onNavigate("guidedBuilder")}>
-          <span className="home-action-icon"><TemplateIcon className="h-6 w-6" /></span>
-          <span className="home-action-content"><strong>Vorlage finden</strong><small>Mit einer fundierten Vorlage schnell starten.</small></span>
-          <ChevronRightIcon className="home-action-chevron" />
-        </button>
-        <button type="button" className="home-action-card" onClick={() => onNavigate("groups")}>
-          <span className="home-action-icon"><GroupIcon className="h-6 w-6" /></span>
-          <span className="home-action-content"><strong>Lerngruppen</strong><small>{activeGroupLabel ?? "Klassen und Lernende verwalten."}</small></span>
-          <ChevronRightIcon className="home-action-chevron" />
-        </button>
-        <button type="button" className="home-action-card" onClick={() => onNavigate("archive")}>
-          <span className="home-action-icon"><ArchiveIcon className="h-6 w-6" /></span>
-          <span className="home-action-content"><strong>Archiv</strong><small>Bewährte Erwartungshorizonte wiederverwenden.</small></span>
-          <ChevronRightIcon className="home-action-chevron" />
-        </button>
-        <button type="button" className="home-action-card" onClick={() => onNavigate("backup")}>
-          <span className="home-action-icon"><SaveIcon className="h-6 w-6" /></span>
-          <span className="home-action-content"><strong>Datensicherung</strong><small>Deine lokalen Daten geschützt behalten.</small></span>
-          <ChevronRightIcon className="home-action-chevron" />
-        </button>
-      </div>
+      <div className="home-content-grid">
+        <section className="home-list-panel">
+          <div className="home-panel-header"><div><p className="home-eyebrow">Zuletzt bearbeitet</p><h3>Arbeitsstände</h3></div><span>{workspaceCount} gesamt</span></div>
+          <div className="home-workspace-list">
+            {recentWorkspaces.map((workspace) => (
+              <button type="button" className={`home-workspace-row${workspace.isActive ? " home-workspace-row-active" : ""}`} key={workspace.id} onClick={() => onOpenWorkspace(workspace.id)}>
+                <span className="home-workspace-mark"><DashboardIcon className="h-4 w-4" /></span>
+                <span className="home-workspace-copy"><strong>{workspace.label}</strong><small>{workspace.meta}</small></span>
+                <time dateTime={workspace.updatedAt}>{formatUpdate(workspace.updatedAt)}</time>
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
+        </section>
 
-      <div className="home-bottom-grid">
-        <article className="home-insight-card">
-          <div className="home-insight-icon"><GroupIcon className="h-5 w-5" /></div>
-          <div><p className="home-eyebrow">Korrekturstand</p><h3>{correctionLabel}</h3><p>Für die aktuell ausgewählte Lerngruppe und Klassenarbeit.</p></div>
-        </article>
-        <article className="home-insight-card home-backup-card">
-          <div className="home-insight-icon"><SaveIcon className="h-5 w-5" /></div>
-          <div><p className="home-eyebrow">Sicherung</p><h3>{backupSummary}</h3><p>{backupDetail}</p></div>
-          <button type="button" className="home-inline-link" onClick={() => onNavigate("backup")}>Öffnen</button>
-        </article>
+        <section className="home-shortcuts-panel">
+          <div className="home-panel-header"><div><p className="home-eyebrow">Schnellzugriff</p><h3>Verwalten</h3></div></div>
+          <div className="home-shortcuts">
+            <button type="button" onClick={() => onNavigate("guidedBuilder")}><TemplateIcon /><span>Vorlagen</span></button>
+            <button type="button" onClick={() => onNavigate("groups")}><GroupIcon /><span>Lerngruppen</span></button>
+            <button type="button" onClick={() => onNavigate("archive")}><ArchiveIcon /><span>Archiv <em>{archiveCount}</em></span></button>
+            <button type="button" onClick={onQuickBackup}><SaveIcon /><span>Backup</span></button>
+          </div>
+        </section>
       </div>
     </section>
   );

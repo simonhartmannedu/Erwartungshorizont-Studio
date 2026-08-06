@@ -784,6 +784,10 @@ function App() {
   const [preRestoreBackupPassphrase, setPreRestoreBackupPassphrase] = useState("");
   const [preRestoreBackupError, setPreRestoreBackupError] = useState("");
   const [preRestoreBackupSaving, setPreRestoreBackupSaving] = useState(false);
+  const [quickBackupDialogOpen, setQuickBackupDialogOpen] = useState(false);
+  const [quickBackupPassphrase, setQuickBackupPassphrase] = useState("");
+  const [quickBackupError, setQuickBackupError] = useState("");
+  const [quickBackupSaving, setQuickBackupSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -2563,6 +2567,28 @@ function App() {
     }
   };
 
+  const openQuickBackupDialog = () => {
+    setQuickBackupPassphrase("");
+    setQuickBackupError("");
+    setQuickBackupDialogOpen(true);
+  };
+
+  const createQuickBackup = async () => {
+    const passphrase = quickBackupPassphrase.trim();
+    if (!passphrase) {
+      setQuickBackupError("Bitte vergib ein Passwort für das verschlüsselte Backup.");
+      return;
+    }
+
+    setQuickBackupSaving(true);
+    const saved = await handleExportDatabase(passphrase);
+    setQuickBackupSaving(false);
+    if (saved) {
+      setQuickBackupDialogOpen(false);
+      setQuickBackupPassphrase("");
+    }
+  };
+
   const handleArchiveSchoolYear = async (schoolYear: string, passphrase: string) => {
     if (!passphrase.trim()) {
       pushNotice("warning", "Archiv-Passwort fehlt", "Bitte vergib ein Passwort für die Schuljahr-Archivdatei.");
@@ -3542,12 +3568,12 @@ function App() {
           isFullscreenAvailable={document.fullscreenEnabled}
           onToggleAppFullscreen={toggleAppFullscreen}
           onOpenUserGuide={openUserGuide}
+          backupStatus={backupStatus}
+          lastBackupAt={lastBackupAt}
+          onOpenBackup={openQuickBackupDialog}
         />
 
         <AppStatusArea
-          backupStatus={backupStatus}
-          lastBackupAt={lastBackupAt}
-          onOpenBackup={() => activateTab("backup")}
           notice={appNotice}
           isDemoModeEnabled={isDemoModeEnabled}
           demoWorkspaceId={draftBundle.activeWorkspaceId}
@@ -3562,14 +3588,13 @@ function App() {
           tabButtonRefs={tabButtonRefs}
         />
 
-        {activeTab !== "home" ? (
         <section className="mb-5 no-print">
-          <div className="workspace-switcher-shell rounded-2xl border px-3 py-3">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <label className="w-full md:flex md:w-auto md:min-w-[250px] md:items-center md:gap-2">
-                <span className="label md:mb-0 md:shrink-0">Schuljahr</span>
+          <div className="workspace-bar">
+            <div className="workspace-bar-primary">
+              <label className="workspace-year-select">
+                <span>Schuljahr</span>
                 <select
-                  className="field py-2 md:min-h-[2.6rem]"
+                  className="field"
                   value={activeSchoolYearFilter}
                   onChange={(event) => setActiveSchoolYearFilter(event.target.value)}
                 >
@@ -3582,38 +3607,25 @@ function App() {
                 </select>
               </label>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 md:hidden">
-                  <button
-                    type="button"
-                    className="workspace-mobile-trigger inline-flex min-w-0 flex-1 items-center justify-center rounded-2xl border px-3 py-2 text-sm font-medium shadow-sm transition"
-                    onClick={() => activeWorkspace && setActiveWorkspaceId(activeWorkspace.id)}
-                  >
-                    <span className="truncate">{getWorkspaceDisplayLabel(activeWorkspace)}</span>
-                  </button>
-                  {visibleWorkspaces.length > 1 ? (
-                    <label className="min-w-0 flex-1">
-                      <span className="sr-only">Weitere Klassenarbeiten auswählen</span>
-                      <select
-                        className="field py-2"
-                        value={draftBundle.activeWorkspaceId}
-                        onChange={(event) => setActiveWorkspaceId(event.target.value)}
-                      >
-                        {visibleWorkspaces.map((workspace) => (
-                          <option key={workspace.id} value={workspace.id}>
-                            {getWorkspaceDisplayLabel(workspace)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
+                <div className="workspace-mobile-select md:hidden">
+                  <label>
+                    <span className="sr-only">Aktive Klassenarbeit auswählen</span>
+                    <select className="field" value={activeWorkspace?.id ?? ""} onChange={(event) => setActiveWorkspaceId(event.target.value)}>
+                      {visibleWorkspaces.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {getWorkspaceDisplayLabel(workspace)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <div className="hidden min-w-0 overflow-x-auto md:block">
-                  <div className="workspace-tabs inline-flex min-w-full items-end border-b">
+                  <div className="workspace-tabs">
                   {visibleWorkspaces.map((workspace) => (
                     <button
                       type="button"
                       key={workspace.id}
-                      className={`workspace-tab -mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition ${
+                      className={`workspace-tab ${
                         workspace.id === draftBundle.activeWorkspaceId
                           ? "workspace-tab-active"
                           : ""
@@ -3626,74 +3638,72 @@ function App() {
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 md:justify-end">
+            </div>
+            <div className="workspace-bar-actions">
+              {activeWorkspace ? (
+                <button
+                  type="button"
+                  className="workspace-history-button"
+                  onClick={() => setVersionListCollapsed((current) => !current)}
+                  aria-expanded={!versionListCollapsed}
+                >
+                  Verlauf{activeWorkspace.versions.length > 0 ? ` · ${activeWorkspace.versions.length}` : ""}
+                  {versionListCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+                </button>
+              ) : null}
               <button
                 type="button"
-                className="button-secondary flex-1 gap-2 sm:flex-none"
+                className="workspace-icon-button"
                 onClick={() => setActiveTab("guidedBuilder")}
+                aria-label="Neuen Erwartungshorizont anlegen"
+                title="Neuen Erwartungshorizont anlegen"
               >
                 <PlusIcon />
-                Neu
               </button>
-              <button
-                type="button"
-                className="button-soft flex-1 gap-2 sm:flex-none"
-                onClick={() => activeWorkspace && setWorkspaceToDelete(activeWorkspace)}
-                disabled={draftBundle.workspaces.length <= 1 || !activeWorkspace}
-              >
-                <ArchiveIcon />
-                Löschen
-              </button>
-              </div>
+              <details className="workspace-actions">
+                <summary title="Weitere Aktionen" aria-label="Weitere Aktionen">•••</summary>
+                <div className="workspace-actions-menu">
+                  <button
+                    type="button"
+                    onClick={() => activeWorkspace && setWorkspaceToDelete(activeWorkspace)}
+                    disabled={draftBundle.workspaces.length <= 1 || !activeWorkspace}
+                  >
+                    <ArchiveIcon />
+                    Aktive Arbeit löschen
+                  </button>
+                </div>
+              </details>
             </div>
             {hasNoAssignedWorkspaceForActiveGroup ? (
-              <div className="empty-workspace-state mt-4">
-                <div className="empty-workspace-scene" aria-hidden="true">
-                  <p className="empty-workspace-title">Missing input</p>
-                  <div className="empty-workspace-loader">
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-                <p className="status-note text-sm leading-6">
-                  Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet.
-                </p>
-              </div>
-            ) : activeWorkspace ? (
-              <WorkspaceVersionPanel
-                workspace={activeWorkspace}
-                workspaceLabel={getWorkspaceDisplayLabel(activeWorkspace)}
-                collapsed={versionListCollapsed}
-                maxVersions={MAX_WORKSPACE_VERSIONS}
-                onToggleCollapsed={() => setVersionListCollapsed((current) => !current)}
-                onSaveVersion={() => saveWorkspaceVersion(activeWorkspace.id)}
-                onRestoreVersion={(version) =>
-                  setPendingVersionRestore({
-                    workspaceId: activeWorkspace.id,
-                    workspaceLabel: getWorkspaceDisplayLabel(activeWorkspace),
-                    version,
-                  })
-                }
-              />
+              <p className="workspace-inline-notice">Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet.</p>
             ) : null}
           </div>
+          {activeWorkspace && !versionListCollapsed ? (
+            <WorkspaceVersionPanel
+              workspace={activeWorkspace}
+              workspaceLabel={getWorkspaceDisplayLabel(activeWorkspace)}
+              collapsed={versionListCollapsed}
+              maxVersions={MAX_WORKSPACE_VERSIONS}
+              onToggleCollapsed={() => setVersionListCollapsed((current) => !current)}
+              onSaveVersion={() => saveWorkspaceVersion(activeWorkspace.id)}
+              onRestoreVersion={(version) =>
+                setPendingVersionRestore({
+                  workspaceId: activeWorkspace.id,
+                  workspaceLabel: getWorkspaceDisplayLabel(activeWorkspace),
+                  version,
+                })
+              }
+            />
+          ) : null}
         </section>
-        ) : null}
 
         <div
-          className={activeTab === "home"
-            ? "space-y-6"
-            : `grid gap-6 ${
-                activeTab === "guidedBuilder"
-                  ? "xl:grid-cols-[320px_minmax(0,1fr)]"
-                  : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
-              }`}
+          className={`grid gap-6 ${
+            activeTab === "guidedBuilder" || activeTab === "home"
+              ? "xl:grid-cols-[320px_minmax(0,1fr)]"
+              : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+          }`}
         >
-          {activeTab !== "home" ? (
           <aside>
             <StudentSelectionPanel
               database={studentDatabase}
@@ -3715,7 +3725,6 @@ function App() {
               onToggleSecurity={handleHeaderLockToggle}
             />
           </aside>
-          ) : null}
 
           <main className="space-y-6">
             <div
@@ -3733,14 +3742,38 @@ function App() {
                   activeGroupStudentCount={activeGroup?.students.length ?? 0}
                   workspaceCount={draftBundle.workspaces.length}
                   archiveCount={archiveEntries.length}
-                  snapshotCount={totalSnapshotCount}
                   sectionCount={activeWorkspace?.exam.sections.length ?? 0}
                   pointCount={activeWorkspace ? summary.totalMaxPoints : 0}
                   correctedCount={correctionCompletionState.correctedCount}
                   relevantStudentCount={correctionCompletionState.relevantStudentCount}
                   backupSummary={backupStatus.summary}
                   backupDetail={backupStatus.detail}
+                  recentWorkspaces={[...draftBundle.workspaces]
+                    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+                    .slice(0, 4)
+                    .map((workspace) => {
+                      const workspaceGroup = workspace.assignedGroupId
+                        ? getStudentGroup(studentDatabase, workspace.assignedGroupId)
+                        : null;
+                      const meta = [workspace.exam.meta.subject, workspaceGroup?.className ?? workspace.exam.meta.course]
+                        .filter(Boolean)
+                        .join(" · ");
+                      return {
+                        id: workspace.id,
+                        label: getWorkspaceDisplayLabel(workspace),
+                        meta: meta || "Erwartungshorizont",
+                        updatedAt: workspace.updatedAt,
+                        isActive: workspace.id === activeWorkspace?.id,
+                      };
+                    })}
                   onNavigate={activateTab}
+                  onQuickBackup={openQuickBackupDialog}
+                  onOpenWorkspace={(workspaceId) => {
+                    const workspace = draftBundle.workspaces.find((entry) => entry.id === workspaceId);
+                    if (workspace?.assignedGroupId) setActiveGroupId(workspace.assignedGroupId);
+                    setActiveWorkspaceId(workspaceId);
+                    activateTab("builder");
+                  }}
                 />
               ) : null}
             </div>
@@ -4327,6 +4360,40 @@ function App() {
         </div>
         <AppFooter />
       </div>
+
+      <ConfirmDialog
+        open={quickBackupDialogOpen}
+        title="Backup jetzt erstellen"
+        description="Das Backup wird mit diesem Passwort verschlüsselt. Anschließend wählst du nur noch den Speicherort für die Datei aus."
+        onCancel={() => {
+          if (quickBackupSaving) return;
+          setQuickBackupDialogOpen(false);
+          setQuickBackupPassphrase("");
+          setQuickBackupError("");
+        }}
+        onConfirm={() => {
+          void createQuickBackup();
+        }}
+        confirmLabel={quickBackupSaving ? "Backup wird erstellt …" : "Backup erstellen"}
+        cancelDisabled={quickBackupSaving}
+        confirmDisabled={quickBackupSaving}
+      >
+        <Field label="Backup-Passwort" inputId="quick-backup-passphrase">
+          <input
+            id="quick-backup-passphrase"
+            className="field"
+            type="password"
+            autoComplete="new-password"
+            value={quickBackupPassphrase}
+            disabled={quickBackupSaving}
+            onChange={(event) => {
+              setQuickBackupPassphrase(event.target.value);
+              if (quickBackupError) setQuickBackupError("");
+            }}
+          />
+        </Field>
+        {quickBackupError ? <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">{quickBackupError}</p> : null}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={pendingImportPreview !== null}
