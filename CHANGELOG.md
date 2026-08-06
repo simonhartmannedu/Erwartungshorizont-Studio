@@ -16,7 +16,7 @@ All notable changes to EWH-Studio are documented in this file. The project follo
 - A global backup status and a confirmed restore flow with an optional encrypted pre-restore backup.
 - Initial `app/`, `domain/`, `features/`, and `infrastructure/` boundaries plus tested workspace command controllers.
 - AGPL-3.0-only licensing, visible in-app license notice, Open Core documentation, DCO contribution guidance, security policy, Contributor Covenant, issue templates, CODEOWNERS, funding configuration, Dependabot, CI, and release automation.
-- Third-party inventory, technical-debt register, public development guide, and roadmap.
+- Third-party inventory and public development guide.
 
 ### Changed
 
@@ -35,7 +35,7 @@ All notable changes to EWH-Studio are documented in this file. The project follo
 ### Known limitations
 
 - Provenance and licensing of local font and graphic assets still require release approval.
-- `xlsx@0.18.5` has known upstream security advisories without an automatic compatible fix; see `docs/technical-debt.md`.
+- `xlsx@0.18.5` has known upstream security advisories without an automatic compatible fix.
 
 ## Planned milestones
 
