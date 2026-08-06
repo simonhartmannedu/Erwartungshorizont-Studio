@@ -4,6 +4,8 @@ All notable changes to EWH-Studio are documented in this file. The project follo
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-06
+
 ### Added
 
 - ESLint, TypeScript type checking, Vitest, Playwright, release checks, and CI quality gates.
