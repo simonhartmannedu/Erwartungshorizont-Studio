@@ -138,20 +138,17 @@ sequenceDiagram
 The app is local-first. There is no sync server in the current architecture.
 
 ## Import and Export Flow
-
-```mermaid
 flowchart LR
-  PDF[PDF file] --> Consent[Consent and privacy preview]
-  Consent --> Extract[/api/pdf-extract]
-  Extract --> Suggest[/api/pdf-suggest]
-  Suggest --> Builder[Guided builder review]
-  Builder --> Workspace[Editable workspace]
+  PDF["PDF file"] --> Consent["Consent and privacy preview"]
+  Consent --> Extract["/api/pdf-extract"]
+  Extract --> Suggest["/api/pdf-suggest"]
+  Suggest --> Builder["Guided builder review"]
+  Builder --> Workspace["Editable workspace"]
 
-  Workspace --> Print[Print windows]
-  Workspace --> CSV[CSV exports]
-  Workspace --> Backup[Encrypted JSON backup]
-  Workspace --> Archive[Reusable archive snapshot]
-```
+  Workspace --> Print["Print windows"]
+  Workspace --> CSV["CSV exports"]
+  Workspace --> Backup["Encrypted JSON backup"]
+  Workspace --> Archive["Reusable archive snapshot"]
 
 ## Implementation Guidelines
 
