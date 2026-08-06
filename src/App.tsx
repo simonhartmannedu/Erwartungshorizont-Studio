@@ -148,6 +148,7 @@ import {
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
+import { HomeDashboard } from "./components/HomeDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
 import { PointScaleControl } from "./components/PointScaleControl";
@@ -783,9 +784,10 @@ function App() {
   const [preRestoreBackupPassphrase, setPreRestoreBackupPassphrase] = useState("");
   const [preRestoreBackupError, setPreRestoreBackupError] = useState("");
   const [preRestoreBackupSaving, setPreRestoreBackupSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("builder");
+  const [activeTab, setActiveTab] = useState<TabId>("home");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
+    home: null,
     groups: null,
     guidedBuilder: null,
     builder: null,
@@ -3560,6 +3562,7 @@ function App() {
           tabButtonRefs={tabButtonRefs}
         />
 
+        {activeTab !== "home" ? (
         <section className="mb-5 no-print">
           <div className="workspace-switcher-shell rounded-2xl border px-3 py-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -3679,14 +3682,18 @@ function App() {
             ) : null}
           </div>
         </section>
+        ) : null}
 
         <div
-          className={`grid gap-6 ${
-            activeTab === "guidedBuilder"
-              ? "xl:grid-cols-[320px_minmax(0,1fr)]"
-              : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
-          }`}
+          className={activeTab === "home"
+            ? "space-y-6"
+            : `grid gap-6 ${
+                activeTab === "guidedBuilder"
+                  ? "xl:grid-cols-[320px_minmax(0,1fr)]"
+                  : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+              }`}
         >
+          {activeTab !== "home" ? (
           <aside>
             <StudentSelectionPanel
               database={studentDatabase}
@@ -3708,8 +3715,35 @@ function App() {
               onToggleSecurity={handleHeaderLockToggle}
             />
           </aside>
+          ) : null}
 
           <main className="space-y-6">
+            <div
+              id={getTabPanelId("home")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("home")}
+              hidden={activeTab !== "home"}
+              tabIndex={0}
+            >
+              {activeTab === "home" ? (
+                <HomeDashboard
+                  activeWorkspaceLabel={activeWorkspace ? getWorkspaceDisplayLabel(activeWorkspace) : null}
+                  activeWorkspaceUpdatedAt={activeWorkspace?.updatedAt ?? null}
+                  activeGroupLabel={activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : null}
+                  activeGroupStudentCount={activeGroup?.students.length ?? 0}
+                  workspaceCount={draftBundle.workspaces.length}
+                  archiveCount={archiveEntries.length}
+                  snapshotCount={totalSnapshotCount}
+                  sectionCount={activeWorkspace?.exam.sections.length ?? 0}
+                  pointCount={activeWorkspace ? summary.totalMaxPoints : 0}
+                  correctedCount={correctionCompletionState.correctedCount}
+                  relevantStudentCount={correctionCompletionState.relevantStudentCount}
+                  backupSummary={backupStatus.summary}
+                  backupDetail={backupStatus.detail}
+                  onNavigate={activateTab}
+                />
+              ) : null}
+            </div>
             <div
               id={getTabPanelId("groups")}
               role="tabpanel"
@@ -4272,7 +4306,7 @@ function App() {
             )}
           </main>
 
-          {activeTab !== "guidedBuilder" ? (
+          {activeTab !== "guidedBuilder" && activeTab !== "home" ? (
             <aside className="space-y-6 xl:sticky xl:top-6 self-start">
               <SummaryPanel
                 summary={summary}
