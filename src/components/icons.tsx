@@ -2,6 +2,13 @@ type IconProps = {
   className?: string;
 };
 
+export const HomeIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="m4 10 8-6.5L20 10v9.2a1.3 1.3 0 0 1-1.3 1.3H5.3A1.3 1.3 0 0 1 4 19.2V10Z" strokeLinejoin="round" />
+    <path d="M9.5 20.5v-6h5v6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const DashboardIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <path d="M4 5.5h16M4 12h16M4 18.5h16" strokeLinecap="round" />

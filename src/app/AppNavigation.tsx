@@ -1,9 +1,10 @@
 import type { KeyboardEvent, MutableRefObject } from "react";
-import { ArchiveIcon, DashboardIcon, GroupIcon, PlusIcon, SaveIcon } from "../components/icons";
+import { ArchiveIcon, DashboardIcon, GroupIcon, HomeIcon, PlusIcon, SaveIcon } from "../components/icons";
 
-export type AppTabId = "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
+export type AppTabId = "home" | "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 
 export const tabs: { id: AppTabId; label: string }[] = [
+  { id: "home", label: "Übersicht" },
   { id: "groups", label: "Lerngruppen" },
   { id: "guidedBuilder", label: "EWH-Templates" },
   { id: "builder", label: "EWH-Editor" },
@@ -16,6 +17,8 @@ export const getTabPanelId = (tabId: AppTabId) => `app-tabpanel-${tabId}`;
 
 export const TabIcon = ({ id }: { id: AppTabId }) => {
   switch (id) {
+    case "home":
+      return <HomeIcon />;
     case "guidedBuilder":
       return <PlusIcon />;
     case "builder":
