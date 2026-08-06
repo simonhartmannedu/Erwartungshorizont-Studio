@@ -10,10 +10,13 @@ Erwartungshorizont-Studio is local-first. The current app does not provide multi
 | EWH archive | Browser SQLite via `sql.js`, persisted in IndexedDB | Contains reusable exam snapshots. |
 | Student database | Browser SQLite via `sql.js`, persisted in IndexedDB | Contains groups, aliases, encrypted names, assessments, comments, and signatures. |
 | Theme settings | `localStorage` | Non-sensitive UI preferences. |
-| Backups | User-downloaded JSON file | Encrypted when exported through the app backup flow. |
+| Backup status | `localStorage` | Only time of the last successful backup and, if applicable, time plus generic error code of the last failed export. No backup contents or student data. |
+| Backups | User-downloaded JSON file | Encrypted when exported through the app backup flow; new exports use backup format v2. |
 | Print windows | Browser popup/print context | Temporary output generated client-side. |
 
 Browser profile deletion, storage cleanup, private browsing mode, or device changes can remove local data. Users should export encrypted backups for recovery.
+
+The visible backup status distinguishes no data, no previous backup, current, recommended, urgent and failed backup attempts. It is a reminder only; it does not send data or create automatic backups.
 
 ## Protection Model
 
@@ -75,9 +78,15 @@ The full app backup can include:
 Backups are designed as user-controlled files. Treat backup parsing as an import boundary:
 
 - Validate structure before applying.
+- Validate the decrypted workspace, archive and student-data domains before showing an import preview.
+- Accept the documented v1 legacy format and v2 format; reject unknown future versions before decryption or restore.
+- The v2 schema version is stored inside the encrypted payload. Outer metadata contains only backup kind, format version and export timestamp.
 - Show an import preview.
+- Before a full restore or student-database replacement, require explicit confirmation and offer a user-selected encrypted backup of the current state.
 - Keep rollback behavior working.
 - Do not silently overwrite active local data.
+
+Backup passwords are never persisted. A password entered for the optional pre-restore backup is held only while that dialog is open and is cleared when the dialog is closed or the restore is applied.
 
 ## Deployment Notes
 

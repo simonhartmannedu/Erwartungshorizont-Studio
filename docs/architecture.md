@@ -8,6 +8,10 @@ For the full GitHub-renderable Mermaid diagrams, including the complete entity r
 
 Erwartungshorizont-Studio is a local-first single-page application. The primary runtime is the browser. A small Vite middleware layer exists for local PDF extraction and PDF-based structure suggestions.
 
+## Open-Core Boundary
+
+The AGPL-3.0-only Community Core contains the local UI, domain logic, browser storage, crypto, migrations and import/export adapters. `src/domain` must never import commercial code, account checks or license checks. Future integrations must be optional adapters with explicit interfaces; no enterprise module is currently implemented. See [Open Core](open-core.md).
+
 ```mermaid
 flowchart TD
   Browser[Browser SPA] --> Components[src/components]

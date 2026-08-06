@@ -1,9 +1,14 @@
 import { DraftBundle, Exam, ExpectationArchiveEntry, StudentDatabase, ThemeMode, VisualTheme } from "../types";
-import { isArchiveEntry } from "./archive";
 import { createEmptyExamMeta } from "./exam";
 import { createGradeScaleGeneratorSettings } from "./gradeScaleGenerator";
 import { createEmptyStudentDatabase, isStudentDatabase } from "./studentDatabase";
 import { serializeStudentDatabaseForStorage } from "./students";
+import {
+  createStoredApplicationData,
+  parseStoredApplicationDataJson,
+  StoredApplicationDataMigrationError,
+} from "../infrastructure/migrations/storedApplicationData";
+import { isValidArchiveEntriesShape, isValidDraftBundleShape } from "../infrastructure/validation/persistedData";
 
 const DRAFT_KEY = "notenrechner-english-nrw-draft";
 const ARCHIVE_KEY = "notenrechner-english-nrw-expectation-archive";
@@ -105,10 +110,48 @@ const isDraftBundle = (value: unknown): value is DraftBundle => {
   );
 };
 
+const isLegacyExam = (value: unknown): value is Exam =>
+  Boolean(value) &&
+  typeof value === "object" &&
+  Array.isArray((value as Partial<Exam>).sections) &&
+  Boolean((value as Partial<Exam>).gradeScale) &&
+  typeof (value as Partial<Exam>).gradeScale === "object" &&
+  Array.isArray((value as Partial<Exam>).gradeScale?.bands);
+
+type LegacyArchiveEntry = Omit<ExpectationArchiveEntry, "examId" | "subject" | "course" | "teacher" | "examSnapshot"> &
+  Partial<Pick<ExpectationArchiveEntry, "examId" | "subject" | "course" | "teacher">> & {
+    examSnapshot: Exam;
+  };
+
+const isLegacyArchiveEntry = (value: unknown): value is LegacyArchiveEntry => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LegacyArchiveEntry>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.examTitle === "string" &&
+    typeof candidate.schoolYear === "string" &&
+    typeof candidate.gradeLevel === "string" &&
+    typeof candidate.examDate === "string" &&
+    typeof candidate.sectionCount === "number" &&
+    Number.isFinite(candidate.sectionCount) &&
+    typeof candidate.totalMaxPoints === "number" &&
+    Number.isFinite(candidate.totalMaxPoints) &&
+    typeof candidate.expectationCount === "number" &&
+    Number.isFinite(candidate.expectationCount) &&
+    typeof candidate.summaryText === "string" &&
+    typeof candidate.createdAt === "string" &&
+    isLegacyExam(candidate.examSnapshot)
+  );
+};
+
+const invalidStoredPayload = (message: string) =>
+  new StoredApplicationDataMigrationError("STORAGE_PAYLOAD_INVALID", message);
+
 export const parseDraftBundle = (raw: string | null): DraftBundle | null => {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = parseStoredApplicationDataJson<unknown>(raw).payload;
     if (isDraftBundle(parsed)) {
       const workspaces = parsed.workspaces.map((workspace) => ({
         ...workspace,
@@ -138,10 +181,18 @@ export const parseDraftBundle = (raw: string | null): DraftBundle | null => {
         workspaces.some((workspace) => workspace.id === parsed.activeWorkspaceId)
           ? parsed.activeWorkspaceId
           : workspaces[0]?.id ?? "";
-      return workspaces.length > 0 ? { activeWorkspaceId, workspaces } : null;
+      const normalizedBundle = workspaces.length > 0 ? { activeWorkspaceId, workspaces } : null;
+      if (normalizedBundle && !isValidDraftBundleShape(normalizedBundle)) {
+        throw invalidStoredPayload("Die gespeicherten Klassenarbeiten enthalten ungültige Felder.");
+      }
+      return normalizedBundle;
     }
 
-    return {
+    if (!isLegacyExam(parsed)) {
+      throw invalidStoredPayload("Die gespeicherten Klassenarbeiten haben kein unterstütztes Datenformat.");
+    }
+
+    const migratedBundle = {
       activeWorkspaceId: "migrated-workspace",
       workspaces: [
         {
@@ -155,32 +206,52 @@ export const parseDraftBundle = (raw: string | null): DraftBundle | null => {
         },
       ],
     };
-  } catch {
-    return null;
+    if (!isValidDraftBundleShape(migratedBundle)) {
+      throw invalidStoredPayload("Die migrierten Klassenarbeiten enthalten ungültige Felder.");
+    }
+    return migratedBundle;
+  } catch (error) {
+    if (error instanceof StoredApplicationDataMigrationError) throw error;
+    throw invalidStoredPayload("Die gespeicherten Klassenarbeiten konnten nicht sicher gelesen werden.");
   }
 };
 
 export const parseArchiveEntries = (raw: string | null): ExpectationArchiveEntry[] => {
   if (!raw) return [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isArchiveEntry).map((entry) => ({
+    const parsed = parseStoredApplicationDataJson<unknown>(raw).payload;
+    if (!Array.isArray(parsed) || !parsed.every(isLegacyArchiveEntry)) {
+      throw invalidStoredPayload("Das gespeicherte Erwartungshorizont-Archiv hat kein unterstütztes Datenformat.");
+    }
+    const normalizedEntries = parsed.map((entry) => ({
       ...entry,
+      examSnapshot: normalizeExamDraft(entry.examSnapshot),
+      examId: entry.examId ?? entry.examSnapshot.id,
       subject: entry.subject ?? entry.examSnapshot.meta.subject ?? "",
+      course: entry.course ?? entry.examSnapshot.meta.course ?? "",
+      teacher: entry.teacher ?? entry.examSnapshot.meta.teacher ?? "",
     }));
-  } catch {
-    return [];
+    if (!isValidArchiveEntriesShape(normalizedEntries)) {
+      throw invalidStoredPayload("Das gespeicherte Erwartungshorizont-Archiv enthält ungültige Felder.");
+    }
+    return normalizedEntries;
+  } catch (error) {
+    if (error instanceof StoredApplicationDataMigrationError) throw error;
+    throw invalidStoredPayload("Das gespeicherte Erwartungshorizont-Archiv konnte nicht sicher gelesen werden.");
   }
 };
 
 export const parseStudentDatabaseState = (raw: string | null): StudentDatabase => {
   if (!raw) return createEmptyStudentDatabase();
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return isStudentDatabase(parsed) ? parsed : createEmptyStudentDatabase();
-  } catch {
-    return createEmptyStudentDatabase();
+    const parsed = parseStoredApplicationDataJson<unknown>(raw).payload;
+    if (!isStudentDatabase(parsed)) {
+      throw invalidStoredPayload("Die gespeicherte Schülerdatenbank hat kein unterstütztes Datenformat.");
+    }
+    return parsed;
+  } catch (error) {
+    if (error instanceof StoredApplicationDataMigrationError) throw error;
+    throw invalidStoredPayload("Die gespeicherte Schülerdatenbank konnte nicht sicher gelesen werden.");
   }
 };
 
@@ -269,13 +340,13 @@ const migrateLegacyLocalStorage = async (database: SqliteDatabase) => {
   const studentDatabase = parseStudentDatabaseState(window.localStorage.getItem(STUDENT_DATABASE_KEY));
 
   if (draft) {
-    writeStoredValue(database, DRAFT_KEY, JSON.stringify(draft));
+    writeStoredValue(database, DRAFT_KEY, JSON.stringify(createStoredApplicationData(draft)));
   }
   if (archiveEntries.length > 0) {
-    writeStoredValue(database, ARCHIVE_KEY, JSON.stringify(archiveEntries));
+    writeStoredValue(database, ARCHIVE_KEY, JSON.stringify(createStoredApplicationData(archiveEntries)));
   }
   if (studentDatabase.groups.length > 0 || Object.keys(studentDatabase.assessments).length > 0) {
-    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(studentDatabase));
+    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(createStoredApplicationData(studentDatabase)));
   }
 
   await writePersistedDatabaseBlob(database.export());
@@ -340,7 +411,7 @@ export const loadDraft = async (): Promise<DraftBundle | null> => {
 
 export const saveDraft = (draftBundle: DraftBundle) =>
   enqueueWrite((database) => {
-    writeStoredValue(database, DRAFT_KEY, JSON.stringify(draftBundle));
+    writeStoredValue(database, DRAFT_KEY, JSON.stringify(createStoredApplicationData(draftBundle)));
   });
 
 export const loadExpectationArchive = async (): Promise<ExpectationArchiveEntry[]> => {
@@ -350,7 +421,7 @@ export const loadExpectationArchive = async (): Promise<ExpectationArchiveEntry[
 
 export const saveExpectationArchive = (entries: ExpectationArchiveEntry[]) =>
   enqueueWrite((database) => {
-    writeStoredValue(database, ARCHIVE_KEY, JSON.stringify(entries));
+    writeStoredValue(database, ARCHIVE_KEY, JSON.stringify(createStoredApplicationData(entries)));
   });
 
 export const loadStudentDatabase = async (): Promise<StudentDatabase> => {
@@ -366,7 +437,7 @@ export const saveStudentDatabase = (
     const serializedState = getUnlockedPassword
       ? await serializeStudentDatabaseForStorage(databaseState, getUnlockedPassword)
       : databaseState;
-    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(serializedState));
+    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(createStoredApplicationData(serializedState)));
   });
 
 export const loadTheme = (): ThemeMode => {

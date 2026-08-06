@@ -1,4 +1,5 @@
 import { EncryptedText, StudentAssessment, StudentDatabase, StudentGroup, StudentRecord } from "../types";
+import { isValidStudentDatabaseShape } from "../infrastructure/validation/persistedData";
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -55,6 +56,7 @@ export const isStudentAssessment = (value: unknown): value is StudentAssessment 
   (value.printedAt === null || isIsoTimestamp(value.printedAt));
 
 export const isStudentDatabase = (value: unknown): value is StudentDatabase => {
+  if (!isValidStudentDatabaseShape(value)) return false;
   if (!isPlainObject(value)) return false;
   if (value.version !== 1) return false;
   if (!Array.isArray(value.groups) || !value.groups.every(isStudentGroup)) return false;

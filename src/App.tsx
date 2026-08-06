@@ -1,4 +1,16 @@
 import { KeyboardEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { AppNavigation, getTabButtonId, getTabPanelId, tabs, type AppTabId as TabId } from "./app/AppNavigation";
+import { AppHeader } from "./app/AppHeader";
+import { AppShell } from "./app/AppShell";
+import { AppStatusArea, type AppNotice, type AppNoticeTone } from "./app/AppStatusArea";
+import { FirstRunGuide, firstRunGuideSteps } from "./app/FirstRunGuide";
+import { StorageLoadingScreen, StorageUnavailableScreen } from "./app/AppStartupScreens";
+import { WorkspaceVersionPanel } from "./app/WorkspaceVersionPanel";
+import { useWorkspaceVersionController } from "./features/workspaces/useWorkspaceVersionController";
+import { useWorkspaceSelectionController } from "./features/workspaces/useWorkspaceSelectionController";
+import { useWorkspaceLifecycleController } from "./features/workspaces/useWorkspaceLifecycleController";
+import { getNextWorkspaceLabel } from "./domain/workspaces/lifecycle";
+import { useWorkspaceContextController } from "./features/workspaces/useWorkspaceContextController";
 import {
   DraftBundle,
   DraftWorkspace,
@@ -35,8 +47,11 @@ import {
 } from "./utils/storage";
 import {
   buildAppBackupFilenameForClass,
+  BackupValidationError,
+  BackupFailureMetadata,
   buildSchoolYearArchiveFilename,
   clearBackupComplete,
+  clearBackupFailure,
   createEncryptedAppBackup,
   createEncryptedSchoolYearWorkspaceArchive,
   describeBackupStatus,
@@ -44,6 +59,8 @@ import {
   isEncryptedSchoolYearWorkspaceArchive,
   isEncryptedStudentDatabaseBackup,
   loadLastBackupAt,
+  loadLastBackupFailure,
+  markBackupFailed,
   markBackupComplete,
   parseAppBackup,
   parseSchoolYearWorkspaceArchive,
@@ -142,18 +159,8 @@ import {
   ArchiveIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  CloseIcon,
-  DashboardIcon,
-  FullscreenExitIcon,
-  FullscreenIcon,
-  GroupIcon,
-  InfoIcon,
   LoadingIcon,
-  SaveIcon,
-  MoonIcon,
-  PaletteIcon,
   PlusIcon,
-  SunIcon,
 } from "./components/icons";
 import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
@@ -170,7 +177,6 @@ const ExpectationArchiveDashboard = lazy(async () => {
   return { default: module.ExpectationArchiveDashboard };
 });
 
-type TabId = "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 type PendingArchiveOverwrite = {
   existing: ExpectationArchiveEntry;
   incoming: ExpectationArchiveEntry;
@@ -210,13 +216,6 @@ type SectionDropIndicator = {
   targetSectionId: string;
   position: "before" | "after";
 } | null;
-type AppNoticeTone = "info" | "warning" | "success" | "danger";
-type AppNotice = {
-  id: number;
-  tone: AppNoticeTone;
-  title: string;
-  detail?: string;
-};
 type StorageErrorState = {
   title: string;
   detail: string;
@@ -228,6 +227,7 @@ type RestoreCheckpoint = {
   activeGroupId: string;
   activeStudentId: string;
   lastBackupAt: string | null;
+  lastBackupFailure: BackupFailureMetadata | null;
 };
 type PendingImportPreview =
   | {
@@ -264,6 +264,11 @@ type PendingImportPreview =
         exportedAt: string;
       };
     };
+
+const describeImportError = (error: unknown) =>
+  error instanceof BackupValidationError
+    ? `${error.message} Fehlercode: ${error.code}.`
+    : "Die Sicherungsdatei konnte nicht verarbeitet werden. Fehlercode: BACKUP_UNEXPECTED.";
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
@@ -308,95 +313,8 @@ const markDemoSeedCurrent = () => {
   }
 };
 
-const TabIcon = ({ id }: { id: TabId }) => {
-  switch (id) {
-    case "guidedBuilder":
-      return <PlusIcon />;
-    case "builder":
-      return <DashboardIcon />;
-    case "groups":
-      return <GroupIcon />;
-    case "archive":
-      return <ArchiveIcon />;
-    case "backup":
-      return <SaveIcon />;
-  }
-};
-
 const getWorkspaceDisplayLabel = (workspace: DraftWorkspace | null | undefined) =>
   workspace?.exam.meta.title.trim() || workspace?.label || "Klassenarbeit";
-
-const tabs: { id: TabId; label: string }[] = [
-  { id: "groups", label: "Lerngruppen" },
-  { id: "guidedBuilder", label: "EWH-Templates" },
-  { id: "builder", label: "EWH-Editor" },
-  { id: "archive", label: "EWH-Archiv" },
-  { id: "backup", label: "Backup" },
-];
-
-const firstRunGuideSteps: {
-  tabId: TabId;
-  title: string;
-  eyebrow: string;
-  body: string;
-  actionLabel: string;
-}[] = [
-  {
-    tabId: "groups",
-    eyebrow: "1. Grundlage",
-    title: "Lege zuerst deine Lerngruppe an",
-    body:
-      "Importiere Namen, entsperre sensible Bewertungsdaten nur bei Bedarf und wähle die Klasse aus, für die du korrigierst.",
-    actionLabel: "Lerngruppen öffnen",
-  },
-  {
-    tabId: "guidedBuilder",
-    eyebrow: "2. Startpunkt",
-    title: "Starte mit Template oder PDF",
-    body:
-      "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Das nimmt neuen Nutzern die Entscheidung ab, wo sie beginnen sollen.",
-    actionLabel: "Templates öffnen",
-  },
-  {
-    tabId: "builder",
-    eyebrow: "3. Korrektur",
-    title: "Bearbeite Erwartungen, Punkte und Notenlogik",
-    body:
-      "Im Editor entsteht der eigentliche Erwartungshorizont. Abschnittsnavigation, Skalierung und Notentabelle bleiben nah an der Arbeit.",
-    actionLabel: "Editor öffnen",
-  },
-  {
-    tabId: "archive",
-    eyebrow: "4. Wiederverwendung",
-    title: "Speichere fertige Horizonte im Archiv",
-    body:
-      "Das Archiv macht alte Arbeiten wiederverwendbar und reduziert späteres Suchen in Dateien oder Browser-Downloads.",
-    actionLabel: "Archiv öffnen",
-  },
-  {
-    tabId: "backup",
-    eyebrow: "5. Sicherheit",
-    title: "Sichere Arbeitsstände regelmäßig",
-    body:
-      "Backups und Wiederherstellungspunkte schützen lokale Browserdaten, bevor du geräteübergreifend oder im Schuljahrarchiv arbeitest.",
-    actionLabel: "Backup öffnen",
-  },
-];
-
-const getTabButtonId = (tabId: TabId) => `app-tab-${tabId}`;
-const getTabPanelId = (tabId: TabId) => `app-tabpanel-${tabId}`;
-
-const visualThemeOptions: { value: VisualTheme; label: string }[] = [
-  { value: "pdf-report", label: "PDF-Report" },
-  { value: "earth-paper", label: "Bernsteinzimmer" },
-  { value: "nrw-trikolore", label: "NRW-Trikolore" },
-  { value: "waldmeister-schorle", label: "Waldmeister-Schorle" },
-  { value: "blaubeer-pommesbude", label: "Blaubeer-Pommesbude" },
-  { value: "flieder-feierabend", label: "Flieder-Feierabend" },
-  { value: "beamtensalon", label: "Beamtensalon" },
-  { value: "barrierefrei", label: "Barrierefrei" },
-  { value: "video-tutorial", label: "Video-Tutorial" },
-];
 
 const createTask = (): Task => ({
   id: crypto.randomUUID(),
@@ -858,8 +776,13 @@ function App() {
   const [unlockedGroupIds, setUnlockedGroupIds] = useState<string[]>([]);
   const unlockActivityAtRef = useRef<number>(Date.now());
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(() => loadLastBackupAt());
+  const [lastBackupFailure, setLastBackupFailure] = useState(() => loadLastBackupFailure());
   const [restoreCheckpoint, setRestoreCheckpoint] = useState<RestoreCheckpoint | null>(null);
   const [pendingImportPreview, setPendingImportPreview] = useState<PendingImportPreview | null>(null);
+  const [restoreOverwriteConfirmed, setRestoreOverwriteConfirmed] = useState(false);
+  const [preRestoreBackupPassphrase, setPreRestoreBackupPassphrase] = useState("");
+  const [preRestoreBackupError, setPreRestoreBackupError] = useState("");
+  const [preRestoreBackupSaving, setPreRestoreBackupSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("builder");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -897,6 +820,30 @@ function App() {
   const completedCorrectionCelebrationKeysRef = useRef<Record<string, boolean>>({});
   const lastVersionedExamByWorkspaceRef = useRef<Record<string, string>>({});
   const previousActiveGroupIdRef = useRef<string>("");
+  const { saveVersion: saveWorkspaceVersion, restoreVersion: restoreWorkspaceVersion } = useWorkspaceVersionController({
+    draftBundle,
+    setDraftBundle,
+    lastVersionedExamByWorkspaceRef,
+    maxVersions: MAX_WORKSPACE_VERSIONS,
+    cloneExam: cloneExamSnapshot,
+    normalizeExam: normalizeExamStructure,
+    onRestoreCompleted: () => {
+      setPendingVersionRestore(null);
+      setCollapsedSectionIds([]);
+    },
+  });
+  const { selectWorkspace: setActiveWorkspaceId } = useWorkspaceSelectionController({
+    setDraftBundle,
+    onWorkspaceSelected: () => setCollapsedSectionIds([]),
+  });
+  const { addWorkspace, removeWorkspace } = useWorkspaceLifecycleController({
+    activeGroupId,
+    setDraftBundle,
+    lastVersionedExamByWorkspaceRef,
+    normalizeExam: normalizeExamStructure,
+    createWorkspace: createDraftWorkspace,
+    onLifecycleChanged: () => setCollapsedSectionIds([]),
+  });
 
   const pushNotice = (tone: AppNoticeTone, title: string, detail?: string) => {
     setAppNotice({
@@ -1204,27 +1151,24 @@ function App() {
     const currentIndex = tabs.findIndex((tab) => tab.id === currentTabId);
     if (currentIndex === -1) return;
 
-    let nextIndex: number | null = null;
+    const nextIndex = (() => {
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          return (currentIndex + 1) % tabs.length;
+        case "ArrowLeft":
+        case "ArrowUp":
+          return (currentIndex - 1 + tabs.length) % tabs.length;
+        case "Home":
+          return 0;
+        case "End":
+          return tabs.length - 1;
+        default:
+          return null;
+      }
+    })();
 
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        nextIndex = (currentIndex + 1) % tabs.length;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-        break;
-      case "Home":
-        nextIndex = 0;
-        break;
-      case "End":
-        nextIndex = tabs.length - 1;
-        break;
-      default:
-        return;
-    }
-
+    if (nextIndex === null) return;
     event.preventDefault();
     activateTab(tabs[nextIndex].id);
   };
@@ -1275,6 +1219,13 @@ function App() {
     preferredWorkspaceForActiveGroup ??
     visibleWorkspaces[0] ??
     null;
+  const {
+    setArchiveEntryId: setActiveWorkspaceArchiveEntryId,
+    setAssignedGroupId: setActiveWorkspaceGroupId,
+  } = useWorkspaceContextController({
+    activeWorkspaceId: activeWorkspace?.id ?? null,
+    setDraftBundle,
+  });
   const exam = activeWorkspace?.exam ?? emptyGroupExam;
   const activeArchiveEntryId = activeWorkspace?.activeArchiveEntryId ?? null;
   const activeStudentRecord = getStudentRecord(studentDatabase, activeStudentId);
@@ -1295,8 +1246,8 @@ function App() {
   const [activeStudentLiveLabel, setActiveStudentLiveLabel] = useState<string | null>(null);
   const [activeStudentLiveLabelTitle, setActiveStudentLiveLabelTitle] = useState("Aktiver Schülercode");
   const backupStatus = useMemo(
-    () => describeBackupStatus(studentDatabase, lastBackupAt),
-    [studentDatabase, lastBackupAt],
+    () => describeBackupStatus(studentDatabase, lastBackupAt, lastBackupFailure),
+    [studentDatabase, lastBackupAt, lastBackupFailure],
   );
   const schoolYearBackupOptions = useMemo<SchoolYearBackupOption[]>(() => {
     const workspaceIdsWithAssessments = new Map<string, number>();
@@ -1340,6 +1291,7 @@ function App() {
     activeGroupId,
     activeStudentId,
     lastBackupAt,
+    lastBackupFailure,
   });
 
   const resetDemoWorkspace = () => {
@@ -1359,7 +1311,9 @@ function App() {
     setRestoreCheckpoint(null);
     setPendingImportPreview(null);
     setLastBackupAt(null);
+    setLastBackupFailure(null);
     clearBackupComplete();
+    clearBackupFailure();
     setActiveTab("groups");
     pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
   };
@@ -1395,6 +1349,7 @@ function App() {
 
     if (nextLastBackupAt) {
       markBackupComplete(nextLastBackupAt);
+      setLastBackupFailure(null);
     } else {
       clearBackupComplete();
     }
@@ -1419,6 +1374,12 @@ function App() {
       clearBackupComplete();
     }
     setLastBackupAt(restoreCheckpoint.lastBackupAt);
+    if (restoreCheckpoint.lastBackupFailure) {
+      markBackupFailed(restoreCheckpoint.lastBackupFailure.code, restoreCheckpoint.lastBackupFailure.occurredAt);
+    } else {
+      clearBackupFailure();
+    }
+    setLastBackupFailure(restoreCheckpoint.lastBackupFailure);
     setRestoreCheckpoint(null);
     pushNotice("success", "Import rückgängig gemacht", "Der vorherige lokale Arbeitsstand wurde wiederhergestellt.");
   };
@@ -1746,14 +1707,6 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [activeWorkspace, storageReady]);
 
-  const setActiveWorkspaceId = (workspaceId: string) => {
-    setDraftBundle((current) => ({
-      ...current,
-      activeWorkspaceId: workspaceId,
-    }));
-    setCollapsedSectionIds([]);
-  };
-
   const openStudentInBuilder = (studentId: string, options?: { groupId?: string; workspaceId?: string }) => {
     if (options?.groupId !== undefined) {
       setActiveGroupId(options.groupId);
@@ -1763,34 +1716,6 @@ function App() {
     }
     setActiveStudentId(studentId);
     setActiveTab("builder");
-  };
-
-  const setActiveWorkspaceArchiveEntryId = (nextActiveArchiveEntryId: string | null) => {
-    const activeWorkspaceId = activeWorkspace?.id;
-    if (!activeWorkspaceId) return;
-
-    setDraftBundle((current) => ({
-      ...current,
-      workspaces: current.workspaces.map((workspace) =>
-        workspace.id === activeWorkspaceId
-          ? { ...workspace, activeArchiveEntryId: nextActiveArchiveEntryId }
-          : workspace,
-      ),
-    }));
-  };
-
-  const setActiveWorkspaceGroupId = (nextGroupId: string | null) => {
-    const activeWorkspaceId = activeWorkspace?.id;
-    if (!activeWorkspaceId) return;
-
-    setDraftBundle((current) => ({
-      ...current,
-      workspaces: current.workspaces.map((workspace) =>
-        workspace.id === activeWorkspaceId
-          ? { ...workspace, assignedGroupId: nextGroupId }
-          : workspace,
-      ),
-    }));
   };
 
   const setActiveWorkspaceExam = (updater: Exam | ((current: Exam) => Exam)) => {
@@ -1807,57 +1732,8 @@ function App() {
     }));
   };
 
-  const createWorkspaceLabel = (workspaces: DraftWorkspace[]) => `Klassenarbeit ${workspaces.length + 1}`;
-
-  const addWorkspace = (
-    nextExam: Exam,
-    options?: { label?: string; activeArchiveEntryId?: string | null; assignedGroupId?: string | null },
-  ) => {
-    const normalizedExam = normalizeExamStructure(nextExam);
-    const workspaceId = crypto.randomUUID();
-    setDraftBundle((current) => {
-      const workspace = {
-        ...createDraftWorkspace(
-          normalizedExam,
-          options?.label ?? createWorkspaceLabel(current.workspaces),
-          options?.activeArchiveEntryId ?? null,
-          (options?.assignedGroupId ?? activeGroupId) || null,
-        ),
-        id: workspaceId,
-      };
-      return {
-        activeWorkspaceId: workspace.id,
-        workspaces: [...current.workspaces, workspace],
-      };
-    });
-    lastVersionedExamByWorkspaceRef.current = {
-      ...lastVersionedExamByWorkspaceRef.current,
-      [workspaceId]: JSON.stringify(normalizedExam),
-    };
-    setCollapsedSectionIds([]);
-  };
-
   const triggerExamCelebration = () => {
     pushNotice("success", "Korrektur abgeschlossen", "Alle ausgewählten Bewertungsbögen sind als korrigiert markiert.");
-  };
-
-  const removeWorkspace = (workspaceId: string) => {
-    setDraftBundle((current) => {
-      if (current.workspaces.length <= 1) return current;
-      const nextWorkspaces = current.workspaces.filter((workspace) => workspace.id !== workspaceId);
-      const nextActiveWorkspaceId =
-        current.activeWorkspaceId === workspaceId
-          ? nextWorkspaces[Math.max(0, current.workspaces.findIndex((workspace) => workspace.id === workspaceId) - 1)]?.id ?? nextWorkspaces[0]!.id
-          : current.activeWorkspaceId;
-      return {
-        activeWorkspaceId: nextActiveWorkspaceId,
-        workspaces: nextWorkspaces,
-      };
-    });
-    const nextVersionedState = { ...lastVersionedExamByWorkspaceRef.current };
-    delete nextVersionedState[workspaceId];
-    lastVersionedExamByWorkspaceRef.current = nextVersionedState;
-    setCollapsedSectionIds([]);
   };
 
   const updateExam = (patch: Partial<Exam>) =>
@@ -1909,7 +1785,7 @@ function App() {
       const workspace = {
         ...createDraftWorkspace(
           normalizedExam,
-          createWorkspaceLabel(draftBundle.workspaces),
+          getNextWorkspaceLabel(draftBundle.workspaces),
           null,
           assignedGroupId,
         ),
@@ -2004,7 +1880,8 @@ function App() {
       );
     }
 
-    const { achievedPoints, ...templatePatch } = patch;
+    const templatePatch = { ...patch };
+    delete templatePatch.achievedPoints;
     if (Object.keys(templatePatch).length === 0) return;
 
     if (templatePatch.maxPoints !== undefined) {
@@ -2096,64 +1973,6 @@ function App() {
 
     setPendingTaskMaxPointsChange(null);
     setScalePendingTaskScores(false);
-  };
-
-  const restoreWorkspaceVersion = (pendingRestore: PendingVersionRestore) => {
-    setDraftBundle((current) => ({
-      ...current,
-      workspaces: current.workspaces.map((workspace) => {
-        if (workspace.id !== pendingRestore.workspaceId) return workspace;
-
-        const currentSnapshot: DraftWorkspaceVersion = {
-          id: crypto.randomUUID(),
-          savedAt: new Date().toISOString(),
-          exam: cloneExamSnapshot(workspace.exam),
-        };
-
-        return {
-          ...workspace,
-          exam: normalizeExamStructure(cloneExamSnapshot(pendingRestore.version.exam)),
-          updatedAt: new Date().toISOString(),
-          versions: [currentSnapshot, ...workspace.versions.filter((version) => version.id !== pendingRestore.version.id)]
-            .slice(0, MAX_WORKSPACE_VERSIONS),
-        };
-      }),
-    }));
-
-    lastVersionedExamByWorkspaceRef.current = {
-      ...lastVersionedExamByWorkspaceRef.current,
-      [pendingRestore.workspaceId]: JSON.stringify(pendingRestore.version.exam),
-    };
-    setPendingVersionRestore(null);
-    setCollapsedSectionIds([]);
-  };
-
-  const saveWorkspaceVersion = (workspaceId: string) => {
-    setDraftBundle((current) => ({
-      ...current,
-      workspaces: current.workspaces.map((workspace) => {
-        if (workspace.id !== workspaceId) return workspace;
-
-        const currentVersion: DraftWorkspaceVersion = {
-          id: crypto.randomUUID(),
-          savedAt: new Date().toISOString(),
-          exam: cloneExamSnapshot(workspace.exam),
-        };
-
-        return {
-          ...workspace,
-          versions: [currentVersion, ...workspace.versions].slice(0, MAX_WORKSPACE_VERSIONS),
-        };
-      }),
-    }));
-
-    const workspace = draftBundle.workspaces.find((entry) => entry.id === workspaceId) ?? null;
-    if (!workspace) return;
-
-    lastVersionedExamByWorkspaceRef.current = {
-      ...lastVersionedExamByWorkspaceRef.current,
-      [workspaceId]: JSON.stringify(workspace.exam),
-    };
   };
 
   const scaleSectionTotal = (sectionId: string, targetTotal: number) => {
@@ -2663,13 +2482,6 @@ function App() {
     if (!activeGroup || !activeStudentId) return;
     if (activeGroup.passwordVerifier && !activeGroupPassword) return;
     setStudentDatabase((current) => {
-      if (value === "/signature.svg") {
-        let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, null);
-        next = updateGroupDefaultSignature(next, activeGroup.id, value);
-        studentDatabaseRef.current = next;
-        return next;
-      }
-
       let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, value);
       if (value === null && activeAssessment?.signatureDataUrl == null && activeGroup.defaultSignatureDataUrl) {
         next = updateGroupDefaultSignature(next, activeGroup.id, null);
@@ -2707,33 +2519,46 @@ function App() {
     }
 
     const exportedAt = new Date().toISOString();
-    const filename = buildAppBackupFilenameForClass(exportedAt, activeGroup?.className ?? null);
-    const saveTarget = await prepareFileSave(filename, {
-      description: "Verschlüsseltes EWH-Backup",
-      accept: { "application/json": [".json"] },
-    });
+    try {
+      const filename = buildAppBackupFilenameForClass(exportedAt, activeGroup?.className ?? null);
+      const saveTarget = await prepareFileSave(filename, {
+        description: "Verschlüsseltes EWH-Backup",
+        accept: { "application/json": [".json"] },
+      });
 
-    if (!saveTarget) {
-      pushNotice("info", "Backup-Speichern abgebrochen", "Es wurden keine Sicherungsdaten geschrieben.");
+      if (!saveTarget) {
+        pushNotice("info", "Backup-Speichern abgebrochen", "Es wurden keine Sicherungsdaten geschrieben.");
+        return false;
+      }
+
+      const backup = await createEncryptedAppBackup({
+        draftBundle,
+        studentDatabase,
+        archiveEntries,
+      }, passphrase.trim(), exportedAt);
+      const saveResult = await saveTarget.save(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+      markBackupComplete(backup.exportedAt);
+      setLastBackupAt(backup.exportedAt);
+      setLastBackupFailure(null);
+      pushNotice(
+        "success",
+        saveResult === "saved" ? "Backup gespeichert" : "Backup exportiert",
+        saveResult === "saved"
+          ? `Verschlüsseltes Backup am gewählten Speicherort erstellt: ${filename}.`
+          : `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`,
+      );
+      return true;
+    } catch {
+      const failure = { occurredAt: exportedAt, code: "BACKUP_EXPORT_FAILED" };
+      markBackupFailed(failure.code, failure.occurredAt);
+      setLastBackupFailure(failure);
+      pushNotice(
+        "danger",
+        "Backup konnte nicht erstellt werden",
+        "Die Daten wurden nicht exportiert. Prüfe Speicherort und Browserberechtigungen. Fehlercode: BACKUP_EXPORT_FAILED.",
+      );
       return false;
     }
-
-    const backup = await createEncryptedAppBackup({
-      draftBundle,
-      studentDatabase,
-      archiveEntries,
-    }, passphrase.trim(), exportedAt);
-    const saveResult = await saveTarget.save(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
-    markBackupComplete(backup.exportedAt);
-    setLastBackupAt(backup.exportedAt);
-    pushNotice(
-      "success",
-      saveResult === "saved" ? "Backup gespeichert" : "Backup exportiert",
-      saveResult === "saved"
-        ? `Verschlüsseltes Backup am gewählten Speicherort erstellt: ${filename}.`
-        : `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`,
-    );
-    return true;
   };
 
   const handleArchiveSchoolYear = async (schoolYear: string, passphrase: string) => {
@@ -2865,6 +2690,8 @@ function App() {
       setActiveStudentId("");
       clearBackupComplete();
       setLastBackupAt(null);
+      clearBackupFailure();
+      setLastBackupFailure(null);
     }
 
     pushNotice(
@@ -2951,11 +2778,19 @@ function App() {
 
           pushNotice("danger", "Import fehlgeschlagen", "Die Sicherungsdatei ist ungültig.");
         } catch (error) {
-          pushNotice("danger", "Import fehlgeschlagen", error instanceof Error ? error.message : "Der Arbeitsstand konnte nicht importiert werden.");
+          pushNotice("danger", "Import fehlgeschlagen", describeImportError(error));
         }
       })();
     };
     reader.readAsText(file);
+  };
+
+  const dismissImportPreview = () => {
+    setPendingImportPreview(null);
+    setRestoreOverwriteConfirmed(false);
+    setPreRestoreBackupPassphrase("");
+    setPreRestoreBackupError("");
+    setPreRestoreBackupSaving(false);
   };
 
   const confirmImportPreview = () => {
@@ -2973,7 +2808,7 @@ function App() {
         "Arbeitsstand importiert",
         `Importiert aus ${pendingImportPreview.sourceLabel} vom ${new Date(pendingImportPreview.data.exportedAt).toLocaleString("de-DE")}.`,
       );
-      setPendingImportPreview(null);
+      dismissImportPreview();
       return;
     }
 
@@ -2990,7 +2825,7 @@ function App() {
           "Schuljahr bereits vorhanden",
           "Alle Klassenarbeiten aus dieser Archivdatei sind bereits in der aktuellen Arbeitsliste vorhanden.",
         );
-        setPendingImportPreview(null);
+        dismissImportPreview();
         return;
       }
 
@@ -3013,7 +2848,7 @@ function App() {
         "Schuljahr wiederhergestellt",
         `${incomingWorkspaces.length} Klassenarbeiten aus ${pendingImportPreview.data.schoolYear} wurden in die Arbeitsliste übernommen.${skippedCount > 0 ? ` ${skippedCount} vorhandene Klassenarbeiten wurden übersprungen.` : ""}`,
       );
-      setPendingImportPreview(null);
+      dismissImportPreview();
       setActiveSchoolYearFilter(incomingWorkspaces[0] ? getWorkspaceSchoolYear(incomingWorkspaces[0]) : "all");
       setActiveTab("backup");
       return;
@@ -3030,7 +2865,31 @@ function App() {
       pendingImportPreview.warning ? "Legacy-Datenbank importiert" : "Schülerdatenbank importiert",
       pendingImportPreview.warning ?? `Quelle: ${pendingImportPreview.sourceLabel}.`,
     );
-    setPendingImportPreview(null);
+    dismissImportPreview();
+  };
+
+  const saveCurrentBackupThenConfirmImport = async () => {
+    if (!pendingImportPreview) return;
+    const passphrase = preRestoreBackupPassphrase.trim();
+    if (!passphrase) {
+      setPreRestoreBackupError("Bitte vergib ein Passwort für die Vorab-Sicherung.");
+      return;
+    }
+
+    setPreRestoreBackupSaving(true);
+    setPreRestoreBackupError("");
+    try {
+      const saved = await handleExportDatabase(passphrase);
+      if (!saved) {
+        setPreRestoreBackupError("Die Wiederherstellung wurde nicht übernommen, weil die Vorab-Sicherung nicht gespeichert wurde.");
+        return;
+      }
+      confirmImportPreview();
+    } catch {
+      setPreRestoreBackupError("Die Vorab-Sicherung konnte nicht erstellt werden. Die Wiederherstellung wurde nicht übernommen.");
+    } finally {
+      setPreRestoreBackupSaving(false);
+    }
   };
 
   const handleImportStudents = (
@@ -3336,15 +3195,26 @@ function App() {
         return;
       }
     }
-    const latestAssessment = activeStudentId ? getStudentAssessment(studentDatabaseRef.current, activeStudentId, activeWorkspace?.id ?? null) : null;
-    const result = await exportEditableExamDocx(displayExam, summary, activeStudentRecord && activeGroup ? {
-      alias: activeStudentRecord.alias,
-      fullName,
-      subject: activeGroup.subject,
-      className: activeGroup.className,
-      teacherComment: latestAssessment?.teacherComment ?? "",
-    } : undefined);
-    if (result !== "cancelled") pushNotice("success", "Word-Dokument erstellt", "Der Bewertungsbogen kann in Word oder LibreOffice weiterbearbeitet werden.");
+
+    const latestAssessment = activeStudentId
+      ? getStudentAssessment(studentDatabaseRef.current, activeStudentId, activeWorkspace?.id ?? null)
+      : null;
+    const result = await exportEditableExamDocx(
+      displayExam,
+      summary,
+      activeStudentRecord && activeGroup
+        ? {
+            alias: activeStudentRecord.alias,
+            fullName,
+            subject: activeGroup.subject,
+            className: activeGroup.className,
+            teacherComment: latestAssessment?.teacherComment ?? "",
+          }
+        : undefined,
+    );
+    if (result !== "cancelled") {
+      pushNotice("success", "Word-Dokument erstellt", "Der Bewertungsbogen kann in Word oder LibreOffice weiterbearbeitet werden.");
+    }
   };
 
   const handlePrintWithoutDetails = async () => {
@@ -3635,295 +3505,60 @@ function App() {
   const activeGuideStep = firstRunGuideSteps[guideStepIndex] ?? firstRunGuideSteps[0];
   const guideProgressLabel = `${guideStepIndex + 1} / ${firstRunGuideSteps.length}`;
   if (storageError) {
-    return (
-      <div className="min-h-screen px-4 py-6 lg:px-8">
-        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl items-center justify-center">
-          <section className="panel w-full p-6 sm:p-8">
-            <h1 className="themed-strong text-2xl font-semibold">Lokaler Speicher nicht verfügbar</h1>
-            <p className="themed-muted mt-3 text-sm leading-6">{storageError.detail}</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className="button-primary" onClick={() => window.location.reload()}>
-                Seite neu laden
-              </button>
-            </div>
-          </section>
-        </div>
-      </div>
-    );
+    return <StorageUnavailableScreen detail={storageError.detail} onReload={() => window.location.reload()} />;
   }
 
   if (!storageReady) {
-    return (
-      <div className="min-h-screen px-4 py-6 lg:px-8">
-        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-[1880px] items-center justify-center">
-          <section className="storage-loader-shell w-full max-w-3xl">
-            <div className="storage-loader-stage">
-              <div className="storage-loader-copy">
-                <p className="storage-loader-kicker">Erwartungshorizont Studio</p>
-                <h1 className="storage-loader-title">Lokaler Speicher wird vorbereitet</h1>
-                <p className="storage-loader-text">
-                  Die Anwendung initialisiert den SQLite-Speicher, prüft vorhandene Datenstände und stellt den letzten
-                  Arbeitsstand wieder her.
-                </p>
-                <div className="storage-loader-status" role="status" aria-live="polite">
-                  <span className="storage-loader-status-dot" />
-                  Speicher synchronisiert
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    );
+    return <StorageLoadingScreen />;
   }
 
   return (
-    <div
-      ref={appShellRef}
-      className="app-shell min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-8"
-    >
-      {guideOpen ? (
-        <div className="guide-overlay fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-6" role="presentation">
-          <div
-            ref={guideDialogRef}
-            className="guide-panel panel w-full max-w-2xl border p-5 shadow-2xl sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="first-run-guide-title"
-            aria-describedby="first-run-guide-description"
-            onKeyDown={handleGuideKeyDown}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="hero-kicker mb-3">{activeGuideStep.eyebrow}</p>
-                <h2
-                  ref={guideTitleRef}
-                  id="first-run-guide-title"
-                  className="themed-strong text-2xl font-semibold"
-                  tabIndex={-1}
-                >
-                  {activeGuideStep.title}
-                </h2>
-              </div>
-              <IconButton
-                onClick={() => closeUserGuide(false)}
-                title="Einführung schließen"
-                className="px-2.5 py-2"
-              >
-                <CloseIcon />
-              </IconButton>
-            </div>
-
-            <p id="first-run-guide-description" className="themed-muted mt-4 text-sm leading-6">
-              {activeGuideStep.body}
-            </p>
-
-            <div className="guide-step-card mt-5 rounded-2xl border p-4">
-              <div className="flex items-center gap-3">
-                <span className="guide-step-icon" aria-hidden="true">
-                  <TabIcon id={activeGuideStep.tabId} />
-                </span>
-                <div>
-                  <p className="label">Direkt zum Bereich</p>
-                  <p className="themed-strong text-sm font-semibold">
-                    {tabs.find((tab) => tab.id === activeGuideStep.tabId)?.label}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="button-primary mt-4 w-full gap-2 sm:w-auto"
-                onClick={() => activateGuideStepTarget(activeGuideStep.tabId)}
-              >
-                <TabIcon id={activeGuideStep.tabId} />
-                {activeGuideStep.actionLabel}
-              </button>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="guide-progress" aria-label={`Schritt ${guideProgressLabel}`}>
-                {firstRunGuideSteps.map((step, index) => (
-                  <button
-                    key={step.tabId}
-                    type="button"
-                    className={`guide-progress-dot ${index === guideStepIndex ? "guide-progress-dot-active" : ""}`}
-                    aria-label={`Schritt ${index + 1}: ${step.title}`}
-                    aria-current={index === guideStepIndex ? "step" : undefined}
-                    onClick={() => setGuideStepIndex(index)}
-                  />
-                ))}
-              </div>
-              <span className="themed-muted text-xs font-semibold">{guideProgressLabel}</span>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                className="button-secondary justify-center gap-2"
-                onClick={() => closeUserGuide(true)}
-              >
-                Nicht mehr anzeigen
-              </button>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="button-secondary flex-1 justify-center sm:flex-none"
-                  onClick={() => setGuideStepIndex((current) => Math.max(0, current - 1))}
-                  disabled={guideStepIndex === 0}
-                >
-                  Zurück
-                </button>
-                {guideStepIndex < firstRunGuideSteps.length - 1 ? (
-                  <button
-                    type="button"
-                    className="button-primary flex-1 justify-center sm:flex-none"
-                    onClick={() => setGuideStepIndex((current) => Math.min(firstRunGuideSteps.length - 1, current + 1))}
-                  >
-                    Weiter
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="button-primary flex-1 justify-center sm:flex-none"
-                    onClick={() => closeUserGuide(true)}
-                  >
-                    Fertig
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+    <AppShell appShellRef={appShellRef}>
+      <FirstRunGuide
+        open={guideOpen}
+        dialogRef={guideDialogRef}
+        titleRef={guideTitleRef}
+        activeStep={activeGuideStep}
+        stepIndex={guideStepIndex}
+        progressLabel={guideProgressLabel}
+        onDialogKeyDown={handleGuideKeyDown}
+        onClose={() => closeUserGuide(false)}
+        onActivateStepTarget={activateGuideStepTarget}
+        onStepChange={setGuideStepIndex}
+        onPrevious={() => setGuideStepIndex((current) => Math.max(0, current - 1))}
+        onNext={() => setGuideStepIndex((current) => Math.min(firstRunGuideSteps.length - 1, current + 1))}
+        onDismiss={() => closeUserGuide(true)}
+      />
       <div className="mx-auto max-w-[1880px]">
-        <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-4xl">
-            <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
-            <div className="brand-header-lockup">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="font-display themed-strong text-4xl md:text-5xl">
-                    Erwartungshorizont Studio
-                  </h1>
-                  <span className="school-year-pill">
-                    Schuljahr {currentSchoolYearPillLabel}
-                  </span>
-                </div>
-                <p className="themed-muted mt-4 max-w-3xl text-base leading-7">
-                  Erwartungshorizonte, erstellen und verwalten
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto">
-            <label className="block w-full sm:min-w-[210px] sm:w-auto">
-              <span className="label inline-flex items-center gap-2">
-                <PaletteIcon className="h-3.5 w-3.5" />
-                Darstellung
-              </span>
-              <select
-                className="field header-control"
-                value={visualTheme}
-                onChange={(event) => setVisualTheme(event.target.value as VisualTheme)}
-              >
-                {visualThemeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className="button-secondary header-control w-full gap-2 sm:w-auto"
-              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
-            >
-              {theme === "light" ? <MoonIcon /> : <SunIcon />}
-              {theme === "light" ? "Dunkel" : "Hell"}
-            </button>
-            <button
-              type="button"
-              className="button-secondary header-control w-full gap-2 sm:w-auto"
-              onClick={toggleAppFullscreen}
-              disabled={!document.fullscreenEnabled}
-              title={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
-              aria-label={isAppFullscreen ? "App-Vollbild verlassen" : "App im Vollbild öffnen"}
-            >
-              {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              <span>{isAppFullscreen ? "Vollbild aus" : "Vollbild"}</span>
-            </button>
-            <button
-              type="button"
-              className="button-secondary header-control w-full gap-2 sm:w-auto"
-              onClick={openUserGuide}
-              title="Kurze Einführung öffnen"
-            >
-              <InfoIcon />
-              Hilfe
-            </button>
-          </div>
-        </header>
+        <AppHeader
+          currentSchoolYearPillLabel={currentSchoolYearPillLabel}
+          visualTheme={visualTheme}
+          onVisualThemeChange={setVisualTheme}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+          isAppFullscreen={isAppFullscreen}
+          isFullscreenAvailable={document.fullscreenEnabled}
+          onToggleAppFullscreen={toggleAppFullscreen}
+          onOpenUserGuide={openUserGuide}
+        />
 
-        {appNotice ? (
-          <div className="mb-6 no-print">
-            <DismissibleCallout tone={appNotice.tone} resetKey={appNotice.id}>
-              <p className="font-semibold">{appNotice.title}</p>
-              {appNotice.detail ? <p>{appNotice.detail}</p> : null}
-            </DismissibleCallout>
-          </div>
-        ) : null}
+        <AppStatusArea
+          backupStatus={backupStatus}
+          lastBackupAt={lastBackupAt}
+          onOpenBackup={() => activateTab("backup")}
+          notice={appNotice}
+          isDemoModeEnabled={isDemoModeEnabled}
+          demoWorkspaceId={draftBundle.activeWorkspaceId}
+          onResetDemoWorkspace={resetDemoWorkspace}
+        />
 
-        {isDemoModeEnabled ? (
-          <div className="mb-6 no-print">
-            <DismissibleCallout tone="info" resetKey={`demo-${draftBundle.activeWorkspaceId}`}>
-              <p className="font-semibold">Demo-Modus aktiv</p>
-              <p>
-                Diese GitHub-Pages-Demo lädt beim ersten Aufruf eine lokale Beispiel-Klassenarbeit. Alle Änderungen
-                bleiben nur in diesem Browser.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className="button-secondary" onClick={resetDemoWorkspace}>
-                  Demo-Daten zurücksetzen
-                </button>
-              </div>
-            </DismissibleCallout>
-          </div>
-        ) : null}
-
-        <div className="mb-6 no-print">
-          <div className="flex gap-3 overflow-x-auto py-1">
-            <div role="tablist" aria-label="Hauptbereiche" className="flex gap-3">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  id={getTabButtonId(tab.id)}
-                  ref={(element) => {
-                    tabButtonRefs.current[tab.id] = element;
-                  }}
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  aria-controls={getTabPanelId(tab.id)}
-                  tabIndex={activeTab === tab.id ? 0 : -1}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-                  className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} shrink-0 gap-2 whitespace-nowrap`}
-                >
-                  <TabIcon id={tab.id} />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={saveExpectationsToArchive}
-              className="button-secondary ml-auto shrink-0 gap-2 whitespace-nowrap border-l pl-4"
-            >
-              <SaveIcon />
-              Im Archiv speichern
-            </button>
-          </div>
-        </div>
+        <AppNavigation
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onTabKeyDown={handleTabKeyDown}
+          onSaveToArchive={saveExpectationsToArchive}
+          tabButtonRefs={tabButtonRefs}
+        />
 
         <section className="mb-5 no-print">
           <div className="workspace-switcher-shell rounded-2xl border px-3 py-3">
@@ -4025,75 +3660,23 @@ function App() {
                   Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet.
                 </p>
               </div>
-            ) : activeWorkspace && (
-              <div className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="surface-muted rounded-2xl p-4">
-                  <p className="label">Aktuelle Klassenarbeit</p>
-                  <p className="themed-strong text-sm font-semibold">{getWorkspaceDisplayLabel(activeWorkspace)}</p>
-                  <p className="themed-muted mt-2 text-sm">
-                    Letzte Bearbeitung: {formatDateTime(activeWorkspace.updatedAt)}
-                  </p>
-                </div>
-                <div className="surface-muted rounded-2xl p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="label">Versionen</p>
-                      <p className="themed-muted text-sm">Lokale Wiederherstellungspunkte der aktuellen Klassenarbeit.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <IconButton
-                        onClick={() => setVersionListCollapsed((current) => !current)}
-                        title={versionListCollapsed ? "Versionen aufklappen" : "Versionen zuklappen"}
-                        className="px-2.5 py-2 text-xs"
-                      >
-                        {versionListCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-                      </IconButton>
-                      <IconButton
-                        onClick={() => saveWorkspaceVersion(activeWorkspace.id)}
-                        title="Schnappschuss jetzt speichern"
-                        className="px-2.5 py-2 text-xs"
-                      >
-                        <SaveIcon />
-                      </IconButton>
-                      <span className="themed-strong text-sm font-semibold">{activeWorkspace.versions.length} / {MAX_WORKSPACE_VERSIONS}</span>
-                    </div>
-                  </div>
-                  {versionListCollapsed ? (
-                    <p className="themed-muted mt-3 text-sm">
-                      {activeWorkspace.versions.length > 0
-                        ? `${activeWorkspace.versions.length} gespeicherte Schnappschüsse`
-                        : "Noch keine gespeicherten Schnappschüsse"}
-                    </p>
-                  ) : activeWorkspace.versions.length > 0 ? (
-                    <div className="mt-3 space-y-2">
-                      {activeWorkspace.versions.map((version, index) => (
-                        <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-3 py-2">
-                          <div>
-                            <p className="themed-strong text-sm font-medium">Version {activeWorkspace.versions.length - index}</p>
-                            <p className="themed-muted text-xs">{formatDateTime(version.savedAt)}</p>
-                          </div>
-                          <button
-                            type="button"
-                            className="button-secondary px-3 py-2 text-xs"
-                            onClick={() =>
-                              setPendingVersionRestore({
-                                workspaceId: activeWorkspace.id,
-                                workspaceLabel: getWorkspaceDisplayLabel(activeWorkspace),
-                                version,
-                              })
-                            }
-                          >
-                            Wiederherstellen
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="themed-muted mt-3 text-sm">Noch keine gespeicherten Versionen vorhanden.</p>
-                  )}
-                </div>
-              </div>
-            )}
+            ) : activeWorkspace ? (
+              <WorkspaceVersionPanel
+                workspace={activeWorkspace}
+                workspaceLabel={getWorkspaceDisplayLabel(activeWorkspace)}
+                collapsed={versionListCollapsed}
+                maxVersions={MAX_WORKSPACE_VERSIONS}
+                onToggleCollapsed={() => setVersionListCollapsed((current) => !current)}
+                onSaveVersion={() => saveWorkspaceVersion(activeWorkspace.id)}
+                onRestoreVersion={(version) =>
+                  setPendingVersionRestore({
+                    workspaceId: activeWorkspace.id,
+                    workspaceLabel: getWorkspaceDisplayLabel(activeWorkspace),
+                    version,
+                  })
+                }
+              />
+            ) : null}
           </div>
         </section>
 
@@ -4713,22 +4296,44 @@ function App() {
 
       <ConfirmDialog
         open={pendingImportPreview !== null}
-        title="Import prüfen"
+        title={
+          pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup"
+            ? "Wiederherstellung bestätigen"
+            : "Import prüfen"
+        }
         description={
           pendingImportPreview?.warning
-            ? `${pendingImportPreview.summary}\n\nWarnung: ${pendingImportPreview.warning}`
-            : pendingImportPreview?.summary ?? ""
+            ? `${pendingImportPreview.summary}\n\nWarnung: ${pendingImportPreview.warning}${pendingImportPreview.kind === "student-database-backup" ? "\n\nDie aktuelle Schülerdatenbank wird ersetzt." : ""}`
+            : `${pendingImportPreview?.summary ?? ""}${pendingImportPreview?.kind === "app-backup" ? "\n\nDer aktuelle Arbeitsstand wird vollständig ersetzt." : pendingImportPreview?.kind === "student-database-backup" ? "\n\nDie aktuelle Schülerdatenbank wird ersetzt." : ""}`
         }
-        onCancel={() => setPendingImportPreview(null)}
+        onCancel={dismissImportPreview}
         onConfirm={confirmImportPreview}
-        confirmLabel="Import übernehmen"
+        onSaveAndConfirm={
+          pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup"
+            ? () => {
+                void saveCurrentBackupThenConfirmImport();
+              }
+            : undefined
+        }
+        saveAndConfirmLabel="Vorher speichern und wiederherstellen"
+        confirmLabel={
+          pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup"
+            ? "Ersetzen und wiederherstellen"
+            : "Import übernehmen"
+        }
+        cancelDisabled={preRestoreBackupSaving}
+        confirmDisabled={
+          preRestoreBackupSaving ||
+          ((pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup") &&
+            !restoreOverwriteConfirmed)
+        }
       >
         <div className="dialog-preview rounded-2xl p-4">
           <p className="label">Datei</p>
           <p className="themed-strong text-sm font-medium">{pendingImportPreview?.sourceLabel}</p>
           {pendingImportPreview?.kind === "app-backup" ? (
             <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
-              Der aktuelle Arbeitsstand wird vollständig ersetzt. Vor dem Übernehmen wird automatisch ein lokaler Rollback-Punkt erstellt.
+              Der aktuelle Arbeitsstand wird vollständig ersetzt. Ein lokaler Rollback-Punkt wird erstellt. Mit „Vorher speichern“ wird zusätzlich eine verschlüsselte Datei angelegt; nur danach wird die Wiederherstellung ausgeführt.
             </p>
           ) : pendingImportPreview?.kind === "schoolyear-workspace-archive" ? (
             <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
@@ -4736,9 +4341,37 @@ function App() {
             </p>
           ) : (
             <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
-              Klassenarbeiten und Archiv bleiben erhalten. Die Schülerdatenbank wird ersetzt und ein lokaler Rollback-Punkt erstellt.
+              Klassenarbeiten und Archiv bleiben erhalten. Die Schülerdatenbank wird ersetzt und ein lokaler Rollback-Punkt erstellt. Mit „Vorher speichern“ wird zusätzlich eine verschlüsselte Datei angelegt.
             </p>
           )}
+          {pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup" ? (
+            <div className="mt-4 space-y-3">
+              <label className="flex items-start gap-3 text-sm leading-5" htmlFor="restore-overwrite-confirmation">
+                <input
+                  id="restore-overwrite-confirmation"
+                  type="checkbox"
+                  checked={restoreOverwriteConfirmed}
+                  disabled={preRestoreBackupSaving}
+                  onChange={(event) => setRestoreOverwriteConfirmed(event.target.checked)}
+                />
+                <span>Ich verstehe, dass bestehende lokale Daten ersetzt werden.</span>
+              </label>
+              <Field label="Passwort für optionale Vorab-Sicherung" inputId="pre-restore-backup-passphrase">
+                <input
+                  id="pre-restore-backup-passphrase"
+                  className="field"
+                  type="password"
+                  value={preRestoreBackupPassphrase}
+                  disabled={preRestoreBackupSaving}
+                  onChange={(event) => {
+                    setPreRestoreBackupPassphrase(event.target.value);
+                    if (preRestoreBackupError) setPreRestoreBackupError("");
+                  }}
+                />
+              </Field>
+              {preRestoreBackupError ? <p className="text-sm font-medium" role="alert">{preRestoreBackupError}</p> : null}
+            </div>
+          ) : null}
         </div>
       </ConfirmDialog>
 
@@ -5123,7 +4756,7 @@ function App() {
           </div>
         )}
       </ConfirmDialog>
-    </div>
+    </AppShell>
   );
 }
 

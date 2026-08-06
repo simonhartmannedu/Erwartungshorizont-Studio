@@ -1,6 +1,7 @@
 import { Exam, ExpectationArchiveEntry } from "../types";
 import { calculateExamSummary } from "./calculations";
 import { cloneExam } from "./exam";
+import { isValidArchiveEntryShape } from "../infrastructure/validation/persistedData";
 
 const resetExamIds = (exam: Exam, titleSuffix = ""): Exam => ({
   ...cloneExam(exam),
@@ -84,6 +85,7 @@ export const createEditableExamFromArchive = (
 };
 
 export const isArchiveEntry = (value: unknown): value is ExpectationArchiveEntry => {
+  if (!isValidArchiveEntryShape(value)) return false;
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<ExpectationArchiveEntry>;
   return (

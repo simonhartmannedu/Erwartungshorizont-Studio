@@ -26,8 +26,10 @@ const { createPasswordVerifier, decryptText, encryptText, verifyPassword } = req
 const { cloneExam, withExamMeta } = require("../.regression-dist/src/utils/exam.js");
 const { generateAutomatedExamFeedback } = require("../.regression-dist/src/utils/reportFeedback.js");
 const {
+  createEncryptedAppBackup,
   createEncryptedStudentDatabaseBackup,
   describeBackupStatus,
+  parseAppBackup,
   parseStudentDatabaseBackup,
 } = require("../.regression-dist/src/utils/backup.js");
 const { renderPrintDocument } = require("../.regression-dist/src/utils/export.js");
@@ -121,15 +123,19 @@ const testStorageMigration = () => {
   assert.equal(bundleWithMissingVersionFields.workspaces[0].versions.length, 0);
   assert.equal(typeof bundleWithMissingVersionFields.workspaces[0].updatedAt, "string");
 
-  const invalidDatabase = parseStudentDatabaseState(
-    JSON.stringify({
-      version: 1,
-      groups: [{ id: "x" }],
-      assessments: {},
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    }),
+  assert.throws(
+    () =>
+      parseStudentDatabaseState(
+        JSON.stringify({
+          version: 1,
+          groups: [{ id: "x" }],
+          assessments: {},
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }),
+      ),
+    /Schülerdatenbank hat kein unterstütztes Datenformat/,
+    "invalid student data must stop loading instead of being overwritten by an empty state",
   );
-  assert.equal(invalidDatabase.groups.length, 0, "invalid student database should reset to an empty state");
 };
 
 const testGroupUnlockAndDecrypt = async () => {
@@ -149,8 +155,59 @@ const testEncryptedBackupRoundTrip = async () => {
 
   assert.deepEqual(restored, database, "encrypted backup should round-trip the full database");
 
+  const legacyBackup = {
+    kind: "ewh-student-database-backup",
+    version: 1,
+    exportedAt: "2026-03-03T12:00:00.000Z",
+    payload: await encryptText(JSON.stringify(database), "Backup-Secret-99"),
+  };
+  assert.deepEqual(
+    await parseStudentDatabaseBackup(legacyBackup, "Backup-Secret-99"),
+    database,
+    "legacy v1 backups must remain readable",
+  );
+
+  const futureSchemaBackup = {
+    ...backup,
+    payload: await encryptText(JSON.stringify({ schemaVersion: 99, payload: database }), "Backup-Secret-99"),
+  };
+  await assert.rejects(
+    () => parseStudentDatabaseBackup(futureSchemaBackup, "Backup-Secret-99"),
+    /wird von dieser App-Version nicht unterstützt/,
+    "future backup schema versions must be rejected without restore",
+  );
+
   const status = describeBackupStatus(database, backup.exportedAt);
   assert.equal(status.tone, "success");
+};
+
+const testEncryptedAppBackupRoundTrip = async () => {
+  const { database } = await createStudentDatabase();
+  const payload = {
+    draftBundle: {
+      activeWorkspaceId: "workspace-1",
+      workspaces: [
+        {
+          id: "workspace-1",
+          label: "Testarbeit",
+          exam: sampleExam,
+          activeArchiveEntryId: null,
+          assignedGroupId: null,
+          updatedAt: "2026-03-03T12:00:00.000Z",
+          versions: [],
+        },
+      ],
+    },
+    studentDatabase: database,
+    archiveEntries: [],
+  };
+  const backup = await createEncryptedAppBackup(payload, "Backup-Secret-99", "2026-03-03T12:00:00.000Z");
+
+  assert.deepEqual(
+    await parseAppBackup(backup, "Backup-Secret-99"),
+    payload,
+    "v2 full-app backups must validate and round-trip all coordinated domain values",
+  );
 };
 
 const testPrintEscaping = async () => {
@@ -417,6 +474,7 @@ Promise.all([
   Promise.resolve().then(testStorageMigration),
   testGroupUnlockAndDecrypt(),
   testEncryptedBackupRoundTrip(),
+  testEncryptedAppBackupRoundTrip(),
   testPrintEscaping(),
   testClassDefaultSignatureFallback(),
   testTaskScoreScaling(),
