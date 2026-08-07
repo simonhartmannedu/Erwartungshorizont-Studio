@@ -1,14 +1,14 @@
 # Sicherheitsrichtlinie
 
-## Responsible Disclosure
+## Vertrauliche Meldung
 
-Bitte veröffentlichen Sie vermutete Sicherheitslücken nicht zuerst in einem öffentlichen Issue. Melden Sie sie vertraulich an `simonhartmann@mailbox.org` mit einer kurzen Beschreibung, betroffenen Versionen, reproduzierbaren Schritten und möglicher Auswirkung. Senden Sie keine echten Schülerdaten, Passwörter, Schlüssel oder entschlüsselten Backups.
+Bitte veröffentliche vermutete Sicherheitslücken nicht zuerst in einem öffentlichen Issue. Melde sie vertraulich an `simonhartmann@mailbox.org` – mit kurzer Beschreibung, betroffenen Versionen, reproduzierbaren Schritten und möglicher Auswirkung. Sende keine echten Schülerdaten, Passwörter, Schlüssel oder entschlüsselten Backups.
 
 Wir bestätigen den Eingang nach Möglichkeit zeitnah, bewerten die Auswirkung und stimmen einen verantwortungsvollen Offenlegungszeitpunkt ab.
 
 ## Unterstützte Versionen
 
-Sicherheitskorrekturen werden für den aktuellen `main`-Stand und veröffentlichte, noch unterstützte Versionen bewertet. Vor `1.0.0` gibt es keine zugesicherte Langzeitpflege für ältere Vorabversionen. Bitte nennen Sie Commit, Release oder Demo-Version.
+Sicherheitskorrekturen werden für den aktuellen `main`-Stand und veröffentlichte, noch unterstützte Versionen bewertet. Vor `1.0.0` gibt es keine zugesicherte Langzeitpflege für ältere Vorabversionen. Nenne bitte Commit, Release oder Demo-Version.
 
 ## Besonderer Schutzbereich
 

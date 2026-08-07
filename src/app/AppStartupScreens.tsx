@@ -1,8 +1,16 @@
-export const StorageUnavailableScreen = ({ detail, onReload }: { detail: string; onReload: () => void }) => (
+export const StorageUnavailableScreen = ({
+  title = "Lokaler Speicher nicht verfügbar",
+  detail,
+  onReload,
+}: {
+  title?: string;
+  detail: string;
+  onReload: () => void;
+}) => (
   <div className="min-h-screen px-4 py-6 lg:px-8">
     <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl items-center justify-center">
       <section className="panel w-full p-6 sm:p-8">
-        <h1 className="themed-strong text-2xl font-semibold">Lokaler Speicher nicht verfügbar</h1>
+        <h1 className="themed-strong text-2xl font-semibold">{title}</h1>
         <p className="themed-muted mt-3 text-sm leading-6">{detail}</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button type="button" className="button-primary" onClick={onReload}>

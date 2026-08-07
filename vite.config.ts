@@ -5,17 +5,40 @@ import { handlePdfSuggestRequest } from "./server/pdfSuggest";
 
 type RequestLike = {
   method?: string;
+  headers?: Record<string, string | string[] | undefined>;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
 };
 
-const readJsonBody = async (request: RequestLike) =>
+const MAX_PDF_REQUEST_BYTES = 12 * 1024 * 1024;
+
+class RequestBodyTooLargeError extends Error {}
+
+const readJsonBody = async (request: RequestLike, maxBytes = MAX_PDF_REQUEST_BYTES) =>
   new Promise<unknown>((resolve, reject) => {
     let raw = "";
+    let receivedBytes = 0;
+    let settled = false;
+    const contentLength = request.headers?.["content-length"];
+    const declaredBytes = Number(Array.isArray(contentLength) ? contentLength[0] : contentLength);
+
+    if (Number.isFinite(declaredBytes) && declaredBytes > maxBytes) {
+      reject(new RequestBodyTooLargeError());
+      return;
+    }
 
     request.on("data", (chunk) => {
-      raw += typeof chunk === "string" ? chunk : String(chunk ?? "");
+      if (settled) return;
+      const value = typeof chunk === "string" ? chunk : String(chunk ?? "");
+      receivedBytes += Buffer.byteLength(value);
+      if (receivedBytes > maxBytes) {
+        settled = true;
+        reject(new RequestBodyTooLargeError());
+        return;
+      }
+      raw += value;
     });
     request.on("end", () => {
+      if (settled) return;
       if (!raw.trim()) {
         resolve({});
         return;
@@ -51,14 +74,16 @@ export default defineConfig(({ mode }) => ({
             response.statusCode = result.status;
             response.setHeader("Content-Type", "application/json");
             response.end(JSON.stringify(result.body));
-          } catch {
-            response.statusCode = 400;
+          } catch (error) {
+            response.statusCode = error instanceof RequestBodyTooLargeError ? 413 : 400;
             response.setHeader("Content-Type", "application/json");
             response.end(
               JSON.stringify({
                 error: {
-                  code: "invalid_json",
-                  message: "Die Anfrage konnte nicht gelesen werden.",
+                  code: error instanceof RequestBodyTooLargeError ? "request_too_large" : "invalid_json",
+                  message: error instanceof RequestBodyTooLargeError
+                    ? "Die Anfrage ist zu groß."
+                    : "Die Anfrage konnte nicht gelesen werden.",
                 },
               }),
             );
@@ -79,14 +104,16 @@ export default defineConfig(({ mode }) => ({
             response.statusCode = result.status;
             response.setHeader("Content-Type", "application/json");
             response.end(JSON.stringify(result.body));
-          } catch {
-            response.statusCode = 400;
+          } catch (error) {
+            response.statusCode = error instanceof RequestBodyTooLargeError ? 413 : 400;
             response.setHeader("Content-Type", "application/json");
             response.end(
               JSON.stringify({
                 error: {
-                  code: "invalid_json",
-                  message: "Die Anfrage konnte nicht gelesen werden.",
+                  code: error instanceof RequestBodyTooLargeError ? "request_too_large" : "invalid_json",
+                  message: error instanceof RequestBodyTooLargeError
+                    ? "Die Anfrage ist zu groß."
+                    : "Die Anfrage konnte nicht gelesen werden.",
                 },
               }),
             );

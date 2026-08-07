@@ -1,5 +1,5 @@
-# Notice
+# Hinweis
 
-Copyright (C) 2026 Simon Hartmann and contributors.
+Copyright (C) 2026 Simon Hartmann und Mitwirkende.
 
-EWH-Studio Community Core is licensed under `AGPL-3.0-only`; see [LICENSE](LICENSE). Third-party dependencies and assets retain their own licenses. `Erwartungshorizont-Studio` and `EWH-Studio` identify unmodified copies and this notice grants no trademark rights.
+Der EWH-Studio Community-Kern steht unter `AGPL-3.0-only`; siehe [LICENSE](LICENSE). Abhängigkeiten und Drittmaterial behalten ihre eigenen Lizenzen. Die Bezeichnungen „Erwartungshorizont-Studio“ und „EWH-Studio“ kennzeichnen unveränderte Kopien; aus diesem Hinweis entstehen keine Markenrechte.

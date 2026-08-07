@@ -6,12 +6,35 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const MAX_OCR_PAGES = 6;
+const MAX_PDF_BYTES = 8 * 1024 * 1024;
+const MAX_CONCURRENT_EXTRACTIONS = 2;
+const COMMAND_TIMEOUT_MS = 45_000;
+const COMMAND_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
 const PDF_CONSENT_VERSION = "2026-04-26";
 const PDF_EXTRACT_PURPOSE = "EWH-Editor: PDF-Text- und OCR-Extraktion";
+let activeExtractionCount = 0;
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
-const decodeBase64 = (base64) => Uint8Array.from(Buffer.from(base64, "base64"));
+const decodeBase64 = (base64) => {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64) || base64.length % 4 !== 0) {
+    throw new Error("Ungültige Base64-Daten");
+  }
+  const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_PDF_BYTES) {
+    throw new Error("PDF-Datei überschreitet die zulässige Größe");
+  }
+  if (Buffer.from(bytes.subarray(0, 5)).toString("ascii") !== "%PDF-") {
+    throw new Error("Datei ist keine PDF");
+  }
+  return bytes;
+};
+
+const runCommand = (command, args) =>
+  execFileAsync(command, args, {
+    timeout: COMMAND_TIMEOUT_MS,
+    maxBuffer: COMMAND_MAX_BUFFER_BYTES,
+  });
 
 const normalizeWhitespace = (value) =>
   value
@@ -41,14 +64,14 @@ const isPdfExtractRequest = (value) =>
   isNonEmptyString(value.timestamp);
 
 const runPdftotext = async (pdfPath, outputPath) => {
-  await execFileAsync("pdftotext", ["-layout", pdfPath, outputPath]);
+  await runCommand("pdftotext", ["-layout", pdfPath, outputPath]);
   const content = await readFile(outputPath, "utf8").catch(() => "");
   return normalizeWhitespace(content);
 };
 
 const runPdfInfoPageCount = async (pdfPath) => {
   try {
-    const { stdout } = await execFileAsync("pdfinfo", [pdfPath]);
+    const { stdout } = await runCommand("pdfinfo", [pdfPath]);
     const pagesMatch = stdout.match(/^Pages:\s+(\d+)\s*$/im);
     if (!pagesMatch) return null;
     const pageCount = Number(pagesMatch[1]);
@@ -60,7 +83,7 @@ const runPdfInfoPageCount = async (pdfPath) => {
 
 const runOcr = async (pdfPath, workDir) => {
   const imagePrefix = path.join(workDir, "page");
-  await execFileAsync("pdftoppm", ["-png", "-f", "1", "-l", String(MAX_OCR_PAGES), pdfPath, imagePrefix]);
+  await runCommand("pdftoppm", ["-png", "-scale-to", "2200", "-f", "1", "-l", String(MAX_OCR_PAGES), pdfPath, imagePrefix]);
 
   const files = [];
   for (let page = 1; page <= MAX_OCR_PAGES; page += 1) {
@@ -75,7 +98,7 @@ const runOcr = async (pdfPath, workDir) => {
       continue;
     }
     try {
-      const { stdout } = await execFileAsync("tesseract", [file, "stdout", "-l", "deu+eng", "--psm", "6"]);
+      const { stdout } = await runCommand("tesseract", [file, "stdout", "-l", "deu+eng", "--psm", "6"]);
       if (stdout.trim()) {
         snippets.push(stdout);
       }
@@ -100,11 +123,17 @@ export const handlePdfExtractRequest = async (payload) => {
     return createError(400, "purpose_mismatch", "Die PDF wurde mit einem unzulässigen Zweck gesendet.");
   }
 
-  const workDir = await mkdtemp(path.join(os.tmpdir(), "ewh-pdf-"));
-  const pdfPath = path.join(workDir, "upload.pdf");
-  const textPath = path.join(workDir, "upload.txt");
+  if (activeExtractionCount >= MAX_CONCURRENT_EXTRACTIONS) {
+    return createError(429, "pdf_extract_busy", "Die PDF-Verarbeitung ist ausgelastet. Bitte versuche es gleich erneut.");
+  }
+
+  activeExtractionCount += 1;
+  let workDir = null;
 
   try {
+    workDir = await mkdtemp(path.join(os.tmpdir(), "ewh-pdf-"));
+    const pdfPath = path.join(workDir, "upload.pdf");
+    const textPath = path.join(workDir, "upload.txt");
     await writeFile(pdfPath, decodeBase64(payload.fileContentBase64));
     const extractedText = await runPdftotext(pdfPath, textPath);
     const pageCountHint = await runPdfInfoPageCount(pdfPath);
@@ -161,6 +190,9 @@ export const handlePdfExtractRequest = async (payload) => {
   } catch {
     return createError(500, "pdf_extract_failed", "Die PDF konnte nicht extrahiert werden.");
   } finally {
-    await rm(workDir, { recursive: true, force: true });
+    activeExtractionCount -= 1;
+    if (workDir) {
+      await rm(workDir, { recursive: true, force: true });
+    }
   }
 };

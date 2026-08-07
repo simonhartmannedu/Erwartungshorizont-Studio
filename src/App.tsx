@@ -44,6 +44,8 @@ import {
   saveStudentDatabase,
   saveTheme,
   saveVisualTheme,
+  StorageWriteConflictError,
+  subscribeToStorageFailures,
 } from "./utils/storage";
 import {
   buildAppBackupFilenameForClass,
@@ -760,6 +762,8 @@ function App() {
   const [archiveEntries, setArchiveEntries] = useState<ExpectationArchiveEntry[]>([]);
   const [studentDatabase, setStudentDatabase] = useState<StudentDatabase>(() => createEmptyStudentDatabase());
   const studentDatabaseRef = useRef(studentDatabase);
+  const skipInitialDraftPersistenceRef = useRef(false);
+  const skipInitialStudentDatabasePersistenceRef = useRef(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
@@ -966,6 +970,10 @@ function App() {
           markDemoSeedCurrent();
         }
 
+        // Loading must be read-only. Otherwise simply opening a second tab would create a new
+        // storage revision and make the first tab appear stale without any user change.
+        skipInitialDraftPersistenceRef.current = !shouldSeedDemoWorkspace;
+        skipInitialStudentDatabasePersistenceRef.current = !shouldSeedDemoWorkspace;
         setDraftBundle(nextDraftBundle);
         setArchiveEntries(nextArchiveEntries);
         setStudentDatabase(nextStudentDatabase);
@@ -995,13 +1003,35 @@ function App() {
     };
   }, []);
 
+  useEffect(
+    () =>
+      subscribeToStorageFailures((error) => {
+        const isConflict = error instanceof StorageWriteConflictError;
+        setStorageError({
+          title: isConflict ? "Arbeitsstand wurde in einem anderen Tab geändert" : "Lokaler Speicherfehler",
+          detail: isConflict
+            ? "Diese Seite speichert keine weiteren Änderungen, damit kein neuerer Arbeitsstand überschrieben wird. Bitte schließe den anderen Tab und lade diese Seite neu."
+            : "Eine Änderung konnte nicht sicher im Browser gespeichert werden. Bitte lade die Seite neu und prüfe anschließend deine letzte verschlüsselte Sicherung.",
+        });
+      }),
+    [],
+  );
+
   useEffect(() => {
     if (!storageReady) return;
+    if (skipInitialDraftPersistenceRef.current) {
+      skipInitialDraftPersistenceRef.current = false;
+      return;
+    }
     void saveDraft(draftBundle);
   }, [draftBundle, storageReady]);
 
   useEffect(() => {
     if (!storageReady) return;
+    if (skipInitialStudentDatabasePersistenceRef.current) {
+      skipInitialStudentDatabasePersistenceRef.current = false;
+      return;
+    }
     const unlockedPasswordsSnapshot = { ...unlockedGroupPasswordsRef.current };
     void saveStudentDatabase(studentDatabase, (groupId) => unlockedPasswordsSnapshot[groupId] ?? null);
   }, [studentDatabase, storageReady]);
@@ -3533,7 +3563,7 @@ function App() {
   const activeGuideStep = firstRunGuideSteps[guideStepIndex] ?? firstRunGuideSteps[0];
   const guideProgressLabel = `${guideStepIndex + 1} / ${firstRunGuideSteps.length}`;
   if (storageError) {
-    return <StorageUnavailableScreen detail={storageError.detail} onReload={() => window.location.reload()} />;
+    return <StorageUnavailableScreen title={storageError.title} detail={storageError.detail} onReload={() => window.location.reload()} />;
   }
 
   if (!storageReady) {
@@ -3698,13 +3728,13 @@ function App() {
         </section>
 
         <div
-          className={`grid gap-6 ${
+          className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 ${
             activeTab === "guidedBuilder" || activeTab === "home"
               ? "xl:grid-cols-[320px_minmax(0,1fr)]"
               : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
           }`}
         >
-          <aside>
+          <aside className="min-w-0">
             <StudentSelectionPanel
               database={studentDatabase}
               workspaces={visibleWorkspaces}
@@ -3726,7 +3756,7 @@ function App() {
             />
           </aside>
 
-          <main className="space-y-6">
+          <main className="min-w-0 space-y-6">
             <div
               id={getTabPanelId("home")}
               role="tabpanel"
