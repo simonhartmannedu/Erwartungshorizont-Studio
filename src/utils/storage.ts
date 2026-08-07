@@ -9,6 +9,7 @@ import {
   StoredApplicationDataMigrationError,
 } from "../infrastructure/migrations/storedApplicationData";
 import { isValidArchiveEntriesShape, isValidDraftBundleShape } from "../infrastructure/validation/persistedData";
+import { applicationStorageScope } from "./storageScope";
 
 const DRAFT_KEY = "notenrechner-english-nrw-draft";
 const ARCHIVE_KEY = "notenrechner-english-nrw-expectation-archive";
@@ -16,7 +17,9 @@ const STUDENT_DATABASE_KEY = "notenrechner-english-nrw-student-database";
 const THEME_KEY = "notenrechner-english-nrw-theme";
 const VISUAL_THEME_KEY = "notenrechner-english-nrw-visual-theme";
 
-const SQLITE_DATABASE_NAME = "ewh-app-storage";
+// Demo and productive use are served from the same origin on GitHub Pages. They must not
+// share IndexedDB, otherwise opening the demo would make its sample data appear in /app.
+const SQLITE_DATABASE_NAME = `ewh-app-storage-${applicationStorageScope}`;
 const SQLITE_DATABASE_VERSION = 1;
 const SQLITE_OBJECT_STORE = "sqlite";
 const SQLITE_BLOB_KEY = "app-storage";
@@ -377,32 +380,6 @@ const writeStoredValue = (database: SqliteDatabase, key: string, value: string) 
   );
 };
 
-const clearLegacyDataKeys = () => {
-  window.localStorage.removeItem(DRAFT_KEY);
-  window.localStorage.removeItem(ARCHIVE_KEY);
-  window.localStorage.removeItem(STUDENT_DATABASE_KEY);
-};
-
-const migrateLegacyLocalStorage = async (database: SqliteDatabase, expectedRevision: number) => {
-  const draft = parseDraftBundle(window.localStorage.getItem(DRAFT_KEY));
-  const archiveEntries = parseArchiveEntries(window.localStorage.getItem(ARCHIVE_KEY));
-  const studentDatabase = parseStudentDatabaseState(window.localStorage.getItem(STUDENT_DATABASE_KEY));
-
-  if (draft) {
-    writeStoredValue(database, DRAFT_KEY, JSON.stringify(createStoredApplicationData(draft)));
-  }
-  if (archiveEntries.length > 0) {
-    writeStoredValue(database, ARCHIVE_KEY, JSON.stringify(createStoredApplicationData(archiveEntries)));
-  }
-  if (studentDatabase.groups.length > 0 || Object.keys(studentDatabase.assessments).length > 0) {
-    writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(createStoredApplicationData(studentDatabase)));
-  }
-
-  const nextRevision = await writePersistedDatabaseBlob(database.export(), expectedRevision);
-  clearLegacyDataKeys();
-  return nextRevision;
-};
-
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeQueue = Promise.resolve();
 let persistedRevision: number | null = null;
@@ -429,14 +406,6 @@ const getDatabase = () => {
           updated_at TEXT NOT NULL
         )`,
       );
-
-      const hasPersistedDraft = readStoredValue(database, DRAFT_KEY) !== null;
-      const hasPersistedArchive = readStoredValue(database, ARCHIVE_KEY) !== null;
-      const hasPersistedStudentDatabase = readStoredValue(database, STUDENT_DATABASE_KEY) !== null;
-
-      if (!hasPersistedDraft && !hasPersistedArchive && !hasPersistedStudentDatabase) {
-        persistedRevision = await migrateLegacyLocalStorage(database, persistedSnapshot.revision);
-      }
 
       return database;
     })();

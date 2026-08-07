@@ -9,6 +9,8 @@ export const AppFooter = () => {
   const publicBase = import.meta.env.BASE_URL;
   const licenseUrl = `${publicBase}LICENSE.txt`;
   const sourceUrl = "https://github.com/simonhartmannedu/Erwartungshorizont-Studio";
+  const imprintUrl = "../impressum/";
+  const privacyUrl = "../datenschutz/";
 
   return (
     <footer className="app-footer mt-10 border-t pt-6 no-print">
@@ -40,6 +42,15 @@ export const AppFooter = () => {
               Quellcode
             </a>
             .
+          </p>
+          <p className="app-footer-text">
+            <a className="app-footer-link" href={imprintUrl}>
+              Impressum
+            </a>
+            {" · "}
+            <a className="app-footer-link" href={privacyUrl}>
+              Datenschutzerklärung
+            </a>
           </p>
         </div>
         <div className="app-footer-support">

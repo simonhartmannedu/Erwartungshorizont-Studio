@@ -169,6 +169,7 @@ import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { ImportedExamSuggestion } from "./pdf/types";
+import { isDemoStorageScope, scopedStorageKey } from "./utils/storageScope";
 
 const GuidedExamBuilder = lazy(async () => {
   const module = await import("./components/GuidedExamBuilder");
@@ -283,7 +284,7 @@ const DEMO_GROUP_ID = "demo-lerngruppe-8b";
 const DEMO_WORKSPACE_UNIT_4_ID = "demo-klassenarbeit-unit-4";
 const DEMO_WORKSPACE_UNIT_5_ID = "demo-klassenarbeit-unit-5";
 const DEMO_SEED_VERSION = "student-demo-v4";
-const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
+const DEMO_SEED_VERSION_KEY = scopedStorageKey("demo-seed-version");
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
 const DEMO_CLASS_PASSWORD = "demo";
 const DEMO_STUDENT_NAMES = [
@@ -313,9 +314,9 @@ const DEMO_STUDENT_NAMES = [
   "Riya Iyer",
   "Noah Hartmann",
 ] as const;
-const FIRST_RUN_GUIDE_DISMISSED_KEY = "ewh-first-run-guide-dismissed";
+const FIRST_RUN_GUIDE_DISMISSED_KEY = scopedStorageKey("first-run-guide-dismissed");
 const runtimeQuery = new URLSearchParams(window.location.search);
-const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
+const isDemoModeEnabled = isDemoStorageScope;
 const shouldForceDemoSeed = runtimeQuery.get("resetDemo") === "1" || runtimeQuery.get("freshDemo") === "1";
 
 const hasDismissedFirstRunGuide = () => {

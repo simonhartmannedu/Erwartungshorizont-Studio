@@ -2,7 +2,7 @@
 
 Erwartungshorizont-Studio hilft Lehrkräften, Erwartungshorizonte, Lerngruppen und Korrekturen an einem Ort zu organisieren – ohne Nutzerkonto und ohne zentrale Schülerdatenbank.
 
-[Demo öffnen](https://simonhartmannedu.github.io/Erwartungshorizont-Studio/)
+[Landingpage öffnen](https://erwartungshorizont.cc/) · [Demo öffnen](https://erwartungshorizont.cc/demo/) · [Produktiv starten](https://erwartungshorizont.cc/app/)
 
 ![Screenshot von Erwartungshorizont-Studio](erwartungshorizontstudio.png)
 

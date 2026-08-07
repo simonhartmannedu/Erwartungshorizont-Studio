@@ -8,9 +8,10 @@ import {
   StoredApplicationDataMigrationError,
 } from "../infrastructure/migrations/storedApplicationData";
 import { isValidApplicationDataShape } from "../infrastructure/validation/persistedData";
+import { scopedStorageKey } from "./storageScope";
 
-const BACKUP_METADATA_KEY = "ewh-student-database-last-backup-at";
-const BACKUP_FAILURE_METADATA_KEY = "ewh-student-database-last-backup-failure";
+const BACKUP_METADATA_KEY = scopedStorageKey("student-database-last-backup-at");
+const BACKUP_FAILURE_METADATA_KEY = scopedStorageKey("student-database-last-backup-failure");
 const STALE_BACKUP_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 7;
 const URGENT_BACKUP_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 30;
 const CURRENT_BACKUP_FORMAT_VERSION = 2;
