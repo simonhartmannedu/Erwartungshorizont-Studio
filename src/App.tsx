@@ -1,6 +1,6 @@
 import { KeyboardEvent, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNavigation, getTabButtonId, getTabPanelId, tabs, type AppTabId as TabId } from "./app/AppNavigation";
-import { AppHeader } from "./app/AppHeader";
+import { AppHeader, type GlobalSearchResult } from "./app/AppHeader";
 import { AppShell } from "./app/AppShell";
 import { AppStatusArea, type AppNotice, type AppNoticeTone } from "./app/AppStatusArea";
 import { FirstRunGuide, firstRunGuideSteps } from "./app/FirstRunGuide";
@@ -192,6 +192,11 @@ type PendingTemplateLoad = {
   targetGroupId: string | null;
   targetTotalPoints: number;
 };
+
+type PendingSchoolYearCreation = {
+  schoolYear: string;
+  course: string;
+};
 type PendingSectionTotalChange = {
   sectionId: string;
   sectionTitle: string;
@@ -275,8 +280,9 @@ const describeImportError = (error: unknown) =>
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
-const DEMO_WORKSPACE_ID = "demo-klassenarbeit-unit-4";
-const DEMO_SEED_VERSION = "student-demo-v2";
+const DEMO_WORKSPACE_UNIT_4_ID = "demo-klassenarbeit-unit-4";
+const DEMO_WORKSPACE_UNIT_5_ID = "demo-klassenarbeit-unit-5";
+const DEMO_SEED_VERSION = "student-demo-v3";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
 const FIRST_RUN_GUIDE_DISMISSED_KEY = "ewh-first-run-guide-dismissed";
@@ -658,26 +664,66 @@ function App() {
   };
 
   const createInitialDraftBundle = () => createDraftBundle(normalizeExamStructure(createEmptyExam()));
+  const createDemoExam = (metaPatch: Partial<Exam["meta"]> = {}) => {
+    const source = cloneExam(sampleExam);
+    return normalizeExamStructure({
+      ...source,
+      id: crypto.randomUUID(),
+      meta: { ...source.meta, ...metaPatch },
+      sections: source.sections.map((section) => ({
+        ...section,
+        id: crypto.randomUUID(),
+        tasks: section.tasks.map((task) => ({ ...task, id: crypto.randomUUID() })),
+      })),
+    });
+  };
   const createDemoDraftBundle = () => {
-    const workspace = createDraftWorkspace(
-      normalizeExamStructure(cloneExam(sampleExam)),
-      "Demo-Klassenarbeit",
+    const unit4Workspace = createDraftWorkspace(
+      createDemoExam({ examDate: "2026-03-23" }),
+      "Englisch · Unit 4",
       null,
       DEMO_GROUP_ID,
     );
+    const unit5Exam = createDemoExam({
+      examDate: "2026-05-15",
+      title: "Englisch-Klassenarbeit Unit 5",
+      unit: "Unit 5 · Across Cultures",
+      notes: "Unit 5: Leseverstehen, Sprachmittlung und Schreiben. Die Aufgabenstruktur ist bewusst mit Unit 4 vergleichbar, damit Lernfortschritte sichtbar bleiben.",
+    });
+    unit5Exam.sections[0].tasks[0] = {
+      ...unit5Exam.sections[0].tasks[0],
+      title: "Reading: Statements and evidence",
+      description: "Ordne Aussagen einem Erfahrungsbericht über einen Schüleraustausch zu und belege sie mit passenden Textstellen.",
+    };
+    unit5Exam.sections[1].tasks[0] = {
+      ...unit5Exam.sections[1].tasks[0],
+      title: "Language: Future forms and conditionals",
+      description: "Verwende passende Zukunftsformen und conditional sentences in einem Austausch-Kontext.",
+    };
+    unit5Exam.sections[2].tasks[0] = {
+      ...unit5Exam.sections[2].tasks[0],
+      title: "Writing: Exchange blog post",
+      description: "Schreibe einen strukturierten Blogbeitrag über deine ersten Erfahrungen im Schüleraustausch.",
+    };
+    const unit5Workspace = createDraftWorkspace(unit5Exam, "Englisch · Unit 5", null, DEMO_GROUP_ID);
 
     return {
-      activeWorkspaceId: DEMO_WORKSPACE_ID,
+      activeWorkspaceId: DEMO_WORKSPACE_UNIT_5_ID,
       workspaces: [
         {
-          ...workspace,
-          id: DEMO_WORKSPACE_ID,
+          ...unit4Workspace,
+          id: DEMO_WORKSPACE_UNIT_4_ID,
+          updatedAt: "2026-03-23T09:00:00.000Z",
+        },
+        {
+          ...unit5Workspace,
+          id: DEMO_WORKSPACE_UNIT_5_ID,
           updatedAt: DEMO_TIMESTAMP,
         },
       ],
     };
   };
-  const createDemoStudentDatabase = (workspace: DraftWorkspace): StudentDatabase => {
+  const createDemoStudentDatabase = (workspaces: DraftWorkspace[]): StudentDatabase => {
     const placeholderEncryptedName = {
       ciphertext: "demo",
       iv: "demo",
@@ -690,38 +736,61 @@ function App() {
       isAbsent: index === 24,
       createdAt: DEMO_TIMESTAMP,
     }));
-    const tasks = workspace.exam.sections.flatMap((section) => section.tasks);
     const snapScore = (value: number, maxPoints: number) =>
       Math.min(maxPoints, Math.max(0, Math.round(value * 2) / 2));
+    const basePerformance = [
+      0.78, 0.68, 0.82, 0.59, 0.9, 0.64, 0.74, 0.54, 0.86, 0.71, 0.61, 0.8,
+      0.57, 0.76, 0.66, 0.84, 0.69, 0.62, 0.88, 0.58, 0.73, 0.65, 0.77, 0.55,
+    ];
+    const skillProfiles = [
+      [0.06, -0.08, 0.01, -0.05],
+      [-0.03, 0.05, -0.05, 0.02],
+      [0.04, 0.02, 0.06, 0.03],
+      [-0.06, -0.03, 0.04, -0.06],
+      [0.08, 0.05, -0.02, 0.04],
+      [-0.02, -0.07, -0.04, -0.02],
+      [0.03, 0.01, 0.05, -0.03],
+      [-0.05, 0.03, -0.06, 0.01],
+    ];
+    const unit5Development = [-0.01, 0.03, 0.02, 0.04, 0.01, -0.02, 0.03, 0.02];
     const assessments = Object.fromEntries(
-      students.slice(0, 23).map((student, studentIndex) => {
-        const scoredTasks = studentIndex === 22 ? tasks.slice(0, 4) : tasks;
-        const taskScores = Object.fromEntries(
-          scoredTasks.map((task, taskIndex) => {
-            const percentage = 0.52 + (((studentIndex + 1) * 7 + taskIndex * 5) % 43) / 100;
-            return [task.id, snapScore(task.maxPoints * percentage, task.maxPoints)];
-          }),
-        );
+      workspaces.flatMap((workspace, workspaceIndex) =>
+        students
+          .filter((student) => !student.isAbsent)
+          .map((student, studentIndex) => {
+            const profile = skillProfiles[studentIndex % skillProfiles.length];
+            const taskScores = Object.fromEntries(
+              workspace.exam.sections.flatMap((section, sectionIndex) =>
+                section.tasks.map((task, taskIndex) => {
+                  const development = workspaceIndex === 1 ? unit5Development[studentIndex % unit5Development.length] : 0;
+                  const taskVariation = ((taskIndex % 3) - 1) * 0.01;
+                  const sectionDevelopment = workspaceIndex === 1 && sectionIndex === 1 ? 0.01 : 0;
+                  const percentage = Math.min(
+                    0.96,
+                    Math.max(0.32, basePerformance[studentIndex] + profile[sectionIndex] + development + sectionDevelopment + taskVariation),
+                  );
+                  return [task.id, snapScore(task.maxPoints * percentage, task.maxPoints)];
+                }),
+              ),
+            );
 
-        return [
-          `${workspace.id}::${student.id}`,
-          {
-            workspaceId: workspace.id,
-            studentId: student.id,
-            taskScores,
-            encryptedTaskScores: null,
-            teacherComment:
-              studentIndex === 22
-                ? "Demo-Kommentar: Diese Korrektur ist absichtlich nur teilweise ausgefüllt, damit der Status \"in Arbeit\" sichtbar wird."
-                : "Demo-Kommentar: {alias} zeigt nachvollziehbare Leistungen. Die Rückmeldung kann direkt angepasst, gedruckt oder exportiert werden.",
-            signatureDataUrl: null,
-            encryptedTeacherComment: null,
-            encryptedSignatureDataUrl: null,
-            updatedAt: DEMO_TIMESTAMP,
-            printedAt: null,
-          },
-        ];
-      }),
+            return [
+              `${workspace.id}::${student.id}`,
+              {
+                workspaceId: workspace.id,
+                studentId: student.id,
+                taskScores,
+                encryptedTaskScores: null,
+                teacherComment: "Demo-Kommentar: {alias} zeigt über beide Klassenarbeiten ein individuelles, nachvollziehbares Leistungsprofil.",
+                signatureDataUrl: null,
+                encryptedTeacherComment: null,
+                encryptedSignatureDataUrl: null,
+                updatedAt: workspace.updatedAt,
+                printedAt: null,
+              },
+            ] as const;
+          }),
+      ),
     );
 
     return {
@@ -797,6 +866,7 @@ function App() {
   const hasLocalSaveFailureRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
+  const [pendingSchoolYearCreation, setPendingSchoolYearCreation] = useState<PendingSchoolYearCreation | null>(null);
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     home: null,
     groups: null,
@@ -949,6 +1019,12 @@ function App() {
     };
   }, [activeTab, loadedExamTemplates]);
 
+  useEffect(() => {
+    if (activeTab !== "guidedBuilder" && pendingSchoolYearCreation) {
+      setPendingSchoolYearCreation(null);
+    }
+  }, [activeTab, pendingSchoolYearCreation]);
+
   const lockGroupSession = (groupId: string, notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
     if (!groupId) return;
 
@@ -976,15 +1052,17 @@ function App() {
         if (cancelled) return;
 
         const hasCurrentDemoSeed = getStoredDemoSeedVersion() === DEMO_SEED_VERSION;
-        const hasDemoWorkspace = Boolean(storedDraft?.workspaces.some((workspace) => workspace.id === DEMO_WORKSPACE_ID));
+        const hasDemoWorkspaces = [DEMO_WORKSPACE_UNIT_4_ID, DEMO_WORKSPACE_UNIT_5_ID].every((workspaceId) =>
+          storedDraft?.workspaces.some((workspace) => workspace.id === workspaceId),
+        );
         const hasDemoGroup = storedStudentDatabase.groups.some((group) => group.id === DEMO_GROUP_ID);
         const shouldSeedDemoWorkspace =
-          isDemoModeEnabled && (shouldForceDemoSeed || !hasCurrentDemoSeed || !hasDemoWorkspace || !hasDemoGroup);
+          isDemoModeEnabled && (shouldForceDemoSeed || !hasCurrentDemoSeed || !hasDemoWorkspaces || !hasDemoGroup);
 
         const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
         const nextArchiveEntries = shouldSeedDemoWorkspace ? [] : storedArchiveEntries;
         const nextStudentDatabase = shouldSeedDemoWorkspace
-          ? createDemoStudentDatabase(nextDraftBundle.workspaces[0])
+          ? createDemoStudentDatabase(nextDraftBundle.workspaces)
           : storedStudentDatabase;
 
         if (shouldSeedDemoWorkspace) {
@@ -1266,6 +1344,30 @@ function App() {
       ),
     [activeGroupId, activeSchoolYearFilter, draftBundle.workspaces],
   );
+  const globalSearchResults = useMemo<GlobalSearchResult[]>(
+    () => [
+      ...draftBundle.workspaces.map((workspace) => ({
+        id: `workspace:${workspace.id}`,
+        kind: "workspace" as const,
+        label: getWorkspaceDisplayLabel(workspace),
+        detail: [
+          workspace.exam.meta.subject,
+          workspace.exam.meta.course,
+          workspace.exam.meta.schoolYear,
+          workspace.exam.meta.examDate,
+        ].filter(Boolean).join(" · ") || "Klassenarbeit",
+      })),
+      ...studentDatabase.groups.flatMap((group) =>
+        group.students.map((student) => ({
+          id: `student:${student.id}`,
+          kind: "student" as const,
+          label: student.alias,
+          detail: `${group.subject} · ${group.className}${student.isAbsent ? " · abwesend" : ""}`,
+        })),
+      ),
+    ],
+    [draftBundle.workspaces, studentDatabase.groups],
+  );
   const emptyGroupExam = useMemo(() => normalizeExamStructure(createEmptyExam()), []);
   const hasNoAssignedWorkspaceForActiveGroup = Boolean(activeGroupId) && visibleWorkspaces.length === 0;
   const activeGroup = getStudentGroup(studentDatabase, activeGroupId);
@@ -1356,7 +1458,7 @@ function App() {
   const resetDemoWorkspace = () => {
     const nextDraftBundle = createDemoDraftBundle();
     const nextArchiveEntries: ExpectationArchiveEntry[] = [];
-    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces[0]);
+    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces);
 
     setDraftBundle(nextDraftBundle);
     setArchiveEntries(nextArchiveEntries);
@@ -1777,6 +1879,37 @@ function App() {
     setActiveTab("builder");
   };
 
+  const openGlobalSearchResult = (resultId: string) => {
+    if (resultId.startsWith("workspace:")) {
+      const workspaceId = resultId.slice("workspace:".length);
+      const workspace = draftBundle.workspaces.find((entry) => entry.id === workspaceId);
+      if (!workspace) return;
+
+      if (workspace.assignedGroupId) setActiveGroupId(workspace.assignedGroupId);
+      setActiveSchoolYearFilter(getWorkspaceSchoolYear(workspace) || "all");
+      setActiveWorkspaceId(workspace.id);
+      setActiveTab("builder");
+      return;
+    }
+
+    if (!resultId.startsWith("student:")) return;
+    const studentId = resultId.slice("student:".length);
+    const group = studentDatabase.groups.find((entry) => entry.students.some((student) => student.id === studentId));
+    if (!group) return;
+
+    const latestWorkspace = draftBundle.workspaces
+      .filter((workspace) => workspace.assignedGroupId === group.id)
+      .sort((left, right) => {
+        const leftDate = left.exam.meta.examDate || left.updatedAt;
+        const rightDate = right.exam.meta.examDate || right.updatedAt;
+        return rightDate.localeCompare(leftDate);
+      })[0];
+    if (latestWorkspace) {
+      setActiveSchoolYearFilter(getWorkspaceSchoolYear(latestWorkspace) || "all");
+    }
+    openStudentInBuilder(studentId, { groupId: group.id, workspaceId: latestWorkspace?.id });
+  };
+
   const setActiveWorkspaceExam = (updater: Exam | ((current: Exam) => Exam)) => {
     const activeWorkspaceId = activeWorkspace?.id;
     if (!activeWorkspaceId) return;
@@ -1865,6 +1998,7 @@ function App() {
 
     setCollapsedSectionIds([]);
     setActiveTab("builder");
+    setPendingSchoolYearCreation(null);
     const assignedGroup =
       config.target === "new"
         ? getStudentGroup(studentDatabaseRef.current, config.targetGroupId || activeGroupId || "")
@@ -2749,29 +2883,12 @@ function App() {
       setRestoreCheckpoint(captureRestoreCheckpoint());
     }
 
-    const nextExam = normalizeExamStructure(createEmptyExam());
-    nextExam.meta.schoolYear = normalizedSchoolYear;
-    nextExam.meta.course = studentListMode === "keep" ? activeGroup?.className ?? "" : "";
-    const schoolYearWorkspaceCount = draftBundle.workspaces.filter(
-      (workspace) => getWorkspaceSchoolYear(workspace) === normalizedSchoolYear,
-    ).length;
-    const nextWorkspace = createDraftWorkspace(
-      nextExam,
-      `Klassenarbeit ${schoolYearWorkspaceCount + 1}`,
-      null,
-      studentListMode === "keep" ? activeGroupId || null : null,
-    );
-
-    setDraftBundle((current) => ({
-      activeWorkspaceId: nextWorkspace.id,
-      workspaces: [...current.workspaces, nextWorkspace],
-    }));
-    lastVersionedExamByWorkspaceRef.current = {
-      ...lastVersionedExamByWorkspaceRef.current,
-      [nextWorkspace.id]: JSON.stringify(nextWorkspace.exam),
-    };
+    setPendingSchoolYearCreation({
+      schoolYear: normalizedSchoolYear,
+      course: studentListMode === "keep" ? activeGroup?.className ?? "" : "",
+    });
     setActiveSchoolYearFilter(normalizedSchoolYear);
-    setActiveTab("builder");
+    setActiveTab("guidedBuilder");
     setCollapsedSectionIds([]);
 
     if (studentListMode === "delete") {
@@ -2790,11 +2907,24 @@ function App() {
 
     pushNotice(
       "success",
-      "Neues Schuljahr angelegt",
+      "Vorlage für neues Schuljahr wählen",
       studentListMode === "keep"
-        ? `${normalizedSchoolYear} ist aktiv. Bestehende Schülerlisten bleiben verfügbar.`
-        : `${normalizedSchoolYear} ist aktiv. Schülerlisten und Bewertungen wurden aus dem aktuellen Browserprofil entfernt.`,
+        ? `${normalizedSchoolYear} ist aktiv. Wähle jetzt eine Vorlage für die erste Klassenarbeit.`
+        : `${normalizedSchoolYear} ist aktiv. Schülerlisten und Bewertungen wurden entfernt; wähle jetzt eine Vorlage für die erste Klassenarbeit.`,
     );
+  };
+
+  const handleRemoveWorkspace = (workspaceId: string) => {
+    const deletesLastVisibleWorkspace =
+      activeSchoolYearFilter !== "all" &&
+      visibleWorkspaces.length === 1 &&
+      visibleWorkspaces[0]?.id === workspaceId;
+
+    removeWorkspace(workspaceId);
+
+    if (deletesLastVisibleWorkspace) {
+      setActiveSchoolYearFilter("all");
+    }
   };
 
   const handleImportDatabase = (file: File, passphrase: string) => {
@@ -3649,6 +3779,8 @@ function App() {
           onTabKeyDown={handleTabKeyDown}
           localSaveState={localSaveState}
           tabButtonRefs={tabButtonRefs}
+          searchResults={globalSearchResults}
+          onSearchResultSelect={openGlobalSearchResult}
         />
 
         <section className="mb-5 no-print">
@@ -3945,13 +4077,20 @@ function App() {
                     initialTotalPoints={summary.totalMaxPoints}
                     initialGradeScale={exam.gradeScale}
                     initialSubject={activeGroup?.subject || ""}
-                    initialMeta={exam.meta}
+                    initialMeta={{
+                      ...exam.meta,
+                      schoolYear: pendingSchoolYearCreation?.schoolYear ?? exam.meta.schoolYear,
+                      course: pendingSchoolYearCreation?.course ?? exam.meta.course,
+                    }}
                     initialSections={exam.sections.map((section) => ({
                       id: section.id,
                       title: section.title,
                       weight: section.weight,
                       description: section.description,
                     }))}
+                    initialTarget={pendingSchoolYearCreation ? "new" : undefined}
+                    lockTargetToNew={Boolean(pendingSchoolYearCreation)}
+                    allowUnassignedWorkspace={Boolean(pendingSchoolYearCreation)}
                     onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
                       applyTemplate(
                         template,
@@ -4769,7 +4908,7 @@ function App() {
         onCancel={() => setWorkspaceToDelete(null)}
         onConfirm={() => {
           if (workspaceToDelete) {
-            removeWorkspace(workspaceToDelete.id);
+            handleRemoveWorkspace(workspaceToDelete.id);
           }
           setWorkspaceToDelete(null);
         }}

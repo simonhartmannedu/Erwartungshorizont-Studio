@@ -70,6 +70,9 @@ interface Props {
   initialSections: GuidedSectionDraft[];
   initialSubject?: string;
   initialMeta: ExamMeta;
+  initialTarget?: GuidedBuilderTarget;
+  lockTargetToNew?: boolean;
+  allowUnassignedWorkspace?: boolean;
   onSelectTemplate: (
     template: ExamTemplateDefinition,
     target: GuidedBuilderTarget,
@@ -568,6 +571,9 @@ export const GuidedExamBuilder = ({
   initialSections,
   initialSubject = "",
   initialMeta,
+  initialTarget = "new",
+  lockTargetToNew = false,
+  allowUnassignedWorkspace = false,
   onSelectTemplate,
   onApplyManualStructure,
   onApplyPdfSuggestion,
@@ -588,7 +594,7 @@ export const GuidedExamBuilder = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
   const [activeTemplateSectionIndex, setActiveTemplateSectionIndex] = useState(0);
-  const [target, setTarget] = useState<GuidedBuilderTarget>("new");
+  const [target, setTarget] = useState<GuidedBuilderTarget>(initialTarget);
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
   const [showMetaSettings, setShowMetaSettings] = useState(false);
   const [manualSubject, setManualSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
@@ -679,11 +685,15 @@ export const GuidedExamBuilder = ({
   );
   const difference = Math.round((100 - weightSum) * 100) / 100;
   const hasEmptyTitles = sectionDrafts.some((section) => !section.title.trim());
-  const canCreate = target === "current" || Boolean(targetGroupId);
+  const canCreate = target === "current" || Boolean(targetGroupId) || allowUnassignedWorkspace;
 
   useEffect(() => {
     setMetaDraft({ ...initialMeta });
   }, [initialMeta]);
+
+  useEffect(() => {
+    setTarget(initialTarget);
+  }, [initialTarget]);
 
   useEffect(() => {
     setTargetGroupId((current) => {
@@ -805,7 +815,7 @@ export const GuidedExamBuilder = ({
 
   const renderTargetControls = () => (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className={`grid gap-3 ${lockTargetToNew ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
         <button
           type="button"
           className={`${target === "new" ? "button-primary" : "button-secondary"} w-full justify-start gap-2 p-3 text-left`}
@@ -814,14 +824,16 @@ export const GuidedExamBuilder = ({
           <PlusIcon />
           Neue Klassenarbeit
         </button>
-        <button
-          type="button"
-          className={`${target === "current" ? "button-primary" : "button-secondary"} w-full justify-start gap-2 p-3 text-left`}
-          onClick={() => setTarget("current")}
-        >
-          <ReplaceIcon />
-          Aktuelle ersetzen
-        </button>
+        {!lockTargetToNew ? (
+          <button
+            type="button"
+            className={`${target === "current" ? "button-primary" : "button-secondary"} w-full justify-start gap-2 p-3 text-left`}
+            onClick={() => setTarget("current")}
+          >
+            <ReplaceIcon />
+            Aktuelle ersetzen
+          </button>
+        ) : null}
       </div>
       {target === "new" &&
         (groups.length > 0 ? (
@@ -834,6 +846,10 @@ export const GuidedExamBuilder = ({
               ))}
             </select>
           </Field>
+        ) : allowUnassignedWorkspace ? (
+          <DismissibleCallout tone="info" resetKey="template-decision-unassigned-workspace">
+            Die Klassenarbeit wird zunächst ohne Lerngruppe angelegt und kann später zugeordnet werden.
+          </DismissibleCallout>
         ) : (
           <DismissibleCallout tone="warning" resetKey="template-decision-no-groups">
             Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden.
