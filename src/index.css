@@ -3807,16 +3807,12 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
-  border-radius: 2rem;
-  border: 1px solid color-mix(in srgb, var(--app-field-focus) 18%, var(--app-border));
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--app-field-focus) 12%, transparent), transparent 56%),
-    linear-gradient(145deg, color-mix(in srgb, var(--app-panel-bg) 98%, white 2%), color-mix(in srgb, var(--app-panel-bg) 88%, transparent));
-  padding: 1rem 1.15rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.25rem 0;
   text-align: left;
-  box-shadow:
-    0 3px 8px color-mix(in srgb, var(--app-text-strong) 4%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
+  box-shadow: none;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -3826,11 +3822,9 @@
 }
 
 .security-key-trigger:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--app-field-focus) 28%, var(--app-secondary-border-hover));
-  box-shadow:
-    0 5px 12px color-mix(in srgb, var(--app-text-strong) 5%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 30%, transparent);
+  transform: none;
+  box-shadow: none;
+  opacity: 0.82;
 }
 
 .security-key-trigger:hover:not(:disabled) .security-key-trigger-key {
@@ -3852,10 +3846,9 @@
 }
 
 .security-key-trigger:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--app-field-ring) 92%, transparent),
-    0 3px 8px color-mix(in srgb, var(--app-text-strong) 4%, transparent);
+  outline: 2px solid var(--app-field-focus);
+  outline-offset: 4px;
+  box-shadow: none;
 }
 
 .security-key-trigger:disabled {
