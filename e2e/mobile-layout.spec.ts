@@ -6,6 +6,12 @@ test("nutzt auf kleinen Displays die verfügbare Breite ohne horizontalen Seiten
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
 
+  await expect(page.locator(".local-save-status")).toContainText(/Speichert lokal|Lokal gespeichert/);
+  await expect(page.getByRole("button", { name: /Arbeitskontext/ })).toBeVisible();
+  await expect(page.locator("#mobile-selection-panel")).not.toBeVisible();
+  await page.getByRole("button", { name: /Arbeitskontext/ }).click();
+  await expect(page.locator("#mobile-selection-panel")).toBeVisible();
+
   const layout = await page.evaluate(() => {
     const main = document.querySelector("main");
     const aside = document.querySelector("aside");

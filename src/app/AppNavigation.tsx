@@ -1,12 +1,12 @@
 import type { KeyboardEvent, MutableRefObject } from "react";
-import { ArchiveIcon, DashboardIcon, GroupIcon, HomeIcon, PlusIcon, SaveIcon } from "../components/icons";
+import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon } from "../components/icons";
 
 export type AppTabId = "home" | "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
   { id: "groups", label: "Lerngruppen" },
-  { id: "guidedBuilder", label: "EWH-Templates" },
+  { id: "guidedBuilder", label: "EWH erstellen" },
   { id: "builder", label: "EWH-Editor" },
   { id: "archive", label: "EWH-Archiv" },
   { id: "backup", label: "Backup" },
@@ -36,7 +36,7 @@ type AppNavigationProps = {
   activeTab: AppTabId;
   onSelectTab: (tabId: AppTabId) => void;
   onTabKeyDown: (event: KeyboardEvent<HTMLButtonElement>, tabId: AppTabId) => void;
-  onSaveToArchive: () => void;
+  localSaveState: "saving" | "saved" | "failed";
   tabButtonRefs: MutableRefObject<Record<AppTabId, HTMLButtonElement | null>>;
 };
 
@@ -45,12 +45,12 @@ export const AppNavigation = ({
   activeTab,
   onSelectTab,
   onTabKeyDown,
-  onSaveToArchive,
+  localSaveState,
   tabButtonRefs,
 }: AppNavigationProps) => (
   <div className="mb-6 no-print">
-    <div className="flex min-w-0 gap-3 overflow-x-auto py-1">
-      <div role="tablist" aria-label="Hauptbereiche" className="flex min-w-max gap-3">
+    <div className="flex min-w-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:gap-3">
+      <div role="tablist" aria-label="Hauptbereiche" className="flex min-w-0 gap-3 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -72,14 +72,21 @@ export const AppNavigation = ({
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={onSaveToArchive}
-        className="button-secondary ml-auto shrink-0 gap-2 whitespace-nowrap border-l pl-4"
+      <div
+        className={`local-save-status local-save-status-${localSaveState} shrink-0 self-start sm:ml-auto sm:self-auto sm:border-l sm:pl-4`}
+        role="status"
+        aria-live="polite"
+        title="Änderungen werden automatisch und nur in diesem Browser gespeichert. Ein verschlüsseltes Backup erstellst du im Bereich Backup."
       >
-        <SaveIcon />
-        Im Archiv speichern
-      </button>
+        {localSaveState === "saving" ? <LoadingIcon className="local-save-status-spinner" /> : localSaveState === "saved" ? <CheckIcon /> : <SaveIcon />}
+        <span>
+          {localSaveState === "saving"
+            ? "Speichert lokal …"
+            : localSaveState === "saved"
+              ? "Lokal gespeichert"
+              : "Lokales Speichern fehlgeschlagen"}
+        </span>
+      </div>
     </div>
   </div>
 );

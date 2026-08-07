@@ -21,6 +21,7 @@ export type RecentWorkspace = {
 type HomeDashboardProps = {
   activeWorkspaceLabel: string | null;
   activeWorkspaceUpdatedAt: string | null;
+  hasActiveGroup: boolean;
   activeGroupLabel: string | null;
   activeGroupStudentCount: number;
   workspaceCount: number;
@@ -31,6 +32,7 @@ type HomeDashboardProps = {
   relevantStudentCount: number;
   backupSummary: string;
   backupDetail: string;
+  backupTone: "info" | "warning" | "success" | "danger";
   recentWorkspaces: RecentWorkspace[];
   onNavigate: (destination: HomeDestination) => void;
   onOpenWorkspace: (workspaceId: string) => void;
@@ -53,6 +55,7 @@ const formatUpdate = (value: string | null) => {
 export const HomeDashboard = ({
   activeWorkspaceLabel,
   activeWorkspaceUpdatedAt,
+  hasActiveGroup,
   activeGroupLabel,
   activeGroupStudentCount,
   workspaceCount,
@@ -63,6 +66,7 @@ export const HomeDashboard = ({
   relevantStudentCount,
   backupSummary,
   backupDetail,
+  backupTone,
   recentWorkspaces,
   onNavigate,
   onOpenWorkspace,
@@ -71,6 +75,14 @@ export const HomeDashboard = ({
   const hasActiveWorkspace = Boolean(activeWorkspaceLabel);
   const correctionProgress = relevantStudentCount > 0 ? Math.round((correctedCount / relevantStudentCount) * 100) : 0;
   const today = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
+  const nextStep = !hasActiveGroup
+    ? { destination: "groups" as const, label: "Lerngruppe anlegen" }
+    : !hasActiveWorkspace
+      ? { destination: "guidedBuilder" as const, label: "EWH erstellen" }
+      : relevantStudentCount > correctedCount
+        ? { destination: "builder" as const, label: "Korrektur fortsetzen" }
+        : { destination: "builder" as const, label: "EWH bearbeiten" };
+  const backupNeedsAttention = backupTone === "warning" || backupTone === "danger";
 
   return (
     <section className="home-dashboard no-print" aria-label="Übersicht">
@@ -80,8 +92,8 @@ export const HomeDashboard = ({
           <h2>Übersicht</h2>
           <p>{today}</p>
         </div>
-        <button type="button" className="button-primary gap-2" onClick={() => onNavigate("guidedBuilder")}>
-          <PlusIcon /> Neuen EWH erstellen
+        <button type="button" className="button-primary gap-2" onClick={() => onNavigate(nextStep.destination)}>
+          {nextStep.destination === "groups" ? <GroupIcon /> : <PlusIcon />} {nextStep.label}
         </button>
       </header>
 
@@ -106,8 +118,8 @@ export const HomeDashboard = ({
           ) : (
             <div className="home-empty-state">
               <div className="home-empty-icon"><TemplateIcon className="h-5 w-5" /></div>
-              <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage oder lege einen EWH manuell an.</p></div>
-              <button type="button" onClick={() => onNavigate("guidedBuilder")}>Vorlagen öffnen <ChevronRightIcon /></button>
+              <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage, nutze eine PDF oder lege die Struktur selbst an.</p></div>
+              <button type="button" onClick={() => onNavigate(nextStep.destination)}>{nextStep.label} <ChevronRightIcon /></button>
             </div>
           )}
         </article>
@@ -118,10 +130,12 @@ export const HomeDashboard = ({
             <div className="home-status-copy"><p>Korrekturstand</p><strong>{relevantStudentCount ? `${correctedCount} / ${relevantStudentCount}` : "Noch offen"}</strong><span>{activeGroupStudentCount ? `${activeGroupStudentCount} Lernende in der aktiven Gruppe` : "Keine aktive Lerngruppe"}</span></div>
             {relevantStudentCount > 0 ? <div className="home-progress" aria-label={`${correctionProgress} Prozent korrigiert`}><i style={{ width: `${correctionProgress}%` }} /></div> : null}
           </article>
-          <article className="home-status-card home-status-card-backup">
+          <article className={`home-status-card home-status-card-backup home-status-card-backup-${backupTone}`}>
             <div className="home-status-icon"><SaveIcon className="h-4 w-4" /></div>
             <div className="home-status-copy"><p>Sicherung</p><strong>{backupSummary}</strong><span>{backupDetail}</span></div>
-            <button type="button" onClick={onQuickBackup} aria-label="Backup jetzt erstellen"><ChevronRightIcon /></button>
+            <button type="button" onClick={onQuickBackup} aria-label={backupNeedsAttention ? "Jetzt Backup erstellen" : "Backup öffnen"}>
+              <span>{backupNeedsAttention ? "Jetzt sichern" : "Backup"}</span><ChevronRightIcon />
+            </button>
           </article>
         </aside>
       </div>
@@ -144,7 +158,7 @@ export const HomeDashboard = ({
         <section className="home-shortcuts-panel">
           <div className="home-panel-header"><div><p className="home-eyebrow">Schnellzugriff</p><h3>Verwalten</h3></div></div>
           <div className="home-shortcuts">
-            <button type="button" onClick={() => onNavigate("guidedBuilder")}><TemplateIcon /><span>Vorlagen</span></button>
+            <button type="button" onClick={() => onNavigate("guidedBuilder")}><TemplateIcon /><span>EWH erstellen</span></button>
             <button type="button" onClick={() => onNavigate("groups")}><GroupIcon /><span>Lerngruppen</span></button>
             <button type="button" onClick={() => onNavigate("archive")}><ArchiveIcon /><span>Archiv <em>{archiveCount}</em></span></button>
             <button type="button" onClick={onQuickBackup}><SaveIcon /><span>Backup</span></button>

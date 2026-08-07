@@ -157,6 +157,9 @@
     --app-soft-ring: rgba(245, 158, 11, 0.35);
     --app-selection-bg: #fde68a;
     --app-selection-text: #14213d;
+    --app-status-success: #15803d;
+    --app-status-warning: #b45309;
+    --app-status-danger: #dc2626;
     color: var(--app-text-strong);
     background: var(--app-bg);
   }
@@ -199,6 +202,9 @@
     --app-soft-ring: rgba(217, 173, 91, 0.22);
     --app-selection-bg: rgba(217, 173, 91, 0.4);
     --app-selection-text: #ffffff;
+    --app-status-success: #6ee7b7;
+    --app-status-warning: #fcd34d;
+    --app-status-danger: #fda4af;
     color: var(--app-text);
     background: var(--app-bg);
   }
@@ -3990,6 +3996,25 @@
     max-width: 34rem;
     margin-inline: auto;
   }
+
+  .mobile-selection-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid var(--app-secondary-border);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--app-panel-bg) 94%, var(--app-secondary-bg));
+    padding: 0.75rem 0.9rem;
+    color: var(--app-text-strong);
+    text-align: left;
+  }
+  .mobile-selection-toggle span { display: grid; min-width: 0; gap: 0.18rem; }
+  .mobile-selection-toggle small { color: var(--app-label); font-size: 0.65rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+  .mobile-selection-toggle strong { overflow: hidden; font-size: 0.86rem; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-selection-toggle svg { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--app-label); }
+  .mobile-selection-toggle:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
 }
 
 @media (max-width: 639px) {
@@ -4300,7 +4325,12 @@
 
   .app-footer-grid {
     grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
-    align-items: start;
+    align-items: stretch;
+  }
+
+  .app-footer-copy,
+  .app-footer-support {
+    height: 100%;
   }
 }
 
@@ -4914,9 +4944,11 @@
   .home-status-copy p { margin: 0; color: var(--app-label); font-size: 0.67rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
   .home-status-copy strong { overflow: hidden; color: var(--app-text-strong); font-size: 0.86rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
   .home-status-copy span { overflow: hidden; color: var(--app-text); font-size: 0.7rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-  .home-status-card > button { margin-left: auto; color: var(--app-label); transition: color 150ms ease, transform 150ms ease; }
+  .home-status-card > button { display: inline-flex; align-items: center; gap: 0.2rem; margin-left: auto; color: var(--app-label); font-size: 0.72rem; font-weight: 750; transition: color 150ms ease, transform 150ms ease; }
   .home-status-card > button:hover { color: var(--app-text-strong); transform: translateX(2px); }
   .home-status-card > button:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 3px; border-radius: 0.3rem; }
+  .home-status-card-backup-warning { border-color: color-mix(in srgb, var(--app-status-warning) 38%, var(--app-secondary-border)); }
+  .home-status-card-backup-danger { border-color: color-mix(in srgb, var(--app-status-danger) 42%, var(--app-secondary-border)); }
   .home-progress { position: absolute; right: 1rem; bottom: 0.7rem; left: 4.05rem; height: 0.22rem; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--app-secondary-border) 72%, transparent); }
   .home-progress i { display: block; height: 100%; border-radius: inherit; background: var(--home-accent); transition: width 300ms ease; }
 
@@ -5086,27 +5118,22 @@
   .workspace-inline-notice { width: 100%; margin: -0.25rem 0 0; padding-bottom: 0.5rem; color: var(--app-label); font-size: 0.75rem; }
   .workspace-version-drawer { border-color: var(--app-secondary-border); background: color-mix(in srgb, var(--app-panel-bg) 96%, transparent); box-shadow: 0 0.75rem 1.8rem color-mix(in srgb, var(--app-text-strong) 5%, transparent); }
 
-  .header-display-group { display: flex; align-items: end; gap: 0.45rem; }
-  .backup-status-indicator {
-    display: inline-grid;
-    width: 2.75rem;
-    min-width: 2.75rem;
-    height: 2.75rem;
-    place-items: center;
-    border: 1px solid currentColor;
-    border-radius: 0.8rem;
-    background: color-mix(in srgb, currentColor 9%, var(--app-secondary-bg));
-    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  .local-save-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-height: 2.5rem;
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    font-weight: 650;
+    white-space: nowrap;
   }
-  .backup-status-indicator svg { width: 1rem; height: 1rem; }
-  .backup-status-indicator:hover { background: color-mix(in srgb, currentColor 17%, var(--app-secondary-bg)); box-shadow: 0 0.55rem 1.3rem color-mix(in srgb, currentColor 14%, transparent); transform: translateY(-1px); }
-  .backup-status-indicator:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
-  .backup-status-indicator-success { color: #15803d; }
-  .backup-status-indicator-info, .backup-status-indicator-warning { color: #b45309; }
-  .backup-status-indicator-danger { color: #dc2626; }
-  :root.dark .backup-status-indicator-success { color: #6ee7b7; }
-  :root.dark .backup-status-indicator-info, :root.dark .backup-status-indicator-warning { color: #fcd34d; }
-  :root.dark .backup-status-indicator-danger { color: #fda4af; }
+  .local-save-status svg { width: 1rem; height: 1rem; }
+  .local-save-status-saving { color: var(--app-status-warning); }
+  .local-save-status-saved { color: var(--app-status-success); }
+  .local-save-status-failed { color: var(--app-status-danger); }
+  .local-save-status-spinner { animation: local-save-status-spin 850ms linear infinite; }
+  @keyframes local-save-status-spin { to { transform: rotate(360deg); } }
 
   @media (max-width: 767px) {
     .workspace-bar { align-items: stretch; flex-direction: column; gap: 0.55rem; padding: 0.65rem 0; }
