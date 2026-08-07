@@ -47,13 +47,18 @@ jobs:
       - name: Run unit tests
         run: npm run test
 
-      - name: Build production bundle
-        run: npm run build
+      - name: Build app bundles
+        run: |
+          rm -rf .pages
+          npm run build -- --outDir .pages/app
 
       - name: Build demo bundle
         env:
           VITE_APP_MODE: demo
-        run: npm run build:demo
+        run: npm run build:demo -- --outDir .pages/demo
+
+      - name: Add landing page
+        run: cp -R landing/. .pages/
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
@@ -72,7 +77,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: .pages
 
   deploy:
     needs: build
