@@ -20,8 +20,30 @@ const SQLITE_DATABASE_NAME = "ewh-app-storage";
 const SQLITE_DATABASE_VERSION = 1;
 const SQLITE_OBJECT_STORE = "sqlite";
 const SQLITE_BLOB_KEY = "app-storage";
+const SQLITE_REVISION_KEY = "app-storage-revision";
 
 type SqliteDatabase = import("sql.js").Database;
+
+export class StorageWriteConflictError extends Error {
+  constructor() {
+    super("Der lokale Datenstand wurde in einem anderen geöffneten Tab geändert.");
+    this.name = "StorageWriteConflictError";
+  }
+}
+
+type StorageFailureListener = (error: unknown) => void;
+const storageFailureListeners = new Set<StorageFailureListener>();
+
+export const subscribeToStorageFailures = (listener: StorageFailureListener) => {
+  storageFailureListeners.add(listener);
+  return () => {
+    storageFailureListeners.delete(listener);
+  };
+};
+
+const reportStorageFailure = (error: unknown) => {
+  storageFailureListeners.forEach((listener) => listener(error));
+};
 
 const normalizeExamDraft = (exam: Exam): Exam => ({
   ...exam,
@@ -282,25 +304,52 @@ const waitForTransaction = (transaction: IDBTransaction) =>
     transaction.oncomplete = () => resolve();
   });
 
-const readPersistedDatabaseBlob = async () => {
+const readPersistedDatabaseSnapshot = async () => {
   const database = await openIndexedDb();
   try {
     const transaction = database.transaction(SQLITE_OBJECT_STORE, "readonly");
     const store = transaction.objectStore(SQLITE_OBJECT_STORE);
-    const blob = await runRequest(store.get(SQLITE_BLOB_KEY));
+    const [blob, revisionValue] = await Promise.all([
+      runRequest(store.get(SQLITE_BLOB_KEY)),
+      runRequest(store.get(SQLITE_REVISION_KEY)),
+    ]);
     await waitForTransaction(transaction);
-    return blob instanceof Uint8Array ? blob : blob instanceof ArrayBuffer ? new Uint8Array(blob) : null;
+    const bytes = blob instanceof Uint8Array ? blob : blob instanceof ArrayBuffer ? new Uint8Array(blob) : null;
+    const revision = typeof revisionValue === "number" && Number.isSafeInteger(revisionValue) && revisionValue >= 0
+      ? revisionValue
+      : 0;
+    return { bytes, revision };
   } finally {
     database.close();
   }
 };
 
-const writePersistedDatabaseBlob = async (bytes: Uint8Array) => {
+const writePersistedDatabaseBlob = async (bytes: Uint8Array, expectedRevision: number | null): Promise<number> => {
   const database = await openIndexedDb();
   try {
     const transaction = database.transaction(SQLITE_OBJECT_STORE, "readwrite");
-    transaction.objectStore(SQLITE_OBJECT_STORE).put(bytes, SQLITE_BLOB_KEY);
+    const store = transaction.objectStore(SQLITE_OBJECT_STORE);
+    const revisionValue = await runRequest(store.get(SQLITE_REVISION_KEY));
+    const currentRevision =
+      typeof revisionValue === "number" && Number.isSafeInteger(revisionValue) && revisionValue >= 0
+        ? revisionValue
+        : 0;
+
+    if (expectedRevision !== null && currentRevision !== expectedRevision) {
+      transaction.abort();
+      try {
+        await waitForTransaction(transaction);
+      } catch {
+        // The conflict is intentional; expose a stable application error below.
+      }
+      throw new StorageWriteConflictError();
+    }
+
+    const nextRevision = currentRevision + 1;
+    store.put(bytes, SQLITE_BLOB_KEY);
+    store.put(nextRevision, SQLITE_REVISION_KEY);
     await waitForTransaction(transaction);
+    return nextRevision;
   } finally {
     database.close();
   }
@@ -334,7 +383,7 @@ const clearLegacyDataKeys = () => {
   window.localStorage.removeItem(STUDENT_DATABASE_KEY);
 };
 
-const migrateLegacyLocalStorage = async (database: SqliteDatabase) => {
+const migrateLegacyLocalStorage = async (database: SqliteDatabase, expectedRevision: number) => {
   const draft = parseDraftBundle(window.localStorage.getItem(DRAFT_KEY));
   const archiveEntries = parseArchiveEntries(window.localStorage.getItem(ARCHIVE_KEY));
   const studentDatabase = parseStudentDatabaseState(window.localStorage.getItem(STUDENT_DATABASE_KEY));
@@ -349,12 +398,14 @@ const migrateLegacyLocalStorage = async (database: SqliteDatabase) => {
     writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(createStoredApplicationData(studentDatabase)));
   }
 
-  await writePersistedDatabaseBlob(database.export());
+  const nextRevision = await writePersistedDatabaseBlob(database.export(), expectedRevision);
   clearLegacyDataKeys();
+  return nextRevision;
 };
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeQueue = Promise.resolve();
+let persistedRevision: number | null = null;
 
 const getDatabase = () => {
   if (!databasePromise) {
@@ -367,8 +418,9 @@ const getDatabase = () => {
         locateFile: () => wasmUrl,
       });
 
-      const persistedBytes = await readPersistedDatabaseBlob();
-      const database = persistedBytes ? new SQL.Database(persistedBytes) : new SQL.Database();
+      const persistedSnapshot = await readPersistedDatabaseSnapshot();
+      persistedRevision = persistedSnapshot.revision;
+      const database = persistedSnapshot.bytes ? new SQL.Database(persistedSnapshot.bytes) : new SQL.Database();
 
       database.run(
         `CREATE TABLE IF NOT EXISTS app_state (
@@ -383,7 +435,7 @@ const getDatabase = () => {
       const hasPersistedStudentDatabase = readStoredValue(database, STUDENT_DATABASE_KEY) !== null;
 
       if (!hasPersistedDraft && !hasPersistedArchive && !hasPersistedStudentDatabase) {
-        await migrateLegacyLocalStorage(database);
+        persistedRevision = await migrateLegacyLocalStorage(database, persistedSnapshot.revision);
       }
 
       return database;
@@ -397,11 +449,17 @@ const enqueueWrite = (operation: (database: SqliteDatabase) => void | Promise<vo
   const nextWrite = writeQueue.then(async () => {
     const database = await getDatabase();
     await operation(database);
-    await writePersistedDatabaseBlob(database.export());
+    if (persistedRevision === null) {
+      throw new Error("Der lokale Speicherstand wurde nicht initialisiert.");
+    }
+    persistedRevision = await writePersistedDatabaseBlob(database.export(), persistedRevision);
   });
 
-  writeQueue = nextWrite.catch(() => undefined);
-  return nextWrite;
+  const handledWrite = nextWrite.catch((error: unknown) => {
+    reportStorageFailure(error);
+  });
+  writeQueue = handledWrite;
+  return handledWrite;
 };
 
 export const loadDraft = async (): Promise<DraftBundle | null> => {

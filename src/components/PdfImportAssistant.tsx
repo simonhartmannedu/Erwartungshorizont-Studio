@@ -6,6 +6,8 @@ import { buildPdfRiskInspectionText, classifyPdfDataRisks, hasHighRiskFindings, 
 import { DataRiskFinding, ImportedExamSuggestion, PdfAnswerStyle, PdfAssistanceGoal, PdfDocumentKind, PdfExtractionResult, PdfPrivacyMode, PdfSuggestRequest } from "../pdf/types";
 import { Badge, Card, DismissibleCallout } from "./ui";
 
+const MAX_PDF_SIZE_BYTES = 8 * 1024 * 1024;
+
 type ConsentState = {
   accepted: boolean;
   version: string;
@@ -62,10 +64,24 @@ export const PdfImportAssistant = ({
     setPendingReview(null);
 
     if (!file) return;
+    if (!consent.accepted) {
+      setFilename("");
+      setExtraction(null);
+      setError("Bitte bestätige zuerst die Einwilligung. Erst danach wird eine PDF verarbeitet.");
+      event.target.value = "";
+      return;
+    }
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setFilename(file.name);
       setExtraction(null);
       setError("Bitte eine PDF-Datei auswählen.");
+      return;
+    }
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setFilename(file.name);
+      setExtraction(null);
+      setError("Die PDF ist zu groß. Bitte verwende eine Datei bis maximal 8 MB.");
+      event.target.value = "";
       return;
     }
 
@@ -205,11 +221,46 @@ export const PdfImportAssistant = ({
         </label>
       </div>
 
+      <section className="rounded-3xl border p-4">
+        <div className="flex items-start gap-3">
+          <input
+            id="pdf-import-consent"
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-slate-300"
+            checked={consent.accepted}
+            onChange={(event) =>
+              setConsent({
+                accepted: event.target.checked,
+                version: PDF_CONSENT_VERSION,
+                acceptedAt: event.target.checked ? new Date().toISOString() : null,
+              })
+            }
+            disabled={disabled || loading}
+          />
+          <label htmlFor="pdf-import-consent" className="text-sm leading-6" style={{ color: "var(--app-text)" }}>
+            Ich bestätige, dass die ausgewählte PDF für Extraktion, OCR und einen automatischen Strukturvorschlag im
+            EWH-Editor verarbeitet werden darf. Die PDF wird erst nach dieser Bestätigung übertragen und ich prüfe die
+            Inhalte vor der Übernahme fachlich und datenschutzrechtlich.
+          </label>
+        </div>
+      </section>
+
       <div className="space-y-3">
         <label className="block">
           <span className="label">PDF-Datei</span>
-          <input className="field file:mr-4 file:border-0 file:bg-transparent" type="file" accept="application/pdf,.pdf" onChange={(event) => void handleFileChange(event)} disabled={disabled || loading} />
+          <input
+            className="field file:mr-4 file:border-0 file:bg-transparent"
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(event) => void handleFileChange(event)}
+            disabled={disabled || loading || !consent.accepted}
+          />
         </label>
+        {!consent.accepted ? (
+          <p className="text-sm" style={{ color: "var(--app-text-muted)" }}>
+            Bitte bestätige zuerst die Einwilligung. Danach kann eine PDF bis 8 MB ausgewählt werden.
+          </p>
+        ) : null}
         {filename ? <p className="text-sm" style={{ color: "var(--app-text)" }}>Ausgewählt: {filename}</p> : null}
       </div>
 
@@ -241,29 +292,6 @@ export const PdfImportAssistant = ({
           </div>
         </div>
       ) : null}
-
-      <section className="rounded-3xl border p-4">
-        <div className="flex items-start gap-3">
-          <input
-            id="pdf-import-consent"
-            type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-slate-300"
-            checked={consent.accepted}
-            onChange={(event) =>
-              setConsent({
-                accepted: event.target.checked,
-                version: PDF_CONSENT_VERSION,
-                acceptedAt: event.target.checked ? new Date().toISOString() : null,
-              })
-            }
-            disabled={disabled || loading}
-          />
-          <label htmlFor="pdf-import-consent" className="text-sm leading-6" style={{ color: "var(--app-text)" }}>
-            Ich bestätige, dass die ausgewählte PDF für Extraktion, OCR und einen automatischen Strukturvorschlag im
-            EWH-Editor verwendet werden darf und dass ich die Inhalte vor der Übernahme fachlich und datenschutzrechtlich prüfe.
-          </label>
-        </div>
-      </section>
 
       {pendingReview ? (
         <div className="rounded-3xl border border-amber-300 bg-amber-50/70 p-4" role="alert">

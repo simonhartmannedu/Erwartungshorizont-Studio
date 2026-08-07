@@ -1,94 +1,85 @@
 # Erwartungshorizont-Studio
 
-Eine lokale Browser-Anwendung für Lehrkräfte: Erwartungshorizonte erstellen, Lerngruppen organisieren, korrigieren, bewerten, archivieren und Berichte exportieren.
+Erwartungshorizont-Studio hilft Lehrkräften, Erwartungshorizonte, Lerngruppen und Korrekturen an einem Ort zu organisieren – ohne Nutzerkonto und ohne zentrale Schülerdatenbank.
 
-[Demo öffnen](https://simonhartmannedu.github.io/Erwartungshorizont-Studio/) · [Architektur](docs/architecture.md)
+[Demo öffnen](https://simonhartmannedu.github.io/Erwartungshorizont-Studio/)
 
 ![Screenshot von Erwartungshorizont-Studio](erwartungshorizontstudio.png)
 
-## Hauptfunktionen
+## Wofür die Anwendung gedacht ist
 
-- Erwartungshorizonte, Aufgaben, Punkte und Notenschlüssel erstellen und wiederverwenden.
-- Lerngruppen lokal anlegen oder aus CSV/XLSX/ODS importieren.
-- Punkte, Kommentare und Signaturen pro Schüler verwalten.
-- Korrekturen, Berichte und lokale Exporte (PDF, DOCX, XLSX, ODS, CSV und Druck) erstellen.
-- Erwartungshorizonte und Schuljahre archivieren.
-- Verschlüsselte lokale Backups erstellen und wiederherstellen.
-- Ausschließlich fiktive Demo-Daten nutzen.
+Der Schulalltag rund um Klassenarbeiten besteht oft aus vielen kleinen, fehleranfälligen Schritten: Kriterien festlegen, Punkte nachrechnen, Listen pflegen, Rückmeldungen schreiben und den Überblick über bereits korrigierte Arbeiten behalten. EWH-Studio bündelt diese Schritte in einer lokalen Anwendung.
 
-## Local-first und Datenschutz
+Damit kannst du:
 
-Ihre Schülerdaten verlassen dieses Gerät nicht. Es gibt kein verpflichtendes Benutzerkonto und keine zentrale Schülerdatenbank.
+- Erwartungshorizonte, Aufgaben, Punkte und Notenschlüssel erstellen und wiederverwenden;
+- Lerngruppen aus CSV-, XLSX- oder ODS-Dateien übernehmen;
+- Punkte, Kommentare und Unterschriften pro Schüler*in erfassen;
+- Korrekturübersichten, Bewertungsbögen sowie CSV-, XLSX-, ODS- und DOCX-Dateien erzeugen;
+- abgeschlossene Arbeiten archivieren und für das nächste Schuljahr wiederverwenden;
+- verschlüsselte Sicherungen deines Arbeitsstands anlegen.
 
-Die Daten liegen in diesem Browser. Erstellen Sie deshalb regelmäßig eine verschlüsselte Sicherung. Browserprofil-Löschung, privates Surfen, Speicherbereinigung oder ein Gerätewechsel können lokale Daten entfernen.
+Die Demo enthält ausschließlich fiktive Daten.
 
-Die Anwendung unterstützt eine datensparsame, lokale Verarbeitung. Die datenschutzrechtliche Bewertung hängt vom konkreten schulischen Einsatz ab. Details enthält [Daten und Datenschutz](docs/data-and-privacy.md).
+## Warum das für Lehrkräfte praktisch ist
 
-## Open Core und AGPL-3.0
+EWH-Studio soll keine zusätzliche Verwaltungsplattform sein. Es ist ein Werkzeug für die Zeit zwischen Aufgabenplanung, Korrektur und Rückgabe:
 
-EWH-Studio ist Open Core. Der gesamte lokale Community-Kern steht unter der [AGPL-3.0](LICENSE). Lehrkräfte können sämtliche Kernfunktionen kostenlos, lokal und ohne Cloud nutzen.
+- Ein Erwartungshorizont kann für ähnliche Lerngruppen kopiert statt neu geschrieben werden.
+- Der Notenschlüssel und die Punktesummen bleiben direkt neben den Kriterien sichtbar.
+- Für jede Lerngruppe bleibt nachvollziehbar, was schon korrigiert, gedruckt oder zurückgegeben wurde.
+- Berichte und Tabellen entstehen aus denselben Daten wie die Korrektur – kein doppeltes Übertragen.
+- Archive helfen, bewährte Aufgabenformate über Schuljahre hinweg weiterzuentwickeln.
 
-**AGPL bedeutet:** Sie dürfen den Community-Kern nutzen, untersuchen, ändern und weitergeben. Wer eine geänderte Version weitergibt, muss den entsprechenden Quellcode unter der AGPL bereitstellen. Wird eine geänderte Version als Netzwerkdienst angeboten, muss den Nutzenden dieses Dienstes ebenfalls der entsprechende Quellcode zugänglich sein.
+Langfristig entsteht so eine persönliche, gut wiederverwendbare Sammlung von Kriterien und Arbeitsständen. Die Hoheit über diese Sammlung bleibt bei dir.
 
-**Open Core bedeutet hier:** Der lokale Community-Kern bleibt vollständig nutzbar und benötigt keine kommerziellen Module. Spätere kommerzielle Erweiterungen dürften den Kern nur über dokumentierte Schnittstellen ergänzen, niemals Datenzugriff, Backup, Restore oder lokale Korrektur einschränken.
+## Datenschutz und Sicherheit – verständlich erklärt
 
-- **Nutzer** dürfen den Kern kostenlos einsetzen, kopieren, anpassen und weitergeben – unter den Bedingungen der AGPL.
-- **Entwickler** dürfen beitragen und Forks veröffentlichen; Änderungen am abgeleiteten Kern bleiben bei Weitergabe unter AGPL.
-- **Schulen** dürfen den Kern selbst betreiben, anpassen und auch kommerzielle Dienstleister beauftragen. Ein verpflichtender Cloud- oder Kontozwang entsteht dadurch nicht.
+Die Anwendung ist **local-first**: Arbeitsstände und Schülerdaten liegen im Browser auf deinem Gerät. Es gibt kein verpflichtendes Konto, keine Telemetrie und keinen zentralen Synchronisationsserver.
 
-Details, Grenzen und keine Rechtsberatung: [Lizenzierung](docs/licensing.md), [Open-Core-Abgrenzung](docs/open-core.md), [Open-Core-Roadmap](docs/open-core-roadmap.md).
+- Namen werden für geschützte Lerngruppen verschlüsselt gespeichert.
+- Punkte, Kommentare und Signaturen können mit dem Gruppenpasswort geschützt werden.
+- Backup-Dateien werden mit einem von dir gewählten Passwort verschlüsselt; dieses Passwort speichert die Anwendung nicht.
+- Eine PDF wird erst nach einer ausdrücklichen Einwilligung verarbeitet. Die Anwendung weist vor der Übernahme auf mögliche sensible Inhalte hin.
+- Bei mehreren geöffneten Tabs stoppt die Anwendung das Speichern, bevor ein neuerer Datenstand überschrieben werden könnte.
 
-## Entwicklungsstatus
+Das ersetzt keine schulische Datenschutzprüfung: Besonders auf gemeinsam genutzten Geräten solltest du geschützte Gruppen sperren, den Browser nach der Arbeit schließen und regelmäßig ein verschlüsseltes Backup außerhalb des Browserprofils ablegen.
 
-Die Anwendung wird schrittweise modernisiert. Kritische Daten-, Sicherheits- und Korrekturabläufe werden durch automatisierte Tests, Dokumentation und Reviews abgesichert.
+Wichtig: Das Löschen des Browserprofils, privates Surfen, Speicherbereinigung oder ein Gerätewechsel können lokale Daten entfernen. Ein verlorenes Backup-Passwort kann nicht wiederhergestellt werden. Mehr dazu steht in [Datenschutz und Datenhaltung](docs/data-and-privacy.md).
 
-## Installation und Entwicklung
+## Schnellstart
 
-Voraussetzungen: Node.js 24 oder eine mit Vite 6 kompatible Node-Version sowie npm.
+Voraussetzung ist Node.js 24 oder eine mit Vite 6 kompatible Node-Version.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Wichtige Befehle:
+Für die normale Nutzung genügt die gehostete Demo oder eine lokale Installation. Der PDF-Import benötigt lokal zusätzlich Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) und Tesseract mit Deutsch und Englisch.
+
+## Für die Wartung
+
+Das Projekt ist bewusst auch für eine einzelne wartende Person überschaubar gehalten. Vor einer Änderung reichen in der Regel diese Prüfungen:
 
 ```bash
 npm run lint
 npm run typecheck
 npm run test
-npm run test:watch
-npm run test:e2e
-npm run test:regression
 npm run build
-npm run build:demo
-npm run check:release
 ```
 
-`npm run check:release` führt Lint, Typecheck, Unit-Tests, Offline-Regression und Produktions-Build aus. `npm run test:e2e` prüft kritische Browserpfade lokal mit Playwright.
+Bei Änderungen an Berechnung, Speicher, Import, Export oder Backups zusätzlich:
 
-## Datenhaltung, Backup und Wiederherstellung
+```bash
+npm run test:regression
+npm run test:e2e
+```
 
-Arbeitsstände, Archive und die Schülerdatenbank liegen als browserlokale SQLite-Datenbank (`sql.js`) in IndexedDB. Theme-Einstellungen liegen in `localStorage`. Es gibt keinen Synchronisationsserver.
+Die kompakte technische Orientierung steht in [Entwicklung und Wartung](docs/development.md). Bitte niemals echte Schülerdaten, Passwörter, Schlüssel oder Backups in Commits, Tests oder Screenshots verwenden.
 
-Vollbackups sind verschlüsselte JSON-Dateien. Das beim Export gewählte Passwort wird nicht gespeichert. Vor einer Wiederherstellung bestehender Daten ist eine explizite Bestätigung erforderlich; optional kann vorher eine zusätzliche verschlüsselte Sicherung erstellt werden.
+## Lizenz und Beiträge
 
-## Sicherheit
+Der Community-Kern ist unter [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`) lizenziert. Er bleibt lokal und ohne Cloud nutzbar. Hinweise zu Drittmaterial stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Geschützte Gruppen und Backups verwenden Browser-Kryptografie. Entschlüsselte Daten liegen während einer aktiven Sitzung im Browser-Arbeitsspeicher vor. Bei gemeinsam genutzten Geräten sollten Gruppen nach der Korrektur gesperrt, der Browser geschlossen und regelmäßig verschlüsselte Backups erstellt werden. Sicherheitslücken bitte gemäß [SECURITY.md](SECURITY.md) vertraulich melden.
-
-## Mitwirken
-
-Beiträge sind willkommen. Bitte beachten Sie [CONTRIBUTING.md](CONTRIBUTING.md), den [Code of Conduct](CODE_OF_CONDUCT.md) und die [Sicherheitsrichtlinie](SECURITY.md). Echte Schülerdaten gehören niemals in Issues, Pull Requests, Screenshots oder Tests.
-
-## Dokumentation
-
-- [Architektur](docs/architecture.md)
-- [Daten und Datenschutz](docs/data-and-privacy.md)
-- [Entwicklerhandbuch](docs/developer-guide.md)
-- [Lizenzierung](docs/licensing.md)
-- [Open Core](docs/open-core.md)
-
-## Lizenz
-
-Der Community-Kern ist unter [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`) lizenziert. Die Lizenz gilt nicht automatisch für Marken oder separat gekennzeichnete Drittinhalte. Siehe [NOTICE](NOTICE) und [docs/licensing.md](docs/licensing.md).
+Sicherheitslücken bitte gemäß [SECURITY.md](SECURITY.md) vertraulich melden. Hinweise für Beiträge enthält [CONTRIBUTING.md](CONTRIBUTING.md).

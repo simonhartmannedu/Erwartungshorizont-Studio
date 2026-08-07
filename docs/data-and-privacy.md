@@ -1,109 +1,31 @@
-# Data and Privacy
+# Datenschutz und Datenhaltung
 
-Erwartungshorizont-Studio is local-first. The current app does not provide multi-user sync or a hosted student-data backend. This document explains where data is stored, what is encrypted, and what developers must preserve when changing privacy-sensitive code.
+EWH-Studio verarbeitet Arbeitsstände und Schülerdaten grundsätzlich lokal im Browser. Es gibt kein verpflichtendes Benutzerkonto, keine zentrale Schülerdatenbank und keine Telemetrie.
 
-## Storage Locations
+## Wo Daten liegen
 
-| Data | Location | Notes |
-| --- | --- | --- |
-| Draft workspaces | Browser SQLite via `sql.js`, persisted in IndexedDB | Contains editable exams and local versions. |
-| EWH archive | Browser SQLite via `sql.js`, persisted in IndexedDB | Contains reusable exam snapshots. |
-| Student database | Browser SQLite via `sql.js`, persisted in IndexedDB | Contains groups, aliases, encrypted names, assessments, comments, and signatures. |
-| Theme settings | `localStorage` | Non-sensitive UI preferences. |
-| Backup status | `localStorage` | Only time of the last successful backup and, if applicable, time plus generic error code of the last failed export. No backup contents or student data. |
-| Backups | User-downloaded JSON file | Encrypted when exported through the app backup flow; new exports use backup format v2. |
-| Print windows | Browser popup/print context | Temporary output generated client-side. |
+| Daten | Speicherort |
+| --- | --- |
+| Klassenarbeiten, Archive und Schülerdaten | sql.js-Datenbank in IndexedDB des Browsers |
+| Darstellung und Backup-Status | `localStorage` des Browsers |
+| Sicherungen | von dir heruntergeladene, verschlüsselte Datei |
 
-Browser profile deletion, storage cleanup, private browsing mode, or device changes can remove local data. Users should export encrypted backups for recovery.
+Löscht du Browserdaten, verwendest ein privates Fenster oder wechselst das Gerät, können lokale Daten verloren gehen. Deshalb sind regelmäßige verschlüsselte Backups wichtig.
 
-The visible backup status distinguishes no data, no previous backup, current, recommended, urgent and failed backup attempts. It is a reminder only; it does not send data or create automatic backups.
+## Schutz geschützter Lerngruppen
 
-## Protection Model
+Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare und Unterschriften werden während einer entsperrten Sitzung im Arbeitsspeicher benötigt und beim Speichern beziehungsweise Sperren wieder verschlüsselt oder aus dem aktiven Zustand entfernt. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.
 
-The app uses local aliases and optional group protection.
+Auf einem gemeinsam genutzten Gerät: Gruppe nach der Korrektur sperren, Browser schließen und kein Passwort im Browser speichern.
 
-```mermaid
-flowchart TD
-  Group[Student group] --> Token[Group token/password]
-  Token --> Unlock[Unlock in browser session]
-  Unlock --> Hydrate[Decrypt sensitive fields]
-  Hydrate --> Correct[Enter scores/comments/signatures]
-  Correct --> Persist[Persist encrypted assessment data]
-  Lock[Lock or timeout] --> Scrub[Remove hydrated sensitive values from state]
-```
+## PDF-Import
 
-Important behaviors:
+Eine PDF wird erst nach deiner ausdrücklichen Einwilligung ausgewählt und verarbeitet. Die Anwendung begrenzt die Größe, zeigt eine redigierte Vorschau und warnt bei erkannten sensiblen Mustern. Vor der Übernahme prüfst du Inhalt und Datenschutz selbst.
 
-- Student aliases remain usable without revealing real names.
-- Protected group names and assessment details are decrypted only after unlock.
-- Group tokens/passwords are not stored in clear text.
-- Locking a group scrubs hydrated sensitive assessment data from active state.
-- Encrypted backups need the backup password chosen during export.
+Im lokalen Entwicklungsbetrieb erfolgt die Verarbeitung im lokalen Dienst. Wenn du die Anwendung anders bereitstellst, muss vorher klar sein, wo die PDF verarbeitet wird und welche Daten das Gerät verlassen könnten.
 
-## Sensitive Data
+## Backups und Wiederherstellung
 
-Potentially sensitive fields include:
+Vollbackups enthalten Arbeitsstände, Archive und – falls vorhanden – Schülerdaten. Du verschlüsselst sie mit einem selbst gewählten Passwort. Die Anwendung zeigt den Import vor dem Ersetzen an, verlangt eine Bestätigung und bietet eine Vorab-Sicherung an.
 
-- Student names.
-- Task scores tied to a student.
-- Teacher comments.
-- Signature data URLs.
-- Imported student lists.
-- PDF text containing names or identifying details.
-
-When changing student workflows, keep hydration/scrubbing paths in `src/utils/students.ts` intact.
-
-## PDF Import Privacy
-
-PDF import has additional risk because source documents may contain personal data. The app mitigates this through:
-
-- Consent-oriented import flow.
-- Text extraction preview.
-- Privacy warnings.
-- Redaction-oriented checks in `src/pdf/privacy.ts`.
-- Local Vite middleware rather than a remote PDF service in the current setup.
-
-Developers should not bypass the preview/consent step when changing PDF import. Users remain responsible for removing unnecessary personal data before import.
-
-## Backups
-
-The full app backup can include:
-
-- Workspaces.
-- Archive entries.
-- Student groups.
-- Student assessments.
-- Export timestamp.
-
-Backups are designed as user-controlled files. Treat backup parsing as an import boundary:
-
-- Validate structure before applying.
-- Validate the decrypted workspace, archive and student-data domains before showing an import preview.
-- Accept the documented v1 legacy format and v2 format; reject unknown future versions before decryption or restore.
-- The v2 schema version is stored inside the encrypted payload. Outer metadata contains only backup kind, format version and export timestamp.
-- Show an import preview.
-- Before a full restore or student-database replacement, require explicit confirmation and offer a user-selected encrypted backup of the current state.
-- Keep rollback behavior working.
-- Do not silently overwrite active local data.
-
-Backup passwords are never persisted. A password entered for the optional pre-restore backup is held only while that dialog is open and is cleared when the dialog is closed or the restore is applied.
-
-## Deployment Notes
-
-Static hosting is suitable for demo mode and browser-only workflows. PDF import requires backend routes equivalent to the local Vite middleware plus Poppler/Tesseract availability.
-
-If the app is deployed beyond local use, document:
-
-- Where PDF processing happens.
-- Whether any student data leaves the browser.
-- Which logs may contain request metadata.
-- How backups and browser storage are handled.
-
-## Developer Checklist for Privacy-Sensitive Changes
-
-- Does the change introduce a new field containing student data?
-- Is the field included in encryption/hydration/scrubbing where appropriate?
-- Does backup export/import preserve it safely?
-- Does print/export expose it intentionally?
-- Does demo mode avoid real personal data?
-- Is the behavior documented in README or this file?
+Ein Backup-Passwort kann nicht wiederhergestellt werden. Teste eine wichtige Sicherung gelegentlich in einem getrennten Browserprofil.

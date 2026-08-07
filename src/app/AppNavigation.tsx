@@ -49,8 +49,8 @@ export const AppNavigation = ({
   tabButtonRefs,
 }: AppNavigationProps) => (
   <div className="mb-6 no-print">
-    <div className="flex gap-3 overflow-x-auto py-1">
-      <div role="tablist" aria-label="Hauptbereiche" className="flex gap-3">
+    <div className="flex min-w-0 gap-3 overflow-x-auto py-1">
+      <div role="tablist" aria-label="Hauptbereiche" className="flex min-w-max gap-3">
         {tabs.map((tab) => (
           <button
             key={tab.id}
