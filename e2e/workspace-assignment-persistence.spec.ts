@@ -9,7 +9,8 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.evaluate(() => window.history.replaceState({}, "", "/?demo=1"));
 
-  await page.getByRole("button", { name: "Im Archiv speichern" }).click();
+  await page.getByRole("tab", { name: "EWH-Editor" }).click();
+  await page.getByRole("button", { name: "Diese Arbeit archivieren" }).click();
   await expect(page.getByRole("heading", { name: "Erwartungshorizont-Archiv" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Lerngruppen" }).click();
@@ -26,6 +27,7 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.getByLabel("Lerngruppe auswählen").selectOption({ label: groupLabel });
   await page.getByTitle("Ausgewählter Lerngruppe zuordnen").click();
   await expect(page.getByRole("tab", { name: "EWH-Editor", selected: true })).toBeVisible();
+  await expect(page.locator(".local-save-status")).toHaveClass(/local-save-status-saved/);
 
   await page.reload();
   await page.getByRole("tab", { name: "EWH-Archiv" }).click();
