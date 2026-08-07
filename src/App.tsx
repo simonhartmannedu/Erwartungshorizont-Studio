@@ -2302,10 +2302,23 @@ function App() {
     const targetGroup = getStudentGroup(studentDatabase, groupId);
     if (!targetGroup) return;
 
-    addWorkspace(createEditableExamFromArchive(entry, { duplicate: true }), {
-      activeArchiveEntryId: entry.id,
-      assignedGroupId: targetGroup.id,
-    });
+    const workspace = createDraftWorkspace(
+      normalizeExamStructure(createEditableExamFromArchive(entry, { duplicate: true })),
+      getNextWorkspaceLabel(draftBundle.workspaces),
+      entry.id,
+      targetGroup.id,
+    );
+    const nextBundle = {
+      activeWorkspaceId: workspace.id,
+      workspaces: [...draftBundle.workspaces, workspace],
+    };
+
+    setDraftBundle(nextBundle);
+    trackLocalSave(saveDraft(nextBundle));
+    lastVersionedExamByWorkspaceRef.current = {
+      ...lastVersionedExamByWorkspaceRef.current,
+      [workspace.id]: JSON.stringify(workspace.exam),
+    };
     setActiveGroupId(targetGroup.id);
     setActiveStudentId(targetGroup.students[0]?.id ?? "");
     setCollapsedSectionIds([]);

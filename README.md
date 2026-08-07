@@ -78,6 +78,10 @@ npm run test:e2e
 
 Die kompakte technische Orientierung steht in [Entwicklung und Wartung](docs/development.md). Bitte niemals echte Schülerdaten, Passwörter, Schlüssel oder Backups in Commits, Tests oder Screenshots verwenden.
 
+## AI-unterstützte Entwicklung
+
+Teile der Entwicklung erfolgen AI-unterstützt. Änderungen werden vor der Veröffentlichung geprüft; die fachliche, pädagogische und datenschutzrechtliche Verantwortung bleibt bei den Projektverantwortlichen und Nutzenden.
+
 ## Lizenz und Beiträge
 
 Der Community-Kern ist unter [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`) lizenziert. Er bleibt lokal und ohne Cloud nutzbar. Hinweise zu Drittmaterial stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
