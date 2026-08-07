@@ -13,6 +13,13 @@ export const visualThemeOptions: { value: VisualTheme; label: string }[] = [
   { value: "video-tutorial", label: "Video-Tutorial" },
 ];
 
+export type GlobalSearchResult = {
+  id: string;
+  kind: "student" | "workspace";
+  label: string;
+  detail: string;
+};
+
 type AppHeaderProps = {
   currentSchoolYearPillLabel: string;
   visualTheme: VisualTheme;
@@ -52,8 +59,8 @@ export const AppHeader = ({
         </div>
       </div>
     </div>
-    <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto">
-      <label className="block w-full min-w-0 sm:min-w-[210px] sm:w-auto">
+    <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:justify-self-end">
+      <label className="block w-full min-w-0 sm:min-w-[170px] sm:w-auto">
         <span className="label inline-flex items-center gap-2">
           <PaletteIcon className="h-3.5 w-3.5" />
           Darstellung

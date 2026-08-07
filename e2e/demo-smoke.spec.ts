@@ -16,5 +16,15 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+  const globalSearch = page.getByRole("textbox", { name: "Schüler:innen und Klassenarbeiten durchsuchen" });
+  const globalSearchResults = page.locator("#global-search-results");
+  await globalSearch.fill("Unit 5");
+  const unit5Result = globalSearchResults.getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ });
+  await expect(unit5Result).toBeVisible();
+  await unit5Result.click();
+  await expect(page.getByRole("tab", { name: "EWH-Editor" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Titel der Klassenarbeit")).toHaveValue("Englisch-Klassenarbeit Unit 5");
+  await globalSearch.fill("Student 8");
+  await expect(globalSearchResults.getByRole("option", { name: /Student 8/ })).toBeVisible();
   expect(externalRequests).toEqual([]);
 });
