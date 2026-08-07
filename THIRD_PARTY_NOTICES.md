@@ -9,6 +9,10 @@ Die lokalen WOFF2-Teilmengen von Fraunces und Manrope stehen unter der SIL Open 
 
 Die Schriftdateien sind unveränderte Webfont-Teilmengen. Der Projektcode bleibt `AGPL-3.0-only`; die Schriftlizenzen werden dadurch nicht geändert.
 
+## Marken-Icons
+
+Die in der Landingpage verwendeten SVG-Marken-Icons für GitHub, Ko-fi und Bluesky stammen von [Simple Icons](https://simpleicons.org/) und stehen unter [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
 ## Projektdateien
 
 `public/signature.svg` wird weder versioniert noch ausgeliefert. Die Herkunft der Favicons muss vor einem öffentlichen Release bestätigt oder durch eindeutig dokumentierte Ersatzgrafiken ersetzt werden.
