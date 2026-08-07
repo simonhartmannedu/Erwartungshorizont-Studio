@@ -469,9 +469,17 @@ export const StudentRosterPanel = ({
                     onChange={handleStudentImport}
                   />
                 </label>
+                <a
+                  className="button-secondary w-full gap-2 sm:w-auto"
+                  href="/klassenimport-vorlage.csv"
+                  download="klassenimport-vorlage.csv"
+                >
+                  <DownloadIcon />
+                  CSV-Vorlage herunterladen
+                </a>
               </div>
               <p className="status-note mt-3 text-xs leading-5">
-                Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>.
+                Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>. Die Vorlage enthält drei Beispieldatensätze.
               </p>
             </div>
 
