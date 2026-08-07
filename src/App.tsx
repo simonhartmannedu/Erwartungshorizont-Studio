@@ -282,9 +282,37 @@ const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
 const DEMO_WORKSPACE_UNIT_4_ID = "demo-klassenarbeit-unit-4";
 const DEMO_WORKSPACE_UNIT_5_ID = "demo-klassenarbeit-unit-5";
-const DEMO_SEED_VERSION = "student-demo-v3";
+const DEMO_SEED_VERSION = "student-demo-v4";
 const DEMO_SEED_VERSION_KEY = "ewh-demo-seed-version";
 const DEMO_TIMESTAMP = "2026-03-23T09:00:00.000Z";
+const DEMO_CLASS_PASSWORD = "demo";
+const DEMO_STUDENT_NAMES = [
+  "Mia Schneider",
+  "Emir Yılmaz",
+  "Olena Kovalenko",
+  "Aarav Sharma",
+  "Hannah Becker",
+  "Zeynep Kaya",
+  "Maksym Shevchenko",
+  "Ananya Patel",
+  "Leon Fischer",
+  "Elif Demir",
+  "Sofia Melnyk",
+  "Vihaan Gupta",
+  "Greta Wagner",
+  "Can Özdemir",
+  "Kateryna Bondarenko",
+  "Isha Nair",
+  "Jonas Weber",
+  "Derya Aydın",
+  "Andriy Tkachenko",
+  "Kabir Singh",
+  "Lina Hoffmann",
+  "Mert Arslan",
+  "Yuliia Kovalchuk",
+  "Riya Iyer",
+  "Noah Hartmann",
+] as const;
 const FIRST_RUN_GUIDE_DISMISSED_KEY = "ewh-first-run-guide-dismissed";
 const runtimeQuery = new URLSearchParams(window.location.search);
 const isDemoModeEnabled = import.meta.env.VITE_APP_MODE === "demo" || runtimeQuery.get("demo") === "1";
@@ -723,19 +751,17 @@ function App() {
       ],
     };
   };
-  const createDemoStudentDatabase = (workspaces: DraftWorkspace[]): StudentDatabase => {
-    const placeholderEncryptedName = {
-      ciphertext: "demo",
-      iv: "demo",
-      salt: "demo",
-    };
-    const students = Array.from({ length: 25 }, (_, index) => ({
-      id: `demo-student-${index + 1}`,
-      alias: `Student ${index + 1}`,
-      encryptedName: placeholderEncryptedName,
-      isAbsent: index === 24,
-      createdAt: DEMO_TIMESTAMP,
-    }));
+  const createDemoStudentDatabase = async (workspaces: DraftWorkspace[]): Promise<StudentDatabase> => {
+    const passwordVerifier = await createPasswordVerifier(DEMO_GROUP_ID, DEMO_CLASS_PASSWORD);
+    const students = await Promise.all(
+      DEMO_STUDENT_NAMES.map(async (fullName, index) => ({
+        id: `demo-student-${index + 1}`,
+        alias: `Student ${index + 1}`,
+        encryptedName: await encryptText(fullName, DEMO_CLASS_PASSWORD),
+        isAbsent: index === DEMO_STUDENT_NAMES.length - 1,
+        createdAt: DEMO_TIMESTAMP,
+      })),
+    );
     const snapScore = (value: number, maxPoints: number) =>
       Math.min(maxPoints, Math.max(0, Math.round(value * 2) / 2));
     const basePerformance = [
@@ -800,7 +826,7 @@ function App() {
           id: DEMO_GROUP_ID,
           subject: "Englisch",
           className: "8b Demo",
-          passwordVerifier: null,
+          passwordVerifier,
           defaultSignatureDataUrl: null,
           students,
           createdAt: DEMO_TIMESTAMP,
@@ -848,6 +874,9 @@ function App() {
   const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
   const unlockedGroupPasswordsRef = useRef<Record<string, string>>({});
   const [unlockedGroupIds, setUnlockedGroupIds] = useState<string[]>([]);
+  const [globalSearchStudentNames, setGlobalSearchStudentNames] = useState<Record<string, string>>({});
+  const [sensitiveSearchSessionVersion, setSensitiveSearchSessionVersion] = useState(0);
+  const searchNameResolutionVersionRef = useRef(0);
   const unlockActivityAtRef = useRef<number>(Date.now());
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(() => loadLastBackupAt());
   const [lastBackupFailure, setLastBackupFailure] = useState(() => loadLastBackupFailure());
@@ -955,6 +984,12 @@ function App() {
     });
   };
 
+  const clearSensitiveGlobalSearch = () => {
+    searchNameResolutionVersionRef.current += 1;
+    setGlobalSearchStudentNames({});
+    setSensitiveSearchSessionVersion((current) => current + 1);
+  };
+
   const lockUnlockedGroupsWithSnapshot = (
     passwordByGroupId: Record<string, string>,
     notice?: { title: string; detail?: string; tone?: AppNoticeTone },
@@ -991,6 +1026,7 @@ function App() {
 
   const clearUnlockedGroups = (notice?: { title: string; detail?: string; tone?: AppNoticeTone }) => {
     const lockedPasswords = { ...unlockedGroupPasswordsRef.current };
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
     lockUnlockedGroupsWithSnapshot(lockedPasswords, notice);
@@ -1033,6 +1069,7 @@ function App() {
 
     const lockedPassword = nextPasswords[groupId];
     delete nextPasswords[groupId];
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = nextPasswords;
     setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
     lockUnlockedGroupsWithSnapshot({ [groupId]: lockedPassword }, notice);
@@ -1062,7 +1099,7 @@ function App() {
         const nextDraftBundle = shouldSeedDemoWorkspace ? createDemoDraftBundle() : storedDraft ?? createInitialDraftBundle();
         const nextArchiveEntries = shouldSeedDemoWorkspace ? [] : storedArchiveEntries;
         const nextStudentDatabase = shouldSeedDemoWorkspace
-          ? createDemoStudentDatabase(nextDraftBundle.workspaces)
+          ? await createDemoStudentDatabase(nextDraftBundle.workspaces)
           : storedStudentDatabase;
 
         if (shouldSeedDemoWorkspace) {
@@ -1140,6 +1177,51 @@ function App() {
   useEffect(() => {
     studentDatabaseRef.current = studentDatabase;
   }, [studentDatabase]);
+
+  useEffect(() => {
+    const resolutionVersion = ++searchNameResolutionVersionRef.current;
+    const unlockedGroupIdSet = new Set(unlockedGroupIds);
+    const unlockedGroups = studentDatabase.groups.filter((group) => unlockedGroupIdSet.has(group.id));
+    const unlockedStudentIds = new Set(unlockedGroups.flatMap((group) => group.students.map((student) => student.id)));
+
+    setGlobalSearchStudentNames((current) =>
+      Object.fromEntries(Object.entries(current).filter(([studentId]) => unlockedStudentIds.has(studentId))),
+    );
+
+    if (unlockedGroups.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        unlockedGroups.flatMap((group) => {
+          const password = unlockedGroupPasswordsRef.current[group.id]?.trim() ?? "";
+          if (!password) return [];
+
+          return group.students.map(async (student) => {
+            try {
+              const fullName = await decryptText(student.encryptedName, password);
+              return [group.id, password, student.id, fullName] as const;
+            } catch {
+              return null;
+            }
+          });
+        }),
+      );
+
+      if (cancelled || resolutionVersion !== searchNameResolutionVersionRef.current) return;
+
+      const resolvedNames = Object.fromEntries(
+        entries.flatMap((entry) =>
+          entry && unlockedGroupPasswordsRef.current[entry[0]] === entry[1] ? [[entry[2], entry[3]] as const] : [],
+        ),
+      );
+      setGlobalSearchStudentNames(resolvedNames);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [studentDatabase.groups, unlockedGroupIds]);
 
   useEffect(() => {
     const refreshUnlockActivity = () => {
@@ -1345,7 +1427,10 @@ function App() {
     [activeGroupId, activeSchoolYearFilter, draftBundle.workspaces],
   );
   const globalSearchResults = useMemo<GlobalSearchResult[]>(
-    () => [
+    () => {
+      const unlockedGroupIdSet = new Set(unlockedGroupIds);
+
+      return [
       ...draftBundle.workspaces.map((workspace) => ({
         id: `workspace:${workspace.id}`,
         kind: "workspace" as const,
@@ -1361,12 +1446,15 @@ function App() {
         group.students.map((student) => ({
           id: `student:${student.id}`,
           kind: "student" as const,
-          label: student.alias,
+          label: unlockedGroupIdSet.has(group.id) && globalSearchStudentNames[student.id]
+            ? `${globalSearchStudentNames[student.id]} · ${student.alias}`
+            : student.alias,
           detail: `${group.subject} · ${group.className}${student.isAbsent ? " · abwesend" : ""}`,
         })),
       ),
-    ],
-    [draftBundle.workspaces, studentDatabase.groups],
+      ];
+    },
+    [draftBundle.workspaces, globalSearchStudentNames, studentDatabase.groups, unlockedGroupIds],
   );
   const emptyGroupExam = useMemo(() => normalizeExamStructure(createEmptyExam()), []);
   const hasNoAssignedWorkspaceForActiveGroup = Boolean(activeGroupId) && visibleWorkspaces.length === 0;
@@ -1456,27 +1544,30 @@ function App() {
   });
 
   const resetDemoWorkspace = () => {
-    const nextDraftBundle = createDemoDraftBundle();
-    const nextArchiveEntries: ExpectationArchiveEntry[] = [];
-    const nextStudentDatabase = createDemoStudentDatabase(nextDraftBundle.workspaces);
+    void (async () => {
+      const nextDraftBundle = createDemoDraftBundle();
+      const nextArchiveEntries: ExpectationArchiveEntry[] = [];
+      const nextStudentDatabase = await createDemoStudentDatabase(nextDraftBundle.workspaces);
 
-    setDraftBundle(nextDraftBundle);
-    setArchiveEntries(nextArchiveEntries);
-    trackLocalSave(saveExpectationArchive(nextArchiveEntries));
-    markDemoSeedCurrent();
-    setStudentDatabase(nextStudentDatabase);
-    setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
-    setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
-    unlockedGroupPasswordsRef.current = {};
-    setUnlockedGroupIds([]);
-    setRestoreCheckpoint(null);
-    setPendingImportPreview(null);
-    setLastBackupAt(null);
-    setLastBackupFailure(null);
-    clearBackupComplete();
-    clearBackupFailure();
-    setActiveTab("home");
-    pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
+      setDraftBundle(nextDraftBundle);
+      setArchiveEntries(nextArchiveEntries);
+      trackLocalSave(saveExpectationArchive(nextArchiveEntries));
+      markDemoSeedCurrent();
+      setStudentDatabase(nextStudentDatabase);
+      setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
+      setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
+      clearSensitiveGlobalSearch();
+      unlockedGroupPasswordsRef.current = {};
+      setUnlockedGroupIds([]);
+      setRestoreCheckpoint(null);
+      setPendingImportPreview(null);
+      setLastBackupAt(null);
+      setLastBackupFailure(null);
+      clearBackupComplete();
+      clearBackupFailure();
+      setActiveTab("home");
+      pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
+    })();
   };
 
   const applyImportedState = (
@@ -1490,6 +1581,7 @@ function App() {
     setArchiveEntries(nextArchiveEntries);
     trackLocalSave(saveExpectationArchive(nextArchiveEntries));
     setStudentDatabase(nextStudentDatabase);
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
 
@@ -1524,6 +1616,7 @@ function App() {
     setArchiveEntries(restoreCheckpoint.archiveEntries);
     trackLocalSave(saveExpectationArchive(restoreCheckpoint.archiveEntries));
     setStudentDatabase(restoreCheckpoint.studentDatabase);
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
     setActiveGroupId(restoreCheckpoint.activeGroupId);
@@ -2543,6 +2636,7 @@ function App() {
     }
 
     unlockActivityAtRef.current = Date.now();
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [groupId]: password };
     setUnlockedGroupIds((current) => (current.includes(groupId) ? current : [...current, groupId]));
     const hydratedDatabase = await hydrateSensitiveAssessmentsForGroup(studentDatabaseRef.current, groupId, password);
@@ -2588,6 +2682,7 @@ function App() {
 
     const nextPasswords = { ...unlockedGroupPasswordsRef.current };
     delete nextPasswords[groupId];
+    clearSensitiveGlobalSearch();
     unlockedGroupPasswordsRef.current = nextPasswords;
     setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
     setStudentDatabase((current) => scrubSensitiveAssessmentsForGroups(current, [groupId]));
@@ -2664,6 +2759,7 @@ function App() {
       ),
     }));
     const nextPasswords = { ...unlockedGroupPasswordsRef.current };
+    if (groupId in nextPasswords) clearSensitiveGlobalSearch();
     delete nextPasswords[groupId];
     unlockedGroupPasswordsRef.current = nextPasswords;
     setUnlockedGroupIds((current) => current.filter((id) => id !== groupId));
@@ -2895,6 +2991,7 @@ function App() {
       const emptyDatabase = createEmptyStudentDatabase();
       setStudentDatabase(emptyDatabase);
       studentDatabaseRef.current = emptyDatabase;
+      clearSensitiveGlobalSearch();
       unlockedGroupPasswordsRef.current = {};
       setUnlockedGroupIds([]);
       setActiveGroupId("");
@@ -3212,6 +3309,10 @@ function App() {
           importedStudentsPerClass.set(group.className, (importedStudentsPerClass.get(group.className) ?? 0) + 1);
         }
 
+        const lockedGroupDuringImport = Object.keys(unlockedGroupPasswordsRef.current).some(
+          (groupId) => !(groupId in nextUnlockedPasswords),
+        );
+        if (lockedGroupDuringImport) clearSensitiveGlobalSearch();
         unlockedGroupPasswordsRef.current = nextUnlockedPasswords;
         setUnlockedGroupIds(Object.keys(nextUnlockedPasswords));
         setStudentDatabase(nextDatabase);
@@ -3780,6 +3881,7 @@ function App() {
           localSaveState={localSaveState}
           tabButtonRefs={tabButtonRefs}
           searchResults={globalSearchResults}
+          sensitiveSearchSessionVersion={sensitiveSearchSessionVersion}
           onSearchResultSelect={openGlobalSearchResult}
         />
 

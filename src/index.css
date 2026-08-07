@@ -1091,7 +1091,8 @@
     top: calc(100% + 0.45rem);
     right: 0;
     left: 3.3rem;
-    overflow: hidden;
+    max-height: min(50dvh, 24rem);
+    overflow-y: auto;
     border: 1px solid var(--app-secondary-border);
     border-radius: 1rem;
     background: var(--app-panel-bg);
@@ -1157,6 +1158,13 @@
 
   .global-search-navigation {
     flex: 1 1 22rem;
+  }
+
+  @media (max-width: 639px) {
+    .global-search-navigation {
+      flex: none;
+      width: 100%;
+    }
   }
 
   @media (min-width: 640px) {

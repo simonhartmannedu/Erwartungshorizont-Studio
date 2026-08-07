@@ -14,7 +14,7 @@ Löscht du Browserdaten, verwendest ein privates Fenster oder wechselst das Ger�
 
 ## Schutz geschützter Lerngruppen
 
-Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare und Unterschriften werden während einer entsperrten Sitzung im Arbeitsspeicher benötigt und beim Speichern beziehungsweise Sperren wieder verschlüsselt oder aus dem aktiven Zustand entfernt. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.
+Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare und Unterschriften werden während einer entsperrten Sitzung im Arbeitsspeicher benötigt und beim Speichern beziehungsweise Sperren wieder verschlüsselt oder aus dem aktiven Zustand entfernt. Die globale Suche lädt Klarnamen nur für aktuell entsperrte Lerngruppen; beim Sperren oder automatischen Sitzungs-Timeout werden diese Suchdaten und die aktuelle Suchanfrage verworfen. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.
 
 Auf einem gemeinsam genutzten Gerät: Gruppe nach der Korrektur sperren, Browser schließen und kein Passwort im Browser speichern.
 

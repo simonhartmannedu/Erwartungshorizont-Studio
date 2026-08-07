@@ -43,6 +43,9 @@ export const AppStatusArea = ({
             Diese GitHub-Pages-Demo lädt beim ersten Aufruf eine lokale Beispiel-Klassenarbeit. Alle Änderungen bleiben
             nur in diesem Browser.
           </p>
+          <p className="mt-2">
+            Die Demo-Lerngruppe kannst du entsperren: Klassenpasswort <code>demo</code>.
+          </p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button type="button" className="button-secondary" onClick={onResetDemoWorkspace}>
               Demo-Daten zurücksetzen
