@@ -1,6 +1,5 @@
-import { FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SaveIcon, SunIcon } from "../components/icons";
+import { FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SunIcon } from "../components/icons";
 import type { ThemeMode, VisualTheme } from "../types";
-import { formatBackupRecency, type BackupStatus } from "../utils/backup";
 
 export const visualThemeOptions: { value: VisualTheme; label: string }[] = [
   { value: "pdf-report", label: "PDF-Report" },
@@ -24,9 +23,6 @@ type AppHeaderProps = {
   isFullscreenAvailable: boolean;
   onToggleAppFullscreen: () => void;
   onOpenUserGuide: () => void;
-  backupStatus: BackupStatus;
-  lastBackupAt: string | null;
-  onOpenBackup: () => void;
 };
 
 /** Presentational application header; state and persistence remain in App. */
@@ -40,9 +36,6 @@ export const AppHeader = ({
   isFullscreenAvailable,
   onToggleAppFullscreen,
   onOpenUserGuide,
-  backupStatus,
-  lastBackupAt,
-  onOpenBackup,
 }: AppHeaderProps) => (
   <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
     <div className="max-w-4xl">
@@ -60,35 +53,23 @@ export const AppHeader = ({
       </div>
     </div>
     <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto">
-      <div className="header-display-group w-full sm:min-w-[210px] sm:w-auto">
-        <label className="block min-w-0 flex-1">
-          <span className="label inline-flex items-center gap-2">
-            <PaletteIcon className="h-3.5 w-3.5" />
-            Darstellung
-          </span>
-          <select
-            className="field header-control"
-            value={visualTheme}
-            onChange={(event) => onVisualThemeChange(event.target.value as VisualTheme)}
-          >
-            {visualThemeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className={`backup-status-indicator backup-status-indicator-${backupStatus.tone}`}
-          onClick={onOpenBackup}
-          title={`Datensicherung: ${backupStatus.summary}. Letzte Sicherung: ${formatBackupRecency(lastBackupAt)}. ${backupStatus.detail}`}
-          aria-label={`Datensicherung öffnen. ${backupStatus.summary}`}
+      <label className="block w-full min-w-0 sm:min-w-[210px] sm:w-auto">
+        <span className="label inline-flex items-center gap-2">
+          <PaletteIcon className="h-3.5 w-3.5" />
+          Darstellung
+        </span>
+        <select
+          className="field header-control"
+          value={visualTheme}
+          onChange={(event) => onVisualThemeChange(event.target.value as VisualTheme)}
         >
-          <SaveIcon />
-          <span className="sr-only">{backupStatus.summary}</span>
-        </button>
-      </div>
+          {visualThemeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <button type="button" className="button-secondary header-control w-full gap-2 sm:w-auto" onClick={onToggleTheme}>
         {theme === "light" ? <MoonIcon /> : <SunIcon />}
         {theme === "light" ? "Dunkel" : "Hell"}

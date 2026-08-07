@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DraftWorkspace, Exam, StudentDatabase } from "../types";
 import { getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
-import { KeyIcon, LockIcon, UnlockIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, KeyIcon, LockIcon, UnlockIcon } from "./icons";
 import { Card, Field } from "./ui";
 
 interface Props {
@@ -50,6 +50,7 @@ export const StudentSelectionPanel = ({
     }
   };
   const [resolvedNamesByStudentId, setResolvedNamesByStudentId] = useState<Record<string, string>>({});
+  const [isMobileSelectionOpen, setIsMobileSelectionOpen] = useState(false);
 
   useEffect(() => {
     if (!activeGroupId || !isSelectedGroupUnlocked) {
@@ -89,8 +90,24 @@ export const StudentSelectionPanel = ({
     return fullName ? `${fullName} · ${alias}` : alias;
   };
 
+  const activeGroupLabel = activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : "Noch keine Lerngruppe gewählt";
+
   return (
-    <div className="space-y-6 no-print xl:sticky xl:top-6">
+    <div className="space-y-3 no-print xl:sticky xl:top-6">
+      <button
+        type="button"
+        className="mobile-selection-toggle md:hidden"
+        onClick={() => setIsMobileSelectionOpen((current) => !current)}
+        aria-expanded={isMobileSelectionOpen}
+        aria-controls="mobile-selection-panel"
+      >
+        <span>
+          <small>Arbeitskontext</small>
+          <strong>{activeGroupLabel}</strong>
+        </span>
+        {isMobileSelectionOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+      </button>
+      <div id="mobile-selection-panel" className={isMobileSelectionOpen ? "block" : "hidden md:block"}>
       <Card
         title="Auswahl"
         subtitle="Im Arbeitsbereich erscheinen Schülercodes. Klarnamen werden nur lokal entschlüsselt."
@@ -234,6 +251,7 @@ export const StudentSelectionPanel = ({
           </div>
         )}
       </Card>
+      </div>
     </div>
   );
 };

@@ -23,10 +23,10 @@ export const firstRunGuideSteps: FirstRunGuideStep[] = [
   {
     tabId: "guidedBuilder",
     eyebrow: "2. Startpunkt",
-    title: "Starte mit Template oder PDF",
+    title: "Erstelle deinen Erwartungshorizont",
     body:
       "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Das nimmt neuen Nutzern die Entscheidung ab, wo sie beginnen sollen.",
-    actionLabel: "Templates öffnen",
+    actionLabel: "EWH erstellen",
   },
   {
     tabId: "builder",

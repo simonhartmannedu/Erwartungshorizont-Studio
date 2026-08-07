@@ -1,4 +1,4 @@
-import { KeyboardEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardEvent, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppNavigation, getTabButtonId, getTabPanelId, tabs, type AppTabId as TabId } from "./app/AppNavigation";
 import { AppHeader } from "./app/AppHeader";
 import { AppShell } from "./app/AppShell";
@@ -792,6 +792,9 @@ function App() {
   const [quickBackupPassphrase, setQuickBackupPassphrase] = useState("");
   const [quickBackupError, setQuickBackupError] = useState("");
   const [quickBackupSaving, setQuickBackupSaving] = useState(false);
+  const [localSaveState, setLocalSaveState] = useState<"saving" | "saved" | "failed">("saved");
+  const pendingLocalSaveCountRef = useRef(0);
+  const hasLocalSaveFailureRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -802,6 +805,24 @@ function App() {
     archive: null,
     backup: null,
   });
+
+  const trackLocalSave = useCallback((write: Promise<unknown>) => {
+    pendingLocalSaveCountRef.current += 1;
+    setLocalSaveState("saving");
+
+    void write.then(
+      () => {
+        pendingLocalSaveCountRef.current = Math.max(0, pendingLocalSaveCountRef.current - 1);
+        if (pendingLocalSaveCountRef.current === 0 && !hasLocalSaveFailureRef.current) {
+          setLocalSaveState("saved");
+        }
+      },
+      () => {
+        pendingLocalSaveCountRef.current = Math.max(0, pendingLocalSaveCountRef.current - 1);
+        setLocalSaveState("failed");
+      },
+    );
+  }, []);
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [sectionDropIndicator, setSectionDropIndicator] = useState<SectionDropIndicator>(null);
   const [collapsedSectionIds, setCollapsedSectionIds] = useState<string[]>([]);
@@ -980,7 +1001,7 @@ function App() {
         setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
         setActiveStudentId(nextStudentDatabase.groups[0]?.students[0]?.id ?? "");
         if (shouldSeedDemoWorkspace) {
-          setActiveTab("groups");
+          setActiveTab("home");
         }
         setStorageError(null);
         setStorageReady(true);
@@ -1007,6 +1028,8 @@ function App() {
     () =>
       subscribeToStorageFailures((error) => {
         const isConflict = error instanceof StorageWriteConflictError;
+        hasLocalSaveFailureRef.current = true;
+        setLocalSaveState("failed");
         setStorageError({
           title: isConflict ? "Arbeitsstand wurde in einem anderen Tab geändert" : "Lokaler Speicherfehler",
           detail: isConflict
@@ -1023,8 +1046,8 @@ function App() {
       skipInitialDraftPersistenceRef.current = false;
       return;
     }
-    void saveDraft(draftBundle);
-  }, [draftBundle, storageReady]);
+    trackLocalSave(saveDraft(draftBundle));
+  }, [draftBundle, storageReady, trackLocalSave]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -1033,8 +1056,8 @@ function App() {
       return;
     }
     const unlockedPasswordsSnapshot = { ...unlockedGroupPasswordsRef.current };
-    void saveStudentDatabase(studentDatabase, (groupId) => unlockedPasswordsSnapshot[groupId] ?? null);
-  }, [studentDatabase, storageReady]);
+    trackLocalSave(saveStudentDatabase(studentDatabase, (groupId) => unlockedPasswordsSnapshot[groupId] ?? null));
+  }, [studentDatabase, storageReady, trackLocalSave]);
 
   useEffect(() => {
     studentDatabaseRef.current = studentDatabase;
@@ -1337,7 +1360,7 @@ function App() {
 
     setDraftBundle(nextDraftBundle);
     setArchiveEntries(nextArchiveEntries);
-    void saveExpectationArchive(nextArchiveEntries);
+    trackLocalSave(saveExpectationArchive(nextArchiveEntries));
     markDemoSeedCurrent();
     setStudentDatabase(nextStudentDatabase);
     setActiveGroupId(nextStudentDatabase.groups[0]?.id ?? "");
@@ -1350,7 +1373,7 @@ function App() {
     setLastBackupFailure(null);
     clearBackupComplete();
     clearBackupFailure();
-    setActiveTab("groups");
+    setActiveTab("home");
     pushNotice("info", "Demo-Daten wurden neu geladen.", "Der Beispieldatensatz wurde lokal zurückgesetzt.");
   };
 
@@ -1363,7 +1386,7 @@ function App() {
     setRestoreCheckpoint(captureRestoreCheckpoint());
     setDraftBundle(nextDraftBundle);
     setArchiveEntries(nextArchiveEntries);
-    void saveExpectationArchive(nextArchiveEntries);
+    trackLocalSave(saveExpectationArchive(nextArchiveEntries));
     setStudentDatabase(nextStudentDatabase);
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
@@ -1397,7 +1420,7 @@ function App() {
 
     setDraftBundle(restoreCheckpoint.draftBundle);
     setArchiveEntries(restoreCheckpoint.archiveEntries);
-    void saveExpectationArchive(restoreCheckpoint.archiveEntries);
+    trackLocalSave(saveExpectationArchive(restoreCheckpoint.archiveEntries));
     setStudentDatabase(restoreCheckpoint.studentDatabase);
     unlockedGroupPasswordsRef.current = {};
     setUnlockedGroupIds([]);
@@ -1811,7 +1834,7 @@ function App() {
         ),
       };
       setDraftBundle(nextBundle);
-      void saveDraft(nextBundle);
+      trackLocalSave(saveDraft(nextBundle));
       lastVersionedExamByWorkspaceRef.current = {
         ...lastVersionedExamByWorkspaceRef.current,
         [activeWorkspaceId]: JSON.stringify(normalizedExam),
@@ -1832,7 +1855,7 @@ function App() {
         workspaces: [...draftBundle.workspaces, workspace],
       };
       setDraftBundle(nextBundle);
-      void saveDraft(nextBundle);
+      trackLocalSave(saveDraft(nextBundle));
       lastVersionedExamByWorkspaceRef.current = {
         ...lastVersionedExamByWorkspaceRef.current,
         [workspaceId]: JSON.stringify(normalizedExam),
@@ -2300,7 +2323,7 @@ function App() {
         ? current.map((entry) => (entry.id === overwriteId ? { ...incomingEntry, id: overwriteId } : entry))
         : [...current, incomingEntry];
       const merged = mergeArchiveEntries(nextEntries, []);
-      saveExpectationArchive(merged);
+      trackLocalSave(saveExpectationArchive(merged));
       return merged;
     });
     setActiveWorkspaceArchiveEntryId(overwriteId ?? incomingEntry.id);
@@ -3598,9 +3621,6 @@ function App() {
           isFullscreenAvailable={document.fullscreenEnabled}
           onToggleAppFullscreen={toggleAppFullscreen}
           onOpenUserGuide={openUserGuide}
-          backupStatus={backupStatus}
-          lastBackupAt={lastBackupAt}
-          onOpenBackup={openQuickBackupDialog}
         />
 
         <AppStatusArea
@@ -3614,7 +3634,7 @@ function App() {
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           onTabKeyDown={handleTabKeyDown}
-          onSaveToArchive={saveExpectationsToArchive}
+          localSaveState={localSaveState}
           tabButtonRefs={tabButtonRefs}
         />
 
@@ -3768,6 +3788,7 @@ function App() {
                 <HomeDashboard
                   activeWorkspaceLabel={activeWorkspace ? getWorkspaceDisplayLabel(activeWorkspace) : null}
                   activeWorkspaceUpdatedAt={activeWorkspace?.updatedAt ?? null}
+                  hasActiveGroup={Boolean(activeGroup)}
                   activeGroupLabel={activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : null}
                   activeGroupStudentCount={activeGroup?.students.length ?? 0}
                   workspaceCount={draftBundle.workspaces.length}
@@ -3778,6 +3799,7 @@ function App() {
                   relevantStudentCount={correctionCompletionState.relevantStudentCount}
                   backupSummary={backupStatus.summary}
                   backupDetail={backupStatus.detail}
+                  backupTone={backupStatus.tone}
                   recentWorkspaces={[...draftBundle.workspaces]
                     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
                     .slice(0, 4)
@@ -3869,7 +3891,7 @@ function App() {
                       <p className="label">Noch kein EWH zugeordnet</p>
                       <p className="themed-muted mt-2 text-sm leading-6">
                         Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
-                        bis du einen EWH über die Vorlagensuche anlegst oder aus dem Archiv zuweist.
+                        bis du einen EWH über „EWH erstellen“ anlegst oder aus dem Archiv zuweist.
                       </p>
                     </div>
                   ) : null}
@@ -3889,7 +3911,7 @@ function App() {
             {activeTab === "guidedBuilder" && (
               <Suspense
                 fallback={(
-                  <Card title="Vorlagensuche lädt" subtitle="EWH-Templates werden bei Bedarf nachgeladen.">
+                  <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">
                     <div className="surface-muted rounded-3xl p-5">
                       <p className="themed-muted text-sm leading-6">
                         Die Vorlagenoberfläche wird vorbereitet.
@@ -3931,7 +3953,7 @@ function App() {
                     onApplyPdfSuggestion={applyImportedExamSuggestion}
                   />
                 ) : (
-                  <Card title="Vorlagensuche lädt" subtitle="EWH-Templates werden bei Bedarf nachgeladen.">
+                  <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">
                     <div className="surface-muted rounded-3xl p-5">
                       <p className="themed-muted text-sm leading-6">
                         Die Template-Daten werden vorbereitet.
@@ -3948,6 +3970,18 @@ function App() {
               <>
                 {activeWorkspace ? (
                   <div id={EDITOR_POINTS_ANCHOR_ID} className="scroll-mt-24 space-y-6">
+                    <div className="flex flex-col gap-3 rounded-3xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="label">Wiederverwenden</p>
+                        <p className="themed-muted mt-1 text-sm leading-6">
+                          Lege diese Arbeit als eigenständige Vorlage im Archiv ab.
+                        </p>
+                      </div>
+                      <button type="button" className="button-secondary shrink-0 gap-2" onClick={saveExpectationsToArchive}>
+                        <ArchiveIcon />
+                        Diese Arbeit archivieren
+                      </button>
+                    </div>
                     <Card
                       title="Punkte und Note"
                       subtitle="Skaliere bei Bedarf die Gesamtpunktzahl und passe darunter den Notenschlüssel an. Die Gesamtnote wird weiterhin direkt über die erreichten Gesamtpunkte berechnet."
@@ -4073,7 +4107,7 @@ function App() {
                           onClick={() => setActiveTab("guidedBuilder")}
                         >
                           <PlusIcon />
-                          Vorlage suchen
+                          EWH erstellen
                         </button>
                         <button
                           type="button"
@@ -4674,7 +4708,7 @@ function App() {
           )
         }
         onSaveAndConfirm={() => {
-          void saveDraft(draftBundle);
+          trackLocalSave(saveDraft(draftBundle));
           if (templateToLoad) {
             applyTemplate(
               templateToLoad.template,
@@ -4851,7 +4885,7 @@ function App() {
           if (archiveEntryToDelete) {
             setArchiveEntries((current) => {
               const next = current.filter((entry) => entry.id !== archiveEntryToDelete.id);
-              saveExpectationArchive(next);
+              trackLocalSave(saveExpectationArchive(next));
               return next;
             });
           }

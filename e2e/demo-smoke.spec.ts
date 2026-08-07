@@ -15,5 +15,6 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
   await expect(page.getByText("Demo-Modus aktiv")).toBeVisible();
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
   expect(externalRequests).toEqual([]);
 });

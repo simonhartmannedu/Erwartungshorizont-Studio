@@ -936,9 +936,9 @@ export const GuidedExamBuilder = ({
       <div className="template-decision-header">
         <div>
           <p className="label">Schnellentscheidung</p>
-          <h2 className="themed-strong mt-2 text-2xl font-semibold">Vorlage finden, prüfen, öffnen</h2>
+          <h2 className="themed-strong mt-2 text-2xl font-semibold">Erwartungshorizont erstellen</h2>
           <p className="themed-muted mt-2 max-w-3xl text-sm leading-6">
-            Suche direkt nach Fach, Stufe, Punkteumfang oder Prüfungsformat. Die passende Struktur landet sofort im
+            Starte mit einer Vorlage, einer PDF oder einer leeren Struktur. Die passende Grundlage landet sofort im
             EWH-Editor und kann dort weiter angepasst werden. Vor dem Einsatz bitte mit den aktuellen Vorgaben der
             Standardsicherung NRW abgleichen.
           </p>
