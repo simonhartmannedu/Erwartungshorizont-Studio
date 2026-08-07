@@ -13,6 +13,7 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
 
   await expect(page.getByRole("heading", { name: "Erwartungshorizont Studio" })).toBeVisible();
   await expect(page.getByText("Demo-Modus aktiv")).toBeVisible();
+  await expect(page.getByText("Klassenpasswort")).toContainText("demo");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
@@ -26,5 +27,11 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
   await expect(page.getByLabel("Titel der Klassenarbeit")).toHaveValue("Englisch-Klassenarbeit Unit 5");
   await globalSearch.fill("Student 8");
   await expect(globalSearchResults.getByRole("option", { name: /Student 8/ })).toBeVisible();
+  await page.getByRole("button", { name: "Klasse entsperren" }).click();
+  await page.locator("#header-unlock-password").fill("demo");
+  await page.getByRole("button", { name: "Lerngruppe entschlüsseln" }).click();
+  await expect(page.getByRole("button", { name: "Klasse sperren" })).toBeVisible();
+  await globalSearch.fill("Emir Yılmaz");
+  await expect(globalSearchResults.getByRole("option", { name: /Emir Yılmaz/ })).toBeVisible();
   expect(externalRequests).toEqual([]);
 });

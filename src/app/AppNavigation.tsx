@@ -40,6 +40,7 @@ type AppNavigationProps = {
   localSaveState: "saving" | "saved" | "failed";
   tabButtonRefs: MutableRefObject<Record<AppTabId, HTMLButtonElement | null>>;
   searchResults: GlobalSearchResult[];
+  sensitiveSearchSessionVersion: number;
   onSearchResultSelect: (resultId: string) => void;
 };
 
@@ -120,6 +121,7 @@ export const AppNavigation = ({
   localSaveState,
   tabButtonRefs,
   searchResults,
+  sensitiveSearchSessionVersion,
   onSearchResultSelect,
 }: AppNavigationProps) => (
   <div className="mb-6 no-print">
@@ -146,7 +148,11 @@ export const AppNavigation = ({
           </button>
         ))}
       </div>
-      <GlobalSearch searchResults={searchResults} onSearchResultSelect={onSearchResultSelect} />
+      <GlobalSearch
+        key={sensitiveSearchSessionVersion}
+        searchResults={searchResults}
+        onSearchResultSelect={onSearchResultSelect}
+      />
       <div
         className={`local-save-status local-save-status-${localSaveState} shrink-0 self-start sm:ml-auto sm:self-auto sm:border-l sm:pl-4`}
         role="status"
