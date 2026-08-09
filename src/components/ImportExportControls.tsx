@@ -18,6 +18,10 @@ interface Props {
   onImportBackup: (file: File, passphrase: string) => void;
   onExportBackup: (passphrase: string) => Promise<boolean>;
   onExportDocx?: () => void;
+  onExportClassDocx?: () => void;
+  onExportClassOverviewDocx?: () => void;
+  onExportEmptyDocx?: () => void;
+  onExportGradeScaleDocx?: () => void;
   printLabel?: string;
   printWithoutDetailsLabel?: string;
   printGradeScaleLabel?: string;
@@ -37,6 +41,10 @@ export const ImportExportControls = ({
   onImportBackup,
   onExportBackup,
   onExportDocx,
+  onExportClassDocx,
+  onExportClassOverviewDocx,
+  onExportEmptyDocx,
+  onExportGradeScaleDocx,
   onPrint,
   onPrintWithoutDetails,
   onPrintGradeScale,
@@ -68,11 +76,11 @@ export const ImportExportControls = ({
   const [selectedTableOutputValue, setSelectedTableOutputValue] = useState<string | null>(null);
 
   const pdfOutputs = [
-    { value: "current", label: printLabel || "Aktueller Bewertungsbogen", action: onPrint },
-    ...(onPrintClass ? [{ value: "class", label: classPrintLabel || "Klassenbögen", action: onPrintClass }] : []),
-    ...(onPrintClassOverview ? [{ value: "overview", label: classOverviewPrintLabel || "Klassenübersicht", action: onPrintClassOverview }] : []),
-    { value: "empty", label: printWithoutDetailsLabel || "Leerer EWH", action: onPrintWithoutDetails },
-    ...(onPrintGradeScale ? [{ value: "grade-scale", label: printGradeScaleLabel || "Notenbereiche", action: onPrintGradeScale }] : []),
+    { value: "current", label: printLabel || "Aktueller Bewertungsbogen", action: onPrint, docxAction: onExportDocx },
+    ...(onPrintClass ? [{ value: "class", label: classPrintLabel || "Klassenbögen", action: onPrintClass, docxAction: onExportClassDocx }] : []),
+    ...(onPrintClassOverview ? [{ value: "overview", label: classOverviewPrintLabel || "Klassenübersicht", action: onPrintClassOverview, docxAction: onExportClassOverviewDocx }] : []),
+    { value: "empty", label: printWithoutDetailsLabel || "Leerer EWH", action: onPrintWithoutDetails, docxAction: onExportEmptyDocx },
+    ...(onPrintGradeScale ? [{ value: "grade-scale", label: printGradeScaleLabel || "Notenbereiche", action: onPrintGradeScale, docxAction: onExportGradeScaleDocx }] : []),
   ];
   const selectedPdfOutput = pdfOutputs.find((output) => output.value === selectedDocumentOutput) ?? null;
 
@@ -131,8 +139,8 @@ export const ImportExportControls = ({
                   <ReportIcon />
                   Druck-PDF
                 </button>
-                {selectedPdfOutput.value === "current" && onExportDocx ? (
-                  <button type="button" className="button-secondary gap-2" onClick={onExportDocx}>
+                {selectedPdfOutput.docxAction ? (
+                  <button type="button" className="button-secondary gap-2" onClick={selectedPdfOutput.docxAction}>
                     <DownloadIcon />
                     Word (.docx)
                   </button>

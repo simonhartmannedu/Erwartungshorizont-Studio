@@ -6,6 +6,7 @@ export const PDF_SUGGEST_PURPOSE = "EWH-Editor: PDF-Import mit Strukturvorschlag
 
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const PHONE_PATTERN = /(?:(?:\+|00)\d{1,3}[\s./-]?)?(?:\(?\d{2,5}\)?[\s./-]?){2,}\d{2,5}\b/g;
+const DATE_PATTERN = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/;
 const CREDENTIAL_PATTERN = /\b(?:password|passwort|token|api[_-]?key|secret|bearer|access[_-]?key|client[_-]?secret)\b/gi;
 const LONG_NUMERIC_ID_PATTERN = /\b\d{8,}\b/g;
 
@@ -22,6 +23,11 @@ const uniqueBy = <T,>(items: T[], getKey: (item: T) => string) => {
 const collectMatches = (text: string, pattern: RegExp, factory: (match: string) => DataRiskFinding) =>
   Array.from(text.matchAll(pattern)).map((entry) => factory(entry[0]));
 
+const collectPhoneMatches = (text: string) =>
+  Array.from(text.matchAll(PHONE_PATTERN))
+    .map((entry) => entry[0])
+    .filter((match) => !DATE_PATTERN.test(match.trim()));
+
 export const classifyPdfDataRisks = (text: string): DataRiskFinding[] => {
   if (!text.trim()) return [];
 
@@ -32,7 +38,7 @@ export const classifyPdfDataRisks = (text: string): DataRiskFinding[] => {
       match,
       message: "E-Mail-Adresse erkannt. Personenbezug möglichst vor dem Import entfernen.",
     })),
-    ...collectMatches(text, PHONE_PATTERN, (match) => ({
+    ...collectPhoneMatches(text).map((match): DataRiskFinding => ({
       type: "phone",
       severity: "high",
       match,
@@ -58,7 +64,7 @@ export const classifyPdfDataRisks = (text: string): DataRiskFinding[] => {
 export const preparePdfRedactedPreview = (text: string) =>
   text
     .replace(EMAIL_PATTERN, "[REDACTED_EMAIL]")
-    .replace(PHONE_PATTERN, "[REDACTED_PHONE]")
+    .replace(PHONE_PATTERN, (match) => (DATE_PATTERN.test(match.trim()) ? match : "[REDACTED_PHONE]"))
     .replace(CREDENTIAL_PATTERN, "[REDACTED_SECRET_HINT]")
     .replace(LONG_NUMERIC_ID_PATTERN, "[REDACTED_LONG_ID]");
 

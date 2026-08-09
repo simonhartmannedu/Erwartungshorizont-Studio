@@ -22,7 +22,7 @@ Auf einem gemeinsam genutzten Gerät: Gruppe nach der Korrektur sperren, Browser
 
 Eine PDF wird erst nach deiner ausdrücklichen Einwilligung ausgewählt und verarbeitet. Die Anwendung begrenzt die Größe, zeigt eine redigierte Vorschau und warnt bei erkannten sensiblen Mustern. Vor der Übernahme prüfst du Inhalt und Datenschutz selbst.
 
-Im lokalen Entwicklungsbetrieb erfolgt die Verarbeitung im lokalen Dienst. Wenn du die Anwendung anders bereitstellst, muss vorher klar sein, wo die PDF verarbeitet wird und welche Daten das Gerät verlassen könnten.
+Im lokalen Entwicklungsbetrieb erfolgt die Verarbeitung im lokalen Dienst. Statische Bereitstellungen – etwa die GitHub-Pages-Demo – enthalten diesen Dienst nicht und können deshalb keine PDF verarbeiten. Wenn du die Anwendung anders bereitstellst, muss vorher klar sein, wo die PDF verarbeitet wird und welche Daten das Gerät verlassen könnten. Der Dienst sollte Poppler und Tesseract isoliert, mit Ressourcenlimits und ohne dauerhafte Dateiablage ausführen.
 
 ## Backups und Wiederherstellung
 

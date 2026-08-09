@@ -56,7 +56,7 @@ npm install
 npm run dev
 ```
 
-Für die normale Nutzung genügt die gehostete Demo oder eine lokale Installation. Der PDF-Import benötigt lokal zusätzlich Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) und Tesseract mit Deutsch und Englisch.
+Für die normale Nutzung genügt die gehostete Demo oder eine lokale Installation. Der PDF-Import benötigt zusätzlich einen laufenden PDF-Verarbeitungsdienst mit Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) und Tesseract mit Deutsch und Englisch. `npm run dev` stellt diesen lokalen Dienst bereit. Die statischen GitHub-Pages-Bundles enthalten bewusst keinen Serverprozess; dort zeigt die Anwendung einen klaren Hinweis statt eine PDF unbemerkt zu übertragen.
 
 ## Für die Wartung
 

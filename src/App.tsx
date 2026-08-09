@@ -115,7 +115,10 @@ import {
 import {
   downloadCsvFile,
   exportEditableExamDocx,
+  exportClassEditableExamDocx,
+  exportClassOverviewDocx,
   exportClassOverviewCsv,
+  exportGradeScaleDocx,
   exportGradeScaleCsv,
   exportScoringSheetCsv,
   exportScoringSheetOds,
@@ -3543,6 +3546,94 @@ function App() {
     }
   };
 
+  const handleExportClassDocx = async () => {
+    if (!activeGroup) {
+      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
+      return;
+    }
+    if (activeGroup.students.length === 0) {
+      pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
+      return;
+    }
+
+    const password = activeGroup.passwordVerifier
+      ? await getUsableUnlockedGroupPassword(activeGroup.id)
+      : null;
+    if (activeGroup.passwordVerifier && !password) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Für den Klassenexport werden die lokalen Bewertungsdaten benötigt.");
+      return;
+    }
+
+    const reports = [];
+    for (const student of activeGroup.students) {
+      let fullName: string | null = null;
+      if (password) {
+        try {
+          fullName = await decryptText(student.encryptedName, password);
+        } catch {
+          pushNotice("danger", "Klarname konnte nicht entschlüsselt werden", `Der Klarname für ${student.alias} konnte nicht entschlüsselt werden.`);
+          return;
+        }
+      }
+      const studentExam = buildExamForStudent(exam, studentDatabaseRef.current, {
+        groupId: activeGroup.id,
+        studentId: student.id,
+      }, activeWorkspace?.id ?? null);
+      const assessment = getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null);
+      reports.push({
+        exam: studentExam,
+        summary: calculateExamSummary(studentExam),
+        identity: {
+          alias: student.alias,
+          fullName,
+          subject: activeGroup.subject,
+          className: activeGroup.className,
+          teacherComment: assessment.teacherComment ?? "",
+        },
+      });
+    }
+
+    const result = await exportClassEditableExamDocx(exam, reports);
+    if (result !== "cancelled") {
+      pushNotice("success", "Word-Klassendokument erstellt", "Die editierbare Punktetabelle für die aktive Klasse wurde erstellt.");
+    }
+  };
+
+  const handleExportEmptyDocx = async () => {
+    const emptyExam = {
+      ...exam,
+      sections: exam.sections.map((section) => ({
+        ...section,
+        tasks: section.tasks.map((task) => ({ ...task, achievedPoints: 0 })),
+      })),
+    };
+    const result = await exportEditableExamDocx(emptyExam, calculateExamSummary(emptyExam), undefined, { hideResults: true });
+    if (result !== "cancelled") {
+      pushNotice("success", "Leerer Word-EWH erstellt", "Der editierbare Erwartungshorizont wurde ohne individuelle Bewertungsdaten erstellt.");
+    }
+  };
+
+  const handleExportGradeScaleDocx = async () => {
+    const result = await exportGradeScaleDocx(displayExam, summary, activeStudentRecord?.alias ?? displayExam.meta.title);
+    if (result !== "cancelled") {
+      pushNotice("success", "Word-Notenbereiche erstellt", "Der editierbare Notenschlüssel wurde erstellt.");
+    }
+  };
+
+  const handleExportClassOverviewDocx = async () => {
+    if (!activeGroup || !classOverview) {
+      pushNotice("warning", "Keine Klassenübersicht verfügbar", "Bitte zuerst eine Klasse mit auswertbaren Daten auswählen.");
+      return;
+    }
+    const result = await exportClassOverviewDocx(displayExam, classOverview, {
+      subject: activeGroup.subject,
+      className: activeGroup.className,
+    });
+    if (result !== "cancelled") {
+      pushNotice("success", "Word-Klassenübersicht erstellt", "Die editierbare Klassenübersicht wurde erstellt.");
+    }
+  };
+
   const handlePrintWithoutDetails = async () => {
     const opened = openPrintWindow(
       displayExam,
@@ -3812,7 +3903,10 @@ function App() {
     const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
     if (!opened) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return;
     }
+    setPendingSecurityTokenCards([]);
+    pushNotice("success", "Druckkarte geöffnet", "Die Token stehen im neuen Fenster zum Drucken oder als PDF-Speichern bereit.");
   };
 
   const resolvedTeacherCommentPreview = resolveCommentTemplate(activeAssessment?.teacherComment ?? "", {
@@ -4629,6 +4723,10 @@ function App() {
                   onExportBackup={handleExportDatabase}
                   onPrint={handlePrint}
                   onExportDocx={handleExportDocx}
+                  onExportClassDocx={activeGroup ? handleExportClassDocx : undefined}
+                  onExportClassOverviewDocx={activeGroup && classOverview ? handleExportClassOverviewDocx : undefined}
+                  onExportEmptyDocx={handleExportEmptyDocx}
+                  onExportGradeScaleDocx={handleExportGradeScaleDocx}
                   onPrintWithoutDetails={handlePrintWithoutDetails}
                   onPrintGradeScale={handlePrintGradeScale}
                   onPrintClass={activeGroup ? handlePrintClass : undefined}
@@ -4801,7 +4899,7 @@ function App() {
         description="Das generierte Token wird nicht dauerhaft im Klartext gespeichert. Drucke oder kopiere es jetzt und bewahre es getrennt von Schülerlisten auf."
         onCancel={() => setPendingSecurityTokenCards([])}
         onConfirm={handlePrintSecurityTokens}
-        confirmLabel="Druckkarte öffnen"
+        confirmLabel="Druckkarte öffnen und schließen"
       >
         <div className="space-y-3">
           {pendingSecurityTokenCards.map((entry) => (

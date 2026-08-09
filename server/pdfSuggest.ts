@@ -1,4 +1,4 @@
-import { classifyPdfDataRisks, hasHighRiskFindings, PDF_CONSENT_VERSION, PDF_SUGGEST_PURPOSE } from "../src/pdf/privacy";
+import { classifyPdfDataRisks, hasHighRiskFindings, PDF_CONSENT_VERSION, PDF_SUGGEST_PURPOSE, preparePdfRedactedPreview } from "../src/pdf/privacy";
 import { ImportedExamSuggestion, ImportedSectionDraft, ImportedTaskDraft, PdfServiceErrorResponse, PdfSuggestRequest, PdfSuggestResponse } from "../src/pdf/types";
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
@@ -296,6 +296,37 @@ const extractSections = (text: string): ImportedSectionDraft[] => {
   }];
 };
 
+const adaptSuggestionToRequest = (suggestion: ImportedExamSuggestion, request: PdfSuggestRequest): ImportedExamSuggestion => {
+  const focusPrefix = request.assistanceGoal === "language_focus"
+    ? "Sprachlicher Fokus – "
+    : request.assistanceGoal === "content_focus"
+      ? "Fachlicher Fokus – "
+      : "";
+  const maximumLength = request.answerStyle === "compact" ? 280 : request.answerStyle === "balanced" ? 520 : 700;
+  const caution = request.answerStyle === "very_cautious"
+    ? " Bitte nur nach Abgleich mit dem Original übernehmen."
+    : "";
+
+  return {
+    ...suggestion,
+    sections: suggestion.sections.map((section) => ({
+      ...section,
+      tasks: section.tasks.map((task) => ({
+        ...task,
+        expectation: `${focusPrefix}${task.expectation}`.slice(0, maximumLength) + caution,
+      })),
+    })),
+    reviewNotes: [
+      ...suggestion.reviewNotes,
+      request.documentKind === "studentSubmission"
+        ? "Bei Schülerlösungen wurden keine Punkte oder Endnoten abgeleitet; erst passende Kriterien festlegen."
+        : request.documentKind === "exam"
+          ? "Bei reinen Aufgabenblättern sind Erwartungstexte nur Platzhalter und müssen ergänzt werden."
+          : "Dokumenttyp und erkannte Struktur vor der Übernahme abgleichen.",
+    ],
+  };
+};
+
 const buildSuggestion = (request: PdfSuggestRequest): ImportedExamSuggestion => ({
   meta: {
     title:
@@ -338,8 +369,11 @@ export const handlePdfSuggestRequest = async (payload: unknown) => {
     );
   }
 
+  const suggestionRequest = payload.privacyMode === "already_anonymized"
+    ? payload
+    : { ...payload, extractedText: preparePdfRedactedPreview(payload.extractedText) };
   const response: PdfSuggestResponse = {
-    suggestion: buildSuggestion(payload),
+    suggestion: adaptSuggestionToRequest(buildSuggestion(suggestionRequest), payload),
     warnings: findings.length > 0
       ? [
           "Die PDF enthielt sensible Muster; der Vorschlag wurde nur nach ausdrücklicher Bestätigung erzeugt.",

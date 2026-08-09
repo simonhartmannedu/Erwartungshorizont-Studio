@@ -104,6 +104,7 @@ export const exportEditableExamDocx = async (
   exam: Exam,
   summary: ExamSummary,
   identity?: PrintIdentity,
+  options?: { hideResults?: boolean },
 ) => {
   const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
   const textCell = (text: string, bold = false) =>
@@ -162,8 +163,8 @@ export const exportEditableExamDocx = async (
             new TableRow({
               children: [
                 textCell(`${taskIndex + 1}. ${task.title || "Aufgabe"}`),
-                textCell(task.description || "—"),
-                textCell(`${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`),
+                textCell(task.expectation || task.description || "—"),
+                textCell(options?.hideResults ? `— / ${formatNumber(task.maxPoints)}` : `${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`),
               ],
             }),
           ),
@@ -175,26 +176,166 @@ export const exportEditableExamDocx = async (
     );
   });
 
-  children.push(
-    new Paragraph({
-      children: [new TextRun({ text: "Ergebnis", bold: true, size: 24 })],
-      spacing: { before: 300, after: 100 },
-    }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [textCell("Gesamtpunkte", true), textCell(`${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
-        new TableRow({ children: [textCell("Prozent", true), textCell(`${formatNumber(summary.finalPercentage)} %`)] }),
-        new TableRow({ children: [textCell("Note", true), textCell(`${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
-        new TableRow({ children: [textCell("Kommentar", true), textCell(identity?.teacherComment || "") ] }),
-      ],
-    }),
-  );
+  if (!options?.hideResults) {
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Ergebnis", bold: true, size: 24 })],
+        spacing: { before: 300, after: 100 },
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({ children: [textCell("Gesamtpunkte", true), textCell(`${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
+          new TableRow({ children: [textCell("Prozent", true), textCell(`${formatNumber(summary.finalPercentage)} %`)] }),
+          new TableRow({ children: [textCell("Note", true), textCell(`${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
+          new TableRow({ children: [textCell("Kommentar", true), textCell(identity?.teacherComment || "") ] }),
+        ],
+      }),
+    );
+  }
 
   const document = new Document({ sections: [{ children }] });
   const blob = await Packer.toBlob(document);
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizeFilenamePart(identity?.alias || exam.meta.title || "Bewertungsbogen")}_${timestamp}.docx`;
+  return saveBlobWithDialog(filename, blob, {
+    description: "Word-Dokument",
+    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
+  });
+};
+
+/** Creates one editable class table. Individual detailed feedback remains available via the current student export. */
+export const exportClassEditableExamDocx = async (exam: Exam, reports: PrintPayload[]) => {
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+  const textCell = (text: string, bold = false) =>
+    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const tasks = exam.sections.flatMap((section, sectionIndex) =>
+    section.tasks.map((task, taskIndex) => ({
+      label: `${sectionIndex + 1}.${taskIndex + 1} ${task.title || "Aufgabe"}`,
+      maxPoints: task.maxPoints,
+    })),
+  );
+  const children = [
+    new Paragraph({
+      children: [new TextRun({ text: `${exam.meta.title || "Bewertungsbogen"} – Klasse`, bold: true, size: 30 })],
+      spacing: { after: 120 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: [exam.meta.subject, exam.meta.course, exam.meta.examDate].filter(Boolean).join(" · ") || "Klassenübersicht" })],
+      spacing: { after: 180 },
+    }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            textCell("Schüler:in", true),
+            ...tasks.map((task) => textCell(`${task.label}\nmax. ${formatNumber(task.maxPoints)}`, true)),
+            textCell("Gesamt", true),
+            textCell("%", true),
+            textCell("Note", true),
+            textCell("Kommentar", true),
+          ],
+        }),
+        ...reports.map((report) => {
+          const scores = report.exam.sections.flatMap((section) => section.tasks.map((task) => task.achievedPoints));
+          return new TableRow({
+            children: [
+              textCell(report.identity?.fullName || report.identity?.alias || "—"),
+              ...tasks.map((_, index) => textCell(formatNumber(scores[index] ?? 0))),
+              textCell(`${formatNumber(report.summary.totalAchievedPoints)} / ${formatNumber(report.summary.totalMaxPoints)}`),
+              textCell(`${formatNumber(report.summary.finalPercentage)} %`),
+              textCell(report.summary.grade.schoolDisplay),
+              textCell(report.identity?.teacherComment || ""),
+            ],
+          });
+        }),
+      ],
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: "Hinweis: Die Tabelle ist editierbar. Für einen vollständigen Einzelbogen wähle den jeweiligen Schüler bzw. die jeweilige Schülerin im Editor.", italics: true })],
+      spacing: { before: 180 },
+    }),
+  ];
+  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `${sanitizeFilenamePart(reports[0]?.identity?.className || exam.meta.course || exam.meta.title || "Klasse")}_${timestamp}.docx`;
+  return saveBlobWithDialog(filename, blob, {
+    description: "Word-Dokument",
+    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
+  });
+};
+
+export const exportGradeScaleDocx = async (exam: Exam, summary: ExamSummary, filenamePrefix?: string) => {
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+  const textCell = (text: string, bold = false) =>
+    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const ranges = getGradeScaleRanges(exam, summary.totalMaxPoints);
+  const digits = getGradeScaleRangeDigits(exam, summary.totalMaxPoints);
+  const children = [
+    new Paragraph({ children: [new TextRun({ text: exam.meta.title || "Notenbereiche", bold: true, size: 30 })], spacing: { after: 100 } }),
+    new Paragraph({ children: [new TextRun({ text: `${exam.gradeScale.title || "Notenschlüssel"} · ${formatNumber(summary.totalMaxPoints)} Gesamtpunkte` })], spacing: { after: 180 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [textCell("Note", true), textCell("Von", true), textCell("Bis", true)] }),
+        ...ranges.map((range) => new TableRow({
+          children: [
+            textCell(range.label),
+            textCell(formatNumber(Number(range.lowerBound.toFixed(digits)))),
+            textCell(formatNumber(Number(range.upperBound.toFixed(digits)))),
+          ],
+        })),
+      ],
+    }),
+  ];
+  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `${sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche")}_Notenbereiche_${timestamp}.docx`;
+  return saveBlobWithDialog(filename, blob, {
+    description: "Word-Dokument",
+    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
+  });
+};
+
+export const exportClassOverviewDocx = async (
+  exam: Exam,
+  overview: ClassOverviewData,
+  context?: { subject?: string; className?: string },
+) => {
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
+  const textCell = (text: string, bold = false) =>
+    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const children = [
+    new Paragraph({ children: [new TextRun({ text: `${exam.meta.title || "Klassenübersicht"} – Klassenübersicht`, bold: true, size: 30 })], spacing: { after: 100 } }),
+    new Paragraph({ children: [new TextRun({ text: [context?.subject, context?.className, exam.meta.examDate].filter(Boolean).join(" · ") })], spacing: { after: 180 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [textCell("Schüler:innen", true), textCell("Ø Prozent", true), textCell("Median", true), textCell("Beste Leistung", true), textCell("Schwächste Leistung", true)] }),
+        new TableRow({ children: [textCell(formatNumber(overview.studentCount)), textCell(`${formatNumber(overview.averagePercentage)} %`), textCell(`${formatNumber(overview.medianPercentage)} %`), textCell(`${formatNumber(overview.bestPercentage)} %`), textCell(`${formatNumber(overview.lowestPercentage)} %`)] }),
+      ],
+    }),
+    new Paragraph({ children: [new TextRun({ text: "Notenspiegel", bold: true, size: 24 })], spacing: { before: 260, after: 80 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [textCell("Note", true), textCell("Anzahl", true)] }),
+        ...overview.gradeDistribution.map((entry) => new TableRow({ children: [textCell(entry.display), textCell(formatNumber(entry.count))] })),
+      ],
+    }),
+    new Paragraph({ children: [new TextRun({ text: "Aufgaben im Überblick", bold: true, size: 24 })], spacing: { before: 260, after: 80 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [textCell("Bereich", true), textCell("Aufgabe", true), textCell("Ø Prozent", true)] }),
+        ...overview.taskDistribution.map((entry) => new TableRow({ children: [textCell(entry.sectionTitle), textCell(entry.taskTitle), textCell(`${formatNumber(entry.percentage)} %`)] })),
+      ],
+    }),
+  ];
+  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const filename = `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Klassenuebersicht")}_${timestamp}.docx`;
   return saveBlobWithDialog(filename, blob, {
     description: "Word-Dokument",
     accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },

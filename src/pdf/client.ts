@@ -61,6 +61,10 @@ export const requestPdfExtraction = async (payload: PdfExtractRequest): Promise<
       throw new Error(body.error.message);
     }
 
+    if (response.status === 404 || response.status === 405) {
+      throw new Error("Diese Bereitstellung hat keinen PDF-Verarbeitungsdienst. Der PDF-Import benötigt eine lokale oder separat betriebene API mit Poppler und Tesseract.");
+    }
+
     throw new Error("Die PDF konnte serverseitig nicht verarbeitet werden.");
   }
 
