@@ -261,7 +261,6 @@ const extractSections = (text: string): ImportedSectionDraft[] => {
     const blockLines = lines.slice(startIndex, endIndex);
     const rawHeading = blockLines[0] ?? `Teil ${index + 1}`;
     const heading = getSectionHeading(rawHeading);
-    const summaryLine = blockLines.find(isSummaryLine) ?? "";
     const tasks = extractTasksFromBlock(blockLines.join("\n"));
     return {
       title: heading?.title || rawHeading,
