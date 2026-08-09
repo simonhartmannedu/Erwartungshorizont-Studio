@@ -21,14 +21,11 @@ export const calculateSectionResult = (section: Section): SectionResult => {
   const maxPoints = getSectionMaxPoints(section);
   const achievedPoints = getSectionAchievedPoints(section);
   const percentage = maxPoints > 0 ? clamp((achievedPoints / maxPoints) * 100, 0, 100) : 0;
-  const weightedPercentage = percentage * (safeNumber(section.weight) / 100);
-
   return {
     sectionId: section.id,
     maxPoints,
     achievedPoints,
     percentage,
-    weightedPercentage,
   };
 };
 
@@ -37,10 +34,9 @@ export const calculateExamSummary = (exam: Exam): ExamSummary => {
   const totalMaxPoints = sum(sectionResults.map((section) => section.maxPoints));
   const totalAchievedPoints = sum(sectionResults.map((section) => section.achievedPoints));
   const rawPercentage = totalMaxPoints > 0 ? (totalAchievedPoints / totalMaxPoints) * 100 : 0;
-  const weightedPercentage = sum(sectionResults.map((section) => section.weightedPercentage));
   const finalPercentage = clamp(rawPercentage, 0, 100);
   const referenceValue =
-    getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? totalAchievedPoints : clamp(finalPercentage, 0, 100);
+    getEffectiveGradeScaleMode(exam.gradeScale) === "points" ? totalAchievedPoints : finalPercentage;
   const grade = resolveGrade(exam.gradeScale, referenceValue, totalMaxPoints);
   const nextGradeProgress = getNextGradeProgress({
     scale: exam.gradeScale,
@@ -53,7 +49,6 @@ export const calculateExamSummary = (exam: Exam): ExamSummary => {
     totalMaxPoints,
     totalAchievedPoints,
     rawPercentage,
-    weightedPercentage,
     finalPercentage,
     sectionResults,
     grade,

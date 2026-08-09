@@ -80,10 +80,6 @@ import {
   normalizeWritingSection,
   scaleSectionTasksToTotal,
 } from "./utils/writing";
-import {
-  getNormalizedSectionPointTargets,
-  hasSectionPointWeightMismatch,
-} from "./utils/sectionWeights";
 import { formatDateTime, formatNumber } from "./utils/format";
 import { createPasswordVerifier, decryptText, encryptText, verifyPassword } from "./utils/crypto";
 import { createDefaultGradeScale, gradeLabelToNumericValue } from "./utils/grades";
@@ -168,7 +164,7 @@ import {
   LoadingIcon,
   PlusIcon,
 } from "./components/icons";
-import { Card, DismissibleCallout, Field, IconButton } from "./components/ui";
+import { Card, Field, IconButton } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { ImportedExamSuggestion } from "./pdf/types";
@@ -384,7 +380,6 @@ const createSection = (): Section => ({
   id: crypto.randomUUID(),
   title: "Neuer Abschnitt",
   description: "",
-  weight: 25,
   linkedSectionId: null,
   maxPointsOverride: null,
   note: "",
@@ -398,7 +393,6 @@ const createImportedSection = (
   id: crypto.randomUUID(),
   title: draft.title.trim() || `Importierter Abschnitt ${fallbackIndex + 1}`,
   description: draft.description.trim(),
-  weight: Number.isFinite(draft.weight) ? Math.max(0, draft.weight) : 25,
   linkedSectionId: null,
   maxPointsOverride: null,
   note: draft.note.trim(),
@@ -672,7 +666,6 @@ function App() {
             id: section.id || crypto.randomUUID(),
             title: section.title ?? "",
             description: section.description ?? "",
-            weight: toFiniteNumber(section.weight),
             linkedSectionId: section.linkedSectionId ?? null,
             maxPointsOverride:
               section.maxPointsOverride == null ? null : toFiniteNumber(section.maxPointsOverride),
@@ -1845,10 +1838,6 @@ function App() {
       taskDistribution,
     };
   }, [activeGroup, activeWorkspace?.id, exam, storageReady, studentDatabase]);
-  const hasPointWeightMismatch = useMemo(
-    () => (storageReady ? hasSectionPointWeightMismatch(exam) : false),
-    [exam, storageReady],
-  );
   const correctionCompletionState = useMemo(() => {
     if (!activeGroup || !activeWorkspace) {
       return {
@@ -1897,10 +1886,6 @@ function App() {
       absentCount,
     };
   }, [activeGroup, activeWorkspace, exam, studentDatabase]);
-  const sectionPointTargets = useMemo(
-    () => (storageReady ? getNormalizedSectionPointTargets(exam) : new Map()),
-    [exam, storageReady],
-  );
 
   useEffect(() => {
     const completionKey = correctionCompletionState.key;
@@ -2291,10 +2276,6 @@ function App() {
     });
   };
 
-  const rebalanceSectionWeight = (sectionId: string, targetWeight: number) => {
-    updateSection(sectionId, { weight: targetWeight });
-  };
-
   const duplicateSection = (sectionId: string) => {
     setActiveWorkspaceExam((current) => {
       const index = current.sections.findIndex((section) => section.id === sectionId);
@@ -2485,7 +2466,6 @@ function App() {
         id: crypto.randomUUID(),
         title: section.title.trim(),
         description: section.description.trim(),
-        weight: section.weight,
         linkedSectionId: null,
         maxPointsOverride: null,
         note: "",
@@ -2495,7 +2475,7 @@ function App() {
             title: `${section.title.trim()} · Aufgabe 1`,
             description: section.description.trim() || `Grundstruktur für ${section.title.trim()}`,
             category: section.title.trim(),
-            maxPoints: Math.round(((config.totalPoints * section.weight) / 100) * 100) / 100,
+            maxPoints: section.points,
             achievedPoints: 0,
             expectation: "",
           },
@@ -4282,7 +4262,7 @@ function App() {
                     initialSections={exam.sections.map((section) => ({
                       id: section.id,
                       title: section.title,
-                      weight: section.weight,
+                      points: summary.sectionResults.find((result) => result.sectionId === section.id)?.maxPoints ?? 0,
                       description: section.description,
                     }))}
                     initialTarget={pendingSchoolYearCreation ? "new" : undefined}
@@ -4377,7 +4357,7 @@ function App() {
                                   Notenschlüssel bearbeiten
                                 </h3>
                                 <p className="subsection-copy mt-1 text-sm leading-6">
-                                  Aktiv ist die direkte Berechnung: Alle erreichten Punkte werden ohne Abschnittsgewichtung zusammengezählt.
+                                  Alle erreichten Punkte werden über alle Abschnitte hinweg zusammengezählt.
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -4390,18 +4370,6 @@ function App() {
                                 </button>
                               </div>
                             </div>
-                            {hasPointWeightMismatch && (
-                              <div className="mt-3">
-                                <DismissibleCallout
-                                  tone="warning"
-                                  resetKey={displayExam.sections
-                                    .map((section) => `${section.id}:${section.weight}:${section.maxPointsOverride ?? "auto"}:${section.tasks.map((task) => task.maxPoints).join(",")}`)
-                                    .join("|")}
-                                >
-                                  Die aktuellen Maximalpunkte passen noch nicht zu den eingetragenen Abschnitts-Gewichtungen. Die Prozentwerte bleiben als Orientierung sichtbar, die Gesamtnote wird aber weiterhin nur über Punkte berechnet.
-                                </DismissibleCallout>
-                              </div>
-                            )}
                           </section>
 
                           <div className="my-8 flex justify-center">
@@ -4517,7 +4485,7 @@ function App() {
                       <SectionEditor
                         section={entry}
                         index={entryIndex}
-                        targetPointsFromWeight={sectionPointTargets.get(entry.id) ?? null}
+                        totalMaxPoints={summary.totalMaxPoints}
                         draggable
                         isDragging={draggedSectionId === entry.id}
                         collapsed={collapsedSectionIds.includes(entry.id)}
@@ -4533,7 +4501,6 @@ function App() {
                         onDragOver={handleDragOverSection}
                         onDrop={handleDropSection}
                         onChange={(patch) => updateSection(entry.id, patch)}
-                        onWeightChange={(value) => rebalanceSectionWeight(entry.id, value)}
                         onTotalPointsChange={(value) => requestSectionTotalChange(entry.id, value)}
                         onToggleCollapse={() =>
                           setCollapsedSectionIds((current) =>

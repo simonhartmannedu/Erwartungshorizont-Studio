@@ -262,27 +262,18 @@ const extractSections = (text: string): ImportedSectionDraft[] => {
     const rawHeading = blockLines[0] ?? `Teil ${index + 1}`;
     const heading = getSectionHeading(rawHeading);
     const summaryLine = blockLines.find(isSummaryLine) ?? "";
-    const sectionWeight = heading?.percentage ?? extractPercentage(summaryLine) ?? 0;
     const tasks = extractTasksFromBlock(blockLines.join("\n"));
     return {
       title: heading?.title || rawHeading,
       description: summarizeLines(blockLines.slice(1).filter((line) => !isSummaryLine(line) && !isTaskHeadingLine(line)), 3, 220),
       note: STRUCTURE_NOTE,
-      weight: sectionWeight,
       tasks,
     };
   });
 
   if (sections.length > 0) {
-    const defaultWeight = Number((100 / sections.length).toFixed(1));
-    const weights = sections.map((section) => section.weight);
-    const hasExplicitWeights = weights.some((weight) => weight > 0);
-    const totalWeight = hasExplicitWeights ? weights.reduce((sum, weight) => sum + weight, 0) || 1 : sections.length;
     return sections.map((section) => ({
       ...section,
-      weight: hasExplicitWeights
-        ? Number(((section.weight / totalWeight) * 100).toFixed(1))
-        : defaultWeight,
       description: section.description || "Aus dem PDF erkannter Abschnitt.",
     }));
   }
@@ -291,7 +282,6 @@ const extractSections = (text: string): ImportedSectionDraft[] => {
     title: "Importierter Abschnitt",
     description: cleanupLine(normalizeText(text).split("\n").slice(0, 3).join(" ")).slice(0, 180),
     note: STRUCTURE_NOTE,
-    weight: 100,
     tasks: extractTasksFromBlock(text),
   }];
 };

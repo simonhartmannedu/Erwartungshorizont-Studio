@@ -20,7 +20,7 @@ const createTask = (
 
 const createSection = (
   title: string,
-  weight: number,
+  _legacyWeight: number,
   description: string,
   note: string,
   tasks: Task[],
@@ -28,7 +28,6 @@ const createSection = (
   id: crypto.randomUUID(),
   title,
   description,
-  weight,
   linkedSectionId: null,
   maxPointsOverride: null,
   note,

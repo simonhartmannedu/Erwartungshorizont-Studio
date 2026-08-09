@@ -28,7 +28,7 @@ export const ExamTemplatePicker = ({ templates, onLoad }: Props) => {
         <>
           <div className="subsection-copy mb-4 max-w-3xl text-sm leading-6">
             Die Vorlagen liefern eine sofort einsatzfähige Gesamtstruktur. Danach bleiben alle Bereiche, Aufgaben,
-            Unteraufgaben, Erwartungshorizonte, Punkte und Gewichtungen frei bearbeitbar, löschbar und umsortierbar.
+            Unteraufgaben, Erwartungshorizonte und Punkte bleiben frei bearbeitbar, löschbar und umsortierbar.
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             {templates.map((template) => (

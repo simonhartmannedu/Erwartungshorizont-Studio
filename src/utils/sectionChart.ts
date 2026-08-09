@@ -3,7 +3,7 @@ import { Exam, ExamSummary } from "../types";
 export interface SectionChartSegment {
   sectionId: string;
   title: string;
-  weight: number;
+  shareOfTotalPoints: number;
   percentage: number;
   achievedPoints: number;
   maxPoints: number;
@@ -58,26 +58,27 @@ export const getSectionChartSegments = (
   const outerRadius = config.outerRadius ?? size / 2 - 18;
   const cx = size / 2;
   const cy = size / 2;
-  const totalWeight = exam.sections.reduce((sum, section) => sum + Math.max(section.weight, 0), 0) || 1;
+  const totalMaxPoints = summary.totalMaxPoints || 1;
 
   let currentAngle = 0;
   return exam.sections.map((section, index) => {
     const result = summary.sectionResults.find((entry) => entry.sectionId === section.id);
-    const angleSpan = (Math.max(section.weight, 0) / totalWeight) * 360;
+    const maxPoints = result?.maxPoints ?? 0;
+    const shareOfTotalPoints = (maxPoints / totalMaxPoints) * 100;
+    const angleSpan = (shareOfTotalPoints / 100) * 360;
     const startAngle = currentAngle;
     const endAngle = currentAngle + angleSpan;
     currentAngle = endAngle;
 
     const percentage = result?.percentage ?? 0;
     const achievedPoints = result?.achievedPoints ?? 0;
-    const maxPoints = result?.maxPoints ?? 0;
     const valueOuterRadius = innerRadius + (outerRadius - innerRadius) * (percentage / 100);
     const color = SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length];
 
     return {
       sectionId: section.id,
       title: section.title,
-      weight: section.weight,
+      shareOfTotalPoints,
       percentage,
       achievedPoints,
       maxPoints,

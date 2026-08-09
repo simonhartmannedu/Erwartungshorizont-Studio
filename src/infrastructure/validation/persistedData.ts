@@ -50,7 +50,9 @@ const examSchema = v.object({
       id: v.string(),
       title: v.string(),
       description: v.string(),
-      weight: v.number(),
+      // Ältere EWHs enthielten frei gesetzte Abschnittsgewichtungen. Sie werden
+      // beim Laden bewusst ignoriert, bleiben hier aber für bestehende Backups lesbar.
+      weight: v.optional(v.number()),
       linkedSectionId: v.nullable(v.string()),
       maxPointsOverride: v.nullable(v.number()),
       note: v.string(),

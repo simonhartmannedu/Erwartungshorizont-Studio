@@ -197,6 +197,7 @@ export const PrintableReport = ({
 
         const renderSection = (entry: typeof section, entryIndex: number) => {
           const result = summary.sectionResults.find((item) => item.sectionId === entry.id)!;
+          const shareOfTotalPoints = summary.totalMaxPoints > 0 ? (result.maxPoints / summary.totalMaxPoints) * 100 : 0;
 
           return (
             <section key={entry.id} className="surface-elevated rounded-3xl border p-4 print-sheet print-hidden">
@@ -209,7 +210,7 @@ export const PrintableReport = ({
               </div>
               <div className="text-right" style={{ color: "var(--app-text)" }}>
                 <p>{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} Punkte</p>
-                <p>{formatNumber(result.percentage)} % · Gewichtung {formatNumber(entry.weight)} %</p>
+                <p>{formatNumber(result.percentage)} % · Anteil Gesamtpunkte {formatNumber(shareOfTotalPoints)} %</p>
               </div>
             </div>
             <div className="themed-table-shell overflow-hidden rounded-2xl border print-section-table-wrapper">

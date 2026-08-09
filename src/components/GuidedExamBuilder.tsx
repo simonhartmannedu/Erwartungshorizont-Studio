@@ -22,7 +22,7 @@ import { Card, DismissibleCallout, Field, NumberInput, TextAreaField } from "./u
 export interface GuidedSectionDraft {
   id: string;
   title: string;
-  weight: number;
+  points: number;
   description: string;
 }
 
@@ -100,20 +100,23 @@ interface Props {
 
 const getPartLabel = (index: number) => `Teil ${String.fromCharCode(65 + index)}`;
 
-const buildSectionDrafts = (sections: Array<Pick<GuidedSectionDraft, "title" | "weight" | "description">>) =>
+const buildSectionDrafts = (
+  sections: Array<{ title: string; weight: number; description: string }>,
+  totalPoints: number,
+) =>
   sections.map((section) => ({
     id: crypto.randomUUID(),
     title: section.title,
-    weight: section.weight,
+    points: Math.round(((totalPoints * section.weight) / 100) * 100) / 100,
     description: section.description,
   }));
 
-const createFallbackSections = () =>
+const createFallbackSections = (totalPoints: number) =>
   buildSectionDrafts([
     { title: "Teil A", weight: 40, description: "Erster Kompetenzbereich." },
     { title: "Teil B", weight: 35, description: "Zweiter Kompetenzbereich." },
     { title: "Teil C", weight: 25, description: "Dritter Kompetenzbereich." },
-  ]);
+  ], totalPoints);
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
 const POINT_STEP = 0.5;
@@ -302,12 +305,10 @@ const adjustTasksToSectionPoints = (tasks: Task[], targetPoints: number) =>
   }));
 
 const adjustExamToSectionPoints = (exam: Exam, sectionPoints: number[]): Exam => {
-  const total = sumPoints(sectionPoints);
   const sections: Section[] = exam.sections.map((section, index) => {
     const sectionTarget = sectionPoints[index] ?? section.tasks.reduce((sum, task) => sum + task.maxPoints, 0);
     return {
       ...section,
-      weight: total > 0 ? Math.round((sectionTarget / total) * 10000) / 100 : section.weight,
       maxPointsOverride: null,
       tasks: adjustTasksToSectionPoints(section.tasks, sectionTarget),
     };
@@ -605,7 +606,7 @@ export const GuidedExamBuilder = ({
     gradeScaleFor(initialGradeScale, Math.max(1, Math.round(initialTotalPoints || 60)), "sek1"),
   );
   const [sectionDrafts, setSectionDrafts] = useState<GuidedSectionDraft[]>(
-    initialSections.length > 0 ? initialSections : createFallbackSections(),
+    initialSections.length > 0 ? initialSections : createFallbackSections(initialTotalPoints),
   );
   const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({ ...initialMeta }));
 
@@ -679,11 +680,11 @@ export const GuidedExamBuilder = ({
     [manualResolvedSubject, manualStage],
   );
   const activeScaleStage = selectedTemplate?.schoolStage ?? manualStage;
-  const weightSum = useMemo(
-    () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.weight, 0) * 100) / 100,
+  const sectionPointSum = useMemo(
+    () => Math.round(sectionDrafts.reduce((sum, section) => sum + section.points, 0) * 100) / 100,
     [sectionDrafts],
   );
-  const difference = Math.round((100 - weightSum) * 100) / 100;
+  const difference = Math.round((totalPoints - sectionPointSum) * 100) / 100;
   const hasEmptyTitles = sectionDrafts.some((section) => !section.title.trim());
   const canCreate = target === "current" || Boolean(targetGroupId) || allowUnassignedWorkspace;
 
@@ -728,7 +729,7 @@ export const GuidedExamBuilder = ({
   useEffect(() => {
     if (mode !== "manual") return;
     setTotalPoints(manualGuidance.preset.totalPoints);
-    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections));
+    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections, manualGuidance.preset.totalPoints));
     setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
   }, [manualGuidance, manualStage, mode]);
 
@@ -778,7 +779,7 @@ export const GuidedExamBuilder = ({
 
   const applyManualPreset = () => {
     setTotalPoints(manualGuidance.preset.totalPoints);
-    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections));
+    setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections, manualGuidance.preset.totalPoints));
     setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
   };
 
@@ -1218,7 +1219,7 @@ export const GuidedExamBuilder = ({
               <div>
                 <h3 className="themed-strong text-lg font-semibold">Sektionen</h3>
                 <p className="themed-muted mt-1 text-sm">
-                  Summe: <strong>{formatNumber(weightSum)}</strong> / 100 %
+                  Summe: <strong>{formatNumber(sectionPointSum)}</strong> / {formatNumber(totalPoints)} Punkte
                 </p>
               </div>
               <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={applyManualPreset}>
@@ -1228,7 +1229,7 @@ export const GuidedExamBuilder = ({
 
             {difference !== 0 && (
               <p className="warning-note text-xs">
-                Noch {difference > 0 ? formatNumber(difference) : formatNumber(Math.abs(difference))} %{" "}
+                Noch {difference > 0 ? formatNumber(difference) : formatNumber(Math.abs(difference))} Punkte{" "}
                 {difference > 0 ? "zu verteilen" : "zu viel vergeben"}.
               </p>
             )}
@@ -1238,7 +1239,7 @@ export const GuidedExamBuilder = ({
                 <div key={section.id} className="template-manual-section">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="themed-strong text-sm font-semibold">{getPartLabel(index)}</p>
-                    <span className="label">{formatNumber((totalPoints * section.weight) / 100)} Punkte</span>
+                    <span className="label">{formatNumber(section.points)} Punkte</span>
                   </div>
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
                     <Field label="Titel">
@@ -1254,15 +1255,15 @@ export const GuidedExamBuilder = ({
                         }
                       />
                     </Field>
-                    <Field label="Gewichtung">
+                    <Field label="Punkte">
                       <NumberInput
                         className="field"
-                        value={section.weight}
+                        value={section.points}
                         min={0}
                         step={0.5}
                         onCommit={(value) =>
                           setSectionDrafts((current) =>
-                            current.map((entry) => (entry.id === section.id ? { ...entry, weight: value } : entry)),
+                            current.map((entry) => (entry.id === section.id ? { ...entry, points: value } : entry)),
                           )
                         }
                       />
