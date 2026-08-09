@@ -32,7 +32,6 @@ export interface ImportedSectionDraft {
   title: string;
   description: string;
   note: string;
-  weight: number;
   tasks: ImportedTaskDraft[];
 }
 

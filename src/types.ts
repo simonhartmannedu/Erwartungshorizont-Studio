@@ -42,7 +42,6 @@ export interface Section {
   id: string;
   title: string;
   description: string;
-  weight: number;
   linkedSectionId: string | null;
   maxPointsOverride: number | null;
   note: string;
@@ -181,7 +180,6 @@ export interface SectionResult {
   maxPoints: number;
   achievedPoints: number;
   percentage: number;
-  weightedPercentage: number;
 }
 
 export interface ValidationIssue {
@@ -248,7 +246,6 @@ export interface ExamSummary {
   totalMaxPoints: number;
   totalAchievedPoints: number;
   rawPercentage: number;
-  weightedPercentage: number;
   finalPercentage: number;
   sectionResults: SectionResult[];
   grade: GradeResult;

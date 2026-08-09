@@ -20,7 +20,7 @@ const createTask = (
 
 const createSection = (
   title: string,
-  weight: number,
+  _legacyWeight: number,
   description: string,
   note: string,
   tasks: Task[],
@@ -28,7 +28,6 @@ const createSection = (
   id: crypto.randomUUID(),
   title,
   description,
-  weight,
   linkedSectionId: null,
   maxPointsOverride: null,
   note,
@@ -1215,7 +1214,7 @@ const sek2Blueprints: TemplateBlueprint[] = [
     title: "Deutsch Sek II · Klausur",
     shortLabel: "D Sek II",
     description: "GOSt-Klausurvorlage mit Analyse, Deutung/Argumentation, Transfer und Darstellungsleistung.",
-    pedagogicalHint: "Die Gewichtung orientiert sich an einer oberstufentypischen Trennung von Inhalt und Darstellungsleistung.",
+    pedagogicalHint: "Die Punktverteilung orientiert sich an einer oberstufentypischen Trennung von Inhalt und Darstellungsleistung.",
     metaTitle: "Deutsch-Klausur GOSt",
     unit: "Analyse, Deutung und Transfer",
     notes:
@@ -2558,7 +2557,7 @@ export const createReadingExamTemplate = (): Exam => ({
     title: "Englisch-Klassenarbeit Lesen",
     unit: "Leseverstehen · Unit-Text und Aufgaben",
     notes:
-      "Sek-I-Bewertungsbogen Englisch NRW. Alle Teile, Aufgaben, Erwartungshorizonte und Gewichtungen sind vollständig editierbar.",
+      "Sek-I-Bewertungsbogen Englisch NRW. Alle Teile, Aufgaben, Erwartungshorizonte und Punkte sind vollständig editierbar.",
     gradeLevel: "8",
     course: "8b",
   }),

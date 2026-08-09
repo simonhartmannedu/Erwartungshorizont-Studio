@@ -51,7 +51,6 @@ const exam: Exam = {
       id: "section-a",
       title: "A",
       description: "",
-      weight: 60,
       linkedSectionId: null,
       maxPointsOverride: null,
       note: "",
@@ -63,7 +62,6 @@ const exam: Exam = {
       id: "section-b",
       title: "B",
       description: "",
-      weight: 40,
       linkedSectionId: null,
       maxPointsOverride: 10,
       note: "",
@@ -82,7 +80,6 @@ describe("Berechnungen", () => {
     expect(summary.totalAchievedPoints).toBe(22);
     expect(summary.rawPercentage).toBeCloseTo(110);
     expect(summary.finalPercentage).toBe(100);
-    expect(summary.weightedPercentage).toBe(88);
     expect(summary.sectionResults[1]).toMatchObject({ maxPoints: 10, achievedPoints: 14, percentage: 100 });
     expect(summary.grade.label).toBe("1");
   });

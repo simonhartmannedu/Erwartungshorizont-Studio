@@ -2,10 +2,9 @@ import { DragEvent as ReactDragEvent } from "react";
 import { Section, Task } from "../types";
 import { calculateSectionResult } from "../utils/calculations";
 import { formatNumber } from "../utils/format";
-import { getSectionRecommendation } from "../utils/sectionWeights";
 import { getWritingLanguageMetrics } from "../utils/writing";
 import { ChevronDownIcon, ChevronRightIcon, DragIcon, DuplicateIcon, LinkIcon, TrashIcon, UnlinkIcon } from "./icons";
-import { Badge, Card, DismissibleCallout, Field, IconButton, NumberInput, TextAreaField } from "./ui";
+import { Badge, Card, Field, IconButton, NumberInput, TextAreaField } from "./ui";
 import { getEditorTaskAnchorId } from "./EditorToc";
 import { TaskTable } from "./TaskTable";
 
@@ -42,8 +41,8 @@ const getSectionToneKey = (title: string, index: number): keyof typeof SECTION_T
 interface Props {
   section: Section;
   index: number;
+  totalMaxPoints: number;
   scoresLocked?: boolean;
-  targetPointsFromWeight?: number | null;
   draggable?: boolean;
   isDragging?: boolean;
   collapsed?: boolean;
@@ -53,7 +52,6 @@ interface Props {
   onDragOver?: (targetSectionId: string, position: "before" | "after") => void;
   onDrop?: (targetSectionId: string, position: "before" | "after") => void;
   onChange: (patch: Partial<Section>) => void;
-  onWeightChange: (value: number) => void;
   onTotalPointsChange: (value: number) => void;
   onToggleCollapse: () => void;
   onTaskChange: (taskId: string, patch: Partial<Task>) => void;
@@ -72,8 +70,8 @@ interface Props {
 export const SectionEditor = ({
   section,
   index,
+  totalMaxPoints,
   scoresLocked = false,
-  targetPointsFromWeight,
   draggable,
   isDragging,
   collapsed,
@@ -83,7 +81,6 @@ export const SectionEditor = ({
   onDragOver,
   onDrop,
   onChange,
-  onWeightChange,
   onTotalPointsChange,
   onToggleCollapse,
   onTaskChange,
@@ -100,10 +97,8 @@ export const SectionEditor = ({
 }: Props) => {
   const result = calculateSectionResult(section);
   const writingMetrics = getWritingLanguageMetrics(section);
-  const recommendation = getSectionRecommendation(section);
   const tone = SECTION_TONES[getSectionToneKey(section.title, index)];
-  const pointDelta = targetPointsFromWeight == null ? null : result.maxPoints - targetPointsFromWeight;
-  const hasPointWeightMismatch = pointDelta != null && Math.abs(pointDelta) > 0.05;
+  const shareOfTotalPoints = totalMaxPoints > 0 ? (result.maxPoints / totalMaxPoints) * 100 : 0;
   const handleDragPosition = (event: ReactDragEvent<HTMLDivElement>) =>
     event.clientY < event.currentTarget.getBoundingClientRect().top + event.currentTarget.getBoundingClientRect().height / 2
       ? "before"
@@ -197,6 +192,7 @@ export const SectionEditor = ({
           {linkedSectionTitle && <Badge tone="slate">Verknüpft mit {linkedSectionTitle}</Badge>}
           <Badge tone="amber">{formatNumber(result.percentage)} %</Badge>
           <Badge tone="slate">{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge>
+          <Badge tone="slate">Anteil Gesamtpunkte {formatNumber(shareOfTotalPoints)} %</Badge>
           {collapsed && (
             <span className="themed-muted w-full text-xs font-medium sm:ml-auto sm:w-auto">
               {section.tasks.length} Unteraufgaben
@@ -205,7 +201,7 @@ export const SectionEditor = ({
         </div>
         {!collapsed && (
           <>
-        <div className="mb-4 grid gap-3 lg:grid-cols-4">
+        <div className="mb-4 grid gap-3 lg:grid-cols-3">
           <Field label="Titel">
             <input className="field" value={section.title} onChange={(e) => onChange({ title: e.target.value })} />
           </Field>
@@ -215,15 +211,6 @@ export const SectionEditor = ({
               value={section.description}
               onChange={(e) => onChange({ description: e.target.value })}
               placeholder="Kurze Erklärung"
-            />
-          </Field>
-          <Field label="Gewichtung in %">
-            <NumberInput
-              className="field"
-              min={0}
-              step={0.5}
-              value={section.weight}
-              onCommit={onWeightChange}
             />
           </Field>
           <Field label="Max. Punkte Abschnitt">
@@ -269,37 +256,6 @@ export const SectionEditor = ({
             )}
           </div>
         </div>
-        {targetPointsFromWeight != null && (
-          <div className="mb-4">
-          <DismissibleCallout
-            tone={hasPointWeightMismatch ? (pointDelta != null && pointDelta > 0 ? "danger" : "warning") : "success"}
-            resetKey={[
-              section.id,
-              formatNumber(section.weight),
-              formatNumber(result.maxPoints),
-              formatNumber(targetPointsFromWeight),
-              hasPointWeightMismatch ? "mismatch" : "aligned",
-            ].join("|")}
-          >
-            Ziel bei <strong>{formatNumber(section.weight)} %</strong>:{" "}
-            <strong>{formatNumber(targetPointsFromWeight)} Punkte</strong>.
-            {hasPointWeightMismatch ? (
-              <>
-                {" "}Aktuell liegt der Abschnitt{" "}
-                <strong>{formatNumber(Math.abs(pointDelta ?? 0))} Punkte</strong>{" "}
-                {pointDelta != null && pointDelta > 0 ? "über" : "unter"} dem Ziel.
-              </>
-            ) : (
-              <> Die Punktzahl passt.</>
-            )}
-          </DismissibleCallout>
-          </div>
-        )}
-        {recommendation && (
-          <div className="surface-elevated mb-5 rounded-2xl border px-4 py-3 text-sm">
-            Empfehlung: {recommendation.label} · {recommendation.min}-{recommendation.max} % · typisch {recommendation.typical} %
-          </div>
-        )}
         <TaskTable
           tasks={section.tasks}
           scoresLocked={scoresLocked}
