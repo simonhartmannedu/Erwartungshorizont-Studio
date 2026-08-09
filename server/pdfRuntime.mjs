@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -6,7 +6,9 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const MAX_OCR_PAGES = 6;
+const MAX_PDF_PAGES = 30;
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
+const MAX_EXTRACTED_TEXT_CHARS = 120_000;
 const MAX_CONCURRENT_EXTRACTIONS = 2;
 const COMMAND_TIMEOUT_MS = 45_000;
 const COMMAND_MAX_BUFFER_BYTES = 2 * 1024 * 1024;
@@ -63,10 +65,28 @@ const isPdfExtractRequest = (value) =>
   isNonEmptyString(value.purpose) &&
   isNonEmptyString(value.timestamp);
 
+const readTextFileWithinLimit = async (filePath) => {
+  const fileInfo = await stat(filePath).catch(() => null);
+  if (!fileInfo?.isFile() || fileInfo.size === 0) return { text: "", wasTruncated: false };
+
+  const readableBytes = Math.min(fileInfo.size, MAX_EXTRACTED_TEXT_CHARS * 4);
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(readableBytes);
+    const { bytesRead } = await handle.read(buffer, 0, readableBytes, 0);
+    return {
+      text: normalizeWhitespace(buffer.subarray(0, bytesRead).toString("utf8")).slice(0, MAX_EXTRACTED_TEXT_CHARS),
+      wasTruncated: fileInfo.size > readableBytes,
+    };
+  } finally {
+    await handle.close();
+  }
+};
+
 const runPdftotext = async (pdfPath, outputPath) => {
-  await runCommand("pdftotext", ["-layout", pdfPath, outputPath]);
-  const content = await readFile(outputPath, "utf8").catch(() => "");
-  return normalizeWhitespace(content);
+  // Reading order is more useful for prose and task descriptions than visual column positions.
+  await runCommand("pdftotext", ["-nopgbrk", "-f", "1", "-l", String(MAX_PDF_PAGES), pdfPath, outputPath]);
+  return readTextFileWithinLimit(outputPath);
 };
 
 const runPdfInfoPageCount = async (pdfPath) => {
@@ -83,11 +103,11 @@ const runPdfInfoPageCount = async (pdfPath) => {
 
 const runOcr = async (pdfPath, workDir) => {
   const imagePrefix = path.join(workDir, "page");
-  await runCommand("pdftoppm", ["-png", "-scale-to", "2200", "-f", "1", "-l", String(MAX_OCR_PAGES), pdfPath, imagePrefix]);
+  await runCommand("pdftoppm", ["-jpeg", "-jpegopt", "quality=85", "-r", "300", "-f", "1", "-l", String(MAX_OCR_PAGES), pdfPath, imagePrefix]);
 
   const files = [];
   for (let page = 1; page <= MAX_OCR_PAGES; page += 1) {
-    files.push(path.join(workDir, `page-${page}.png`));
+    files.push(path.join(workDir, `page-${page}.jpg`));
   }
 
   const snippets = [];
@@ -98,7 +118,7 @@ const runOcr = async (pdfPath, workDir) => {
       continue;
     }
     try {
-      const { stdout } = await runCommand("tesseract", [file, "stdout", "-l", "deu+eng", "--psm", "6"]);
+      const { stdout } = await runCommand("tesseract", [file, "stdout", "-l", "deu+eng", "--psm", "3"]);
       if (stdout.trim()) {
         snippets.push(stdout);
       }
@@ -135,9 +155,17 @@ export const handlePdfExtractRequest = async (payload) => {
     const pdfPath = path.join(workDir, "upload.pdf");
     const textPath = path.join(workDir, "upload.txt");
     await writeFile(pdfPath, decodeBase64(payload.fileContentBase64));
-    const extractedText = await runPdftotext(pdfPath, textPath);
     const pageCountHint = await runPdfInfoPageCount(pdfPath);
     const warnings = [];
+
+    if (pageCountHint && pageCountHint > MAX_PDF_PAGES) {
+      return createError(422, "pdf_page_limit", `Die PDF hat ${pageCountHint} Seiten. Bitte importiere höchstens ${MAX_PDF_PAGES} Seiten gleichzeitig.`);
+    }
+
+    const { text: extractedText, wasTruncated } = await runPdftotext(pdfPath, textPath);
+    if (wasTruncated) {
+      warnings.push("Der extrahierte Text war sehr lang und wurde für den Strukturvorschlag gekürzt.");
+    }
 
     if (extractedText.length >= 80) {
       return {
@@ -157,7 +185,7 @@ export const handlePdfExtractRequest = async (payload) => {
 
     const ocrText = await runOcr(pdfPath, workDir);
     if (ocrText.length >= 40) {
-      warnings.push("Die PDF enthielt kaum eingebetteten Text. Deshalb wurde OCR auf bis zu 6 Seiten ausgeführt.");
+      warnings.push("Die PDF enthielt kaum eingebetteten Text. Deshalb wurde OCR mit 300 dpi auf bis zu 6 Seiten ausgeführt.");
       return {
         status: 200,
         body: {

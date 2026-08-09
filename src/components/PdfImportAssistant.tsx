@@ -162,6 +162,21 @@ export const PdfImportAssistant = ({
 
   const content = (
     <div className="space-y-5">
+      <DismissibleCallout tone="info" resetKey="pdf-start-help">
+        <p className="font-semibold">Das brauchst du für den PDF-Import</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6">
+          <li>Eine einzelne PDF-Datei – zum Beispiel ein Aufgabenblatt, ein alter Erwartungshorizont oder ein Scan. Maximal 8 MB und höchstens 30 Seiten.</li>
+          <li>Am besten eine gut lesbare Vorlage. Bei einem Scan kann EWH den Text erkennen, aber Tabellen, Handschrift und schlechte Kopien müssen besonders sorgfältig geprüft werden.</li>
+          <li>Keine unnötigen Namen, Noten, E-Mail-Adressen oder Passwörter in der Datei.</li>
+        </ol>
+        <p className="mt-3 text-sm leading-6">
+          <strong>Wichtig:</strong> In der Online-Demo funktioniert der PDF-Import nicht. Er braucht eine zusätzliche PDF-Hilfe auf deinem eigenen Rechner. Erscheint eine Meldung dazu, frage die Person, die EWH eingerichtet hat, oder die Schul-IT.
+        </p>
+        <p className="mt-2 text-sm leading-6">
+          So geht es: Haken setzen → PDF auswählen → Vorschau prüfen → Strukturvorschlag erzeugen → vor dem Übernehmen fachlich kontrollieren.
+        </p>
+      </DismissibleCallout>
+
       <DismissibleCallout tone="info" resetKey={filename || "pdf-import"}>
         <p className="font-semibold">Wichtig vorab</p>
         <p>
