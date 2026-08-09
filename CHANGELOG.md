@@ -4,6 +4,9 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
 ## Noch nicht veröffentlicht
 
+- Abschnittsgewichtungen entfernt: Gesamtnoten werden wieder ausschließlich aus den erreichten Rohpunkten gebildet.
+- Im EWH-Editor und Ausdruck wird je Abschnitt der automatisch aus den Maximalpunkten berechnete Anteil an der Gesamtpunktzahl angezeigt.
+- Vorlagen, geführter Aufbau und PDF-Import übernehmen nur noch Abschnitts- und Aufgabenpunkte; alte Gewichtungswerte aus Backups werden beim Laden ignoriert.
 - PDF-Import verlangt die Einwilligung vor der Dateiauswahl; Uploads sind auf 8 MB begrenzt.
 - Der lokale PDF-Dienst begrenzt Anfragegröße, Parallelität und Laufzeit externer PDF-Werkzeuge.
 - Die lokale Speicherung erkennt konkurrierende Tabs und verhindert das Überschreiben eines neueren Datenstands.

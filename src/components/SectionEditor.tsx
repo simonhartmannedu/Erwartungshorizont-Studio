@@ -192,7 +192,6 @@ export const SectionEditor = ({
           {linkedSectionTitle && <Badge tone="slate">Verknüpft mit {linkedSectionTitle}</Badge>}
           <Badge tone="amber">{formatNumber(result.percentage)} %</Badge>
           <Badge tone="slate">{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge>
-          <Badge tone="slate">Anteil Gesamtpunkte {formatNumber(shareOfTotalPoints)} %</Badge>
           {collapsed && (
             <span className="themed-muted w-full text-xs font-medium sm:ml-auto sm:w-auto">
               {section.tasks.length} Unteraufgaben
@@ -213,7 +212,7 @@ export const SectionEditor = ({
               placeholder="Kurze Erklärung"
             />
           </Field>
-          <Field label="Max. Punkte Abschnitt">
+          <Field label={`Max. Punkte Abschnitt · ${formatNumber(shareOfTotalPoints)} % der Gesamtpunkte`}>
             <NumberInput
               className="field"
               min={0}
