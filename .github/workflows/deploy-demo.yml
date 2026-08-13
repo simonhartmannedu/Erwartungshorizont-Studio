@@ -61,7 +61,7 @@ jobs:
         run: cp -R landing/. .pages/
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Run end-to-end tests
         run: npm run test:e2e

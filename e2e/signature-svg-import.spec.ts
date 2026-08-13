@@ -9,7 +9,7 @@ test("imports a local SVG signature without shipping it with the app", async ({ 
   await globalSearch.fill("Unit 5");
   await globalSearchResults.getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ }).click();
 
-  await page.getByRole("button", { name: "Klasse entsperren" }).click();
+  await page.getByRole("button", { name: "Klasse entsperren", exact: true }).click();
   await page.locator("#header-unlock-password").fill("demo");
   await page.getByRole("button", { name: "Lerngruppe entschlüsseln" }).click();
 
