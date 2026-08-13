@@ -471,7 +471,7 @@ export const StudentRosterPanel = ({
                 </label>
                 <a
                   className="button-secondary w-full gap-2 sm:w-auto"
-                  href="/klassenimport-vorlage.csv"
+                  href={`${import.meta.env.BASE_URL}klassenimport-vorlage.csv`}
                   download="klassenimport-vorlage.csv"
                 >
                   <DownloadIcon />
@@ -479,7 +479,7 @@ export const StudentRosterPanel = ({
                 </a>
               </div>
               <p className="status-note mt-3 text-xs leading-5">
-                Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>. Die Vorlage enthält drei Beispieldatensätze.
+                Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>. Alternativ funktioniert eine TXT/CSV-Liste ohne Kopfzeile im Format <strong>Nachname, Vorname, Klasse</strong>. Die Vorlage enthält drei Beispieldatensätze.
               </p>
             </div>
 

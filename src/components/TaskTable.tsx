@@ -5,6 +5,7 @@ import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
 interface Props {
   tasks: Task[];
   scoresLocked?: boolean;
+  onLockedScoreAttempt?: () => void;
   getTaskAnchorId?: (task: Task) => string;
   onChange: (taskId: string, patch: Partial<Task>) => void;
   onAdd: () => void;
@@ -16,14 +17,59 @@ interface Props {
 export const TaskTable = ({
   tasks,
   scoresLocked = false,
+  onLockedScoreAttempt,
   getTaskAnchorId,
   onChange,
   onAdd,
   onDelete,
   onDuplicate,
   onMove,
-}: Props) => (
-  <div className="space-y-4">
+}: Props) => {
+  const focusNextScoreField = (source: HTMLInputElement) => {
+    // Wait for React to commit the score update before moving focus. In Firefox an
+    // immediate focus call can otherwise be overwritten by the controlled input's
+    // re-render.
+    window.requestAnimationFrame(() => {
+      const scoreFields = Array.from(document.querySelectorAll<HTMLInputElement>(".score-input:not(:disabled)"))
+        .filter((field) => field.offsetParent !== null);
+      const currentIndex = scoreFields.indexOf(source);
+      const nextField = scoreFields[currentIndex + 1];
+      if (!nextField) return;
+
+      nextField.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      nextField.focus();
+      nextField.select();
+    });
+  };
+
+  const renderScoreInput = (task: Task, className: string, wrapperClassName: string) => (
+    <div className={`relative ${wrapperClassName}`}>
+      <NumberInput
+        className={className}
+        min={0}
+        step={0.5}
+        value={task.achievedPoints}
+        disabled={scoresLocked}
+        commitOnChange
+        onAdvance={focusNextScoreField}
+        onCommit={(value) => onChange(task.id, { achievedPoints: value })}
+      />
+      {scoresLocked && onLockedScoreAttempt ? (
+        <button
+          type="button"
+          className="absolute inset-0 z-10 cursor-pointer rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          aria-label="Punkteingabe gesperrt – Klasse entsperren"
+          title="Punkteingabe gesperrt – Klasse entsperren"
+          onClick={onLockedScoreAttempt}
+        >
+          <span className="sr-only">Klasse entsperren</span>
+        </button>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
     <div className="space-y-3 md:hidden">
       {tasks.map((task, index) => (
         <div
@@ -79,14 +125,11 @@ export const TaskTable = ({
                 />
               </Field>
               <Field label="Erreicht">
-                <NumberInput
-                  className="field w-full !px-2 !py-2 text-center text-sm font-semibold"
-                  min={0}
-                  step={0.5}
-                  value={task.achievedPoints}
-                  disabled={scoresLocked}
-                  onCommit={(value) => onChange(task.id, { achievedPoints: value })}
-                />
+                {renderScoreInput(
+                  task,
+                  "field score-input w-full !px-2 !py-2 text-center text-sm font-semibold",
+                  "w-full",
+                )}
               </Field>
             </div>
           </div>
@@ -157,14 +200,11 @@ export const TaskTable = ({
                     />
                   </td>
                   <td className="px-3 py-3">
-                    <NumberInput
-                      className="field mx-auto w-16 !px-2 !py-2 text-center text-sm font-semibold"
-                      min={0}
-                      step={0.5}
-                      value={task.achievedPoints}
-                      disabled={scoresLocked}
-                      onCommit={(value) => onChange(task.id, { achievedPoints: value })}
-                    />
+                    {renderScoreInput(
+                      task,
+                      "field score-input w-16 !px-2 !py-2 text-center text-sm font-semibold",
+                      "mx-auto w-16",
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end">
@@ -197,5 +237,7 @@ export const TaskTable = ({
         Unteraufgabe ergänzen
       </button>
     </Field>
-  </div>
-);
+      <p className="status-note text-xs leading-5">Punkte werden sofort gespeichert. Mit Enter springst du zum nächsten Punktefeld.</p>
+    </div>
+  );
+};

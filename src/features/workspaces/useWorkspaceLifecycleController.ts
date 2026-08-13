@@ -45,6 +45,7 @@ export const useWorkspaceLifecycleController = ({
             (options?.assignedGroupId ?? activeGroupId) || null,
           ),
           id: workspaceId,
+          setupCompletedAt: new Date().toISOString(),
         };
         return appendWorkspaceToBundle(current, workspace);
       });

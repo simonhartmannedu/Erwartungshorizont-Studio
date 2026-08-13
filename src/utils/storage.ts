@@ -185,6 +185,10 @@ export const parseDraftBundle = (raw: string | null): DraftBundle | null => {
           typeof workspace.assignedGroupId === "string" || workspace.assignedGroupId === null
             ? workspace.assignedGroupId
             : null,
+        setupCompletedAt:
+          typeof workspace.setupCompletedAt === "string" || workspace.setupCompletedAt === null
+            ? workspace.setupCompletedAt
+            : null,
         updatedAt:
           typeof workspace.updatedAt === "string" && workspace.updatedAt.trim().length > 0
             ? workspace.updatedAt
@@ -226,6 +230,7 @@ export const parseDraftBundle = (raw: string | null): DraftBundle | null => {
           exam: normalizeExamDraft(parsed as Exam),
           activeArchiveEntryId: null,
           assignedGroupId: null,
+          setupCompletedAt: null,
           updatedAt: new Date().toISOString(),
           versions: [],
         },

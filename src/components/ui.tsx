@@ -117,6 +117,8 @@ export const NumberInput = ({
   className = "",
   placeholder,
   disabled = false,
+  commitOnChange = false,
+  onAdvance,
 }: {
   value: number;
   onCommit: (value: number) => void;
@@ -125,6 +127,10 @@ export const NumberInput = ({
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  /** Persist complete numeric input immediately; useful for rapid score entry. */
+  commitOnChange?: boolean;
+  /** Move focus after Enter; used by the score-entry flow. */
+  onAdvance?: (source: HTMLInputElement) => void;
 }) => {
   const [draft, setDraft] = useState(() => formatEditableNumber(value));
 
@@ -153,8 +159,34 @@ export const NumberInput = ({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
+      event.preventDefault();
+      commit();
+      if (onAdvance) {
+        onAdvance(event.currentTarget);
+        return;
+      }
       event.currentTarget.blur();
     }
+  };
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextDraft = event.target.value;
+    setDraft(nextDraft);
+
+    if (!commitOnChange) return;
+
+    const normalized = nextDraft.replace(",", ".").trim();
+    // Keep incomplete decimal values editable (for example "1,"). Every complete,
+    // valid value is nevertheless persisted immediately, so switching fields with
+    // a click or Tab cannot leave a correction marked as incomplete.
+    if (!normalized || normalized.endsWith(".")) return;
+
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return;
+
+    const snapped = snapToStep(parsed, step);
+    const clamped = min !== undefined ? Math.max(min, snapped) : snapped;
+    onCommit(clamped);
   };
 
   return (
@@ -165,7 +197,7 @@ export const NumberInput = ({
       value={draft}
       placeholder={placeholder}
       disabled={disabled}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={handleChange}
       onBlur={commit}
       onKeyDown={handleKeyDown}
     />

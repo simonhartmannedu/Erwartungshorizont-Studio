@@ -17,7 +17,7 @@ test("searches clear names only during an unlocked class session", async ({ page
   await manualGroupForm.getByLabel("Klassenpasswort").fill("e2e-test-passwort");
   await manualGroupForm.getByRole("button", { name: "Lerngruppe anlegen" }).click();
 
-  const groupSection = page.getByRole("button", { name: groupLabel, exact: true }).locator("xpath=ancestor::section");
+  const groupSection = page.getByRole("button", { name: groupLabel, exact: true }).locator("xpath=ancestor::section[1]");
   await groupSection.getByPlaceholder("Schülercode, z. B. E8B-01").fill("T9S-01");
   await groupSection.getByPlaceholder("Klarname").fill(fullName);
   await groupSection.getByRole("button", { name: "Schüler hinzufügen" }).click();

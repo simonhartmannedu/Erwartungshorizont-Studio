@@ -75,6 +75,17 @@ export const StudentSelectionPanel = ({
     database.groups.find((group) => group.id === activeGroupId) ?? null;
   const selectedStudentRecord =
     activeGroup?.students.find((student) => student.id === activeStudentId) ?? null;
+  const selectedStudentAssessment = selectedStudentRecord
+    ? getStudentAssessment(database, selectedStudentRecord.id, activeWorkspaceId)
+    : null;
+  const taskCount = activeExam.sections.reduce((count, section) => count + section.tasks.length, 0);
+  const scoredTaskCount = activeExam.sections.reduce(
+    (count, section) =>
+      count + section.tasks.filter(
+        (task) => selectedStudentAssessment && Object.prototype.hasOwnProperty.call(selectedStudentAssessment.taskScores, task.id),
+      ).length,
+    0,
+  );
   const studentCorrectionStatuses = useMemo(
     () =>
       new Map(
@@ -194,6 +205,10 @@ export const StudentSelectionPanel = ({
             {activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
               <p className="warning-note text-xs leading-5">
                 Bewertungsdaten und Klarnamen bleiben gesperrt, bis du die aktive Klasse oben über das Schlüsselmodul entsperrst.
+              </p>
+            ) : selectedStudentRecord && taskCount > 0 ? (
+              <p className="status-note text-xs leading-5">
+                Korrekturfortschritt: <strong>{scoredTaskCount} von {taskCount}</strong> Punkteingaben erfasst.
               </p>
             ) : null}
           </div>

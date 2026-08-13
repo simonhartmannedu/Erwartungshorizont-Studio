@@ -12,7 +12,7 @@ const workspace = {
 } as DraftWorkspace;
 
 describe("WorkspaceVersionPanel", () => {
-  it("summarizes collapsed local snapshots", () => {
+  it("summarizes collapsed local EWH versions", () => {
     const markup = renderToStaticMarkup(
       createElement(WorkspaceVersionPanel, {
         workspace,
@@ -25,8 +25,9 @@ describe("WorkspaceVersionPanel", () => {
       }),
     );
 
-    expect(markup).toContain("1 gespeicherte Schnappschüsse");
-    expect(markup).toContain("Schnappschuss jetzt speichern");
+    expect(markup).toContain("1 gespeicherte EWH-Version");
+    expect(markup).toContain("Aktuellen EWH als Version speichern");
+    expect(markup).toContain("Schülerpunkte gehören nicht dazu");
   });
 
   it("shows a restore action when snapshots are expanded", () => {

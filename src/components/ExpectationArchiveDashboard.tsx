@@ -182,7 +182,7 @@ export const ExpectationArchiveDashboard = ({
   return (
     <Card
       title="Erwartungshorizont-Archiv"
-      subtitle="Gespeicherte Bewertungsbögen zum Wiederverwenden, Öffnen oder Duplizieren."
+      subtitle="Wiederverwendbare Vorlagen ohne Schülerergebnisse. Für eine Klasse wird daraus jeweils eine neue Klassenarbeit erstellt."
     >
       <div className="mb-5 grid gap-3 md:grid-cols-5">
         <Field label="Suche">
@@ -410,7 +410,7 @@ export const ExpectationArchiveDashboard = ({
                         )}
                         <IconButton
                           onClick={() => onDuplicateToBuilder(entry)}
-                          title="Als Kopie öffnen"
+                          title="Neue Klassenarbeit aus Vorlage erstellen"
                           className="px-3 py-2"
                         >
                           <DuplicateIcon />

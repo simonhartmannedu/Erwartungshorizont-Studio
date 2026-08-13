@@ -68,6 +68,38 @@ export const BackupPanel = ({
   return (
     <div className="space-y-6 no-print">
       <Card
+        title="Speichern verstehen"
+        subtitle="Drei Ebenen mit unterschiedlichen Aufgaben – sie ergänzen sich, ersetzen sich aber nicht."
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="surface-elevated rounded-3xl border p-4">
+            <p className="label">1. Automatisch speichern</p>
+            <p className="themed-strong mt-2 text-base font-semibold">Während der Arbeit</p>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Änderungen an Klassenarbeiten und Schülerergebnissen werden direkt in diesem Browser gespeichert. Du musst dafür nichts anklicken.
+            </p>
+            <p className="status-note mt-3 text-xs leading-5">Gut für: normales Weiterarbeiten. Nicht genug bei Gerätewechsel, Browserbereinigung oder Verlust des Geräts.</p>
+          </div>
+          <div className="surface-elevated rounded-3xl border p-4">
+            <p className="label">2. EWH-Version</p>
+            <p className="themed-strong mt-2 text-base font-semibold">Vor größeren Änderungen</p>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Eine EWH-Version bewahrt einen früheren Stand des Erwartungshorizonts, zum Beispiel vor dem Umbau von Aufgaben oder Notenschlüssel.
+            </p>
+            <p className="status-note mt-3 text-xs leading-5">Gut für: „Ich möchte diese Änderung zurücknehmen.“ Enthält keine Schülerpunkte und bleibt nur in diesem Browser.</p>
+          </div>
+          <div className="surface-elevated rounded-3xl border p-4">
+            <p className="label">3. Verschlüsseltes Vollbackup</p>
+            <p className="themed-strong mt-2 text-base font-semibold">Regelmäßig und vor Risiken</p>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Eine heruntergeladene Datei enthält Klassenarbeiten, EWH-Versionen, Archiv und Schülerdaten. Sie lässt sich später wieder importieren.
+            </p>
+            <p className="status-note mt-3 text-xs leading-5">Gut für: mindestens wöchentlich, nach abgeschlossener Korrektur sowie vor Browser-/Gerätewechsel.</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card
         title="Backup"
         subtitle="Vollständige Sicherungen, Schuljahr-Archivierung und Wiederherstellung."
       >
@@ -169,7 +201,7 @@ export const BackupPanel = ({
 
       <Card
         title="Schuljahr archivieren"
-        subtitle="Sichert alle Klassenarbeiten eines Schuljahrs samt Schnappschüssen in eine wiederherstellbare Datei und entfernt sie anschließend aus der Arbeitsoberfläche. EWH-Archiv-Einträge bleiben lokal erhalten und werden nicht exportiert."
+        subtitle="Sichert alle Klassenarbeiten eines Schuljahrs samt EWH-Versionen in eine wiederherstellbare Datei und entfernt sie anschließend aus der Arbeitsoberfläche. EWH-Archiv-Einträge bleiben lokal erhalten und werden nicht exportiert."
       >
         {schoolYearOptions.length === 0 ? (
           <p className="status-note text-sm leading-6">Es gibt noch keine Klassenarbeiten, die archiviert werden können.</p>
@@ -192,7 +224,7 @@ export const BackupPanel = ({
               {selectedOption ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Badge tone="slate">{selectedOption.workspaceCount} Klassenarbeiten</Badge>
-                  <Badge tone="slate">{selectedOption.snapshotCount} Schnappschüsse</Badge>
+                  <Badge tone="slate">{selectedOption.snapshotCount} EWH-Versionen</Badge>
                   <Badge tone="slate">{selectedOption.assessmentCount} Bewertungen</Badge>
                 </div>
               ) : null}
@@ -251,13 +283,13 @@ export const BackupPanel = ({
         </p>
       </Card>
 
-      <Card title="Schnappschüsse und Exportdateien" subtitle="Was die Browser-App realistisch verwalten kann.">
+      <Card title="EWH-Versionen und Exportdateien" subtitle="Was die Browser-App realistisch verwalten kann.">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="surface-elevated rounded-3xl border p-4">
-            <p className="label">Schnappschüsse</p>
+            <p className="label">EWH-Versionen</p>
             <p className="themed-strong text-2xl font-semibold">{totalSnapshotCount}</p>
             <p className="themed-muted mt-2 text-sm leading-6">
-              Schnappschüsse hängen an der jeweiligen Klassenarbeit und werden in Vollbackups sowie Schuljahr-Archiven mitgesichert.
+              EWH-Versionen hängen an der jeweiligen Klassenarbeit und werden in Vollbackups sowie Schuljahr-Archiven mitgesichert. Sie enthalten keine Schülerergebnisse.
             </p>
           </div>
           <div className="surface-elevated rounded-3xl border p-4">

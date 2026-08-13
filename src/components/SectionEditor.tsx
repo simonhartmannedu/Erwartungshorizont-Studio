@@ -43,6 +43,7 @@ interface Props {
   index: number;
   totalMaxPoints: number;
   scoresLocked?: boolean;
+  onLockedScoreAttempt?: () => void;
   draggable?: boolean;
   isDragging?: boolean;
   collapsed?: boolean;
@@ -72,6 +73,7 @@ export const SectionEditor = ({
   index,
   totalMaxPoints,
   scoresLocked = false,
+  onLockedScoreAttempt,
   draggable,
   isDragging,
   collapsed,
@@ -258,6 +260,7 @@ export const SectionEditor = ({
         <TaskTable
           tasks={section.tasks}
           scoresLocked={scoresLocked}
+          onLockedScoreAttempt={onLockedScoreAttempt}
           getTaskAnchorId={(task) => getEditorTaskAnchorId(section.id, task.id)}
           onChange={onTaskChange}
           onAdd={onAddTask}
