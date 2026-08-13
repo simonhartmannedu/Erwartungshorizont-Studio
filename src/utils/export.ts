@@ -5,6 +5,120 @@ import { getGradeScaleRangeDigits, getGradeScaleRanges } from "./gradeScaleRange
 import { isLinkedSectionFollower, isLinkedSectionLeader } from "./sectionLinks";
 import { SecurityTokenCard } from "./securityTokens";
 
+type DocxModule = typeof import("docx");
+
+const DOCX_COLORS = {
+  ink: "172033",
+  muted: "526071",
+  accent: "274C77",
+  surface: "F6F8FB",
+  rule: "D8D8D8",
+} as const;
+
+const createDocxCell = (
+  docx: DocxModule,
+  text: string,
+  options: { bold?: boolean; header?: boolean; align?: "left" | "center" | "right"; plain?: boolean } = {},
+) => {
+  const alignment =
+    options.align === "center"
+      ? docx.AlignmentType.CENTER
+      : options.align === "right"
+        ? docx.AlignmentType.RIGHT
+        : docx.AlignmentType.LEFT;
+  const isHeader = options.header ?? false;
+
+  return new docx.TableCell({
+    verticalAlign: docx.VerticalAlign.CENTER,
+    shading: options.plain ? undefined : { fill: isHeader ? DOCX_COLORS.accent : DOCX_COLORS.surface },
+    margins: options.plain ? { top: 35, bottom: 35, left: 50, right: 50 } : { top: 90, bottom: 90, left: 120, right: 120 },
+    children: [
+      new docx.Paragraph({
+        alignment,
+        spacing: { after: 0, line: options.plain ? 200 : 240 },
+        children: [
+          new docx.TextRun({
+            text,
+            bold: options.bold ?? isHeader,
+            size: 18,
+            color: options.plain || !isHeader ? DOCX_COLORS.ink : "FFFFFF",
+          }),
+        ],
+      }),
+    ],
+  });
+};
+
+const createDocxTable = (docx: DocxModule, rows: InstanceType<DocxModule["TableRow"]>[], plain = false) =>
+  new docx.Table({
+    width: { size: 100, type: docx.WidthType.PERCENTAGE },
+    layout: docx.TableLayoutType.AUTOFIT,
+    borders: {
+      top: { style: docx.BorderStyle.SINGLE, size: 8, color: plain ? "111111" : DOCX_COLORS.rule },
+      bottom: { style: docx.BorderStyle.SINGLE, size: 8, color: plain ? "111111" : DOCX_COLORS.rule },
+      insideHorizontal: { style: docx.BorderStyle.SINGLE, size: 4, color: DOCX_COLORS.rule },
+    },
+    rows,
+  });
+
+const createDocxDocument = (
+  docx: DocxModule,
+  options: {
+    title: string;
+    subtitle?: string;
+    children: InstanceType<DocxModule["Paragraph"]>[] | InstanceType<DocxModule["Table"]>[] | Array<InstanceType<DocxModule["Paragraph"]> | InstanceType<DocxModule["Table"]>>;
+    plain?: boolean;
+  },
+) => {
+  return new docx.Document({
+    creator: "Erwartungshorizont Studio",
+    title: options.title,
+    subject: options.subtitle,
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: "16mm", right: "16mm", bottom: "16mm", left: "16mm" },
+          },
+        },
+        ...(options.plain
+          ? {}
+          : {
+              headers: {
+                default: new docx.Header({
+                  children: [
+                    new docx.Paragraph({
+                      border: { bottom: { style: docx.BorderStyle.SINGLE, size: 10, color: DOCX_COLORS.accent } },
+                      spacing: { after: 100 },
+                      children: [
+                        new docx.TextRun({ text: "ERWARTUNGSHORIZONT STUDIO", bold: true, size: 14, color: DOCX_COLORS.accent }),
+                        new docx.TextRun({ text: options.subtitle ? `  ·  ${options.subtitle}` : "", size: 14, color: DOCX_COLORS.muted }),
+                      ],
+                    }),
+                  ],
+                }),
+              },
+              footers: {
+                default: new docx.Footer({
+                  children: [
+                    new docx.Paragraph({
+                      alignment: docx.AlignmentType.RIGHT,
+                      spacing: { before: 80 },
+                      children: [
+                        new docx.TextRun({ text: "Seite ", size: 16, color: DOCX_COLORS.muted }),
+                        new docx.TextRun({ children: [docx.PageNumber.CURRENT], size: 16, color: DOCX_COLORS.muted }),
+                      ],
+                    }),
+                  ],
+                }),
+              },
+            }),
+        children: options.children,
+      },
+    ],
+  });
+};
+
 export const downloadJson = (exam: Exam) => {
   const blob = new Blob([JSON.stringify(exam, null, 2)], { type: "application/json" });
   void saveBlobWithDialog(`${exam.meta.title || "bewertungsraster"}.json`, blob, {
@@ -100,21 +214,14 @@ export const saveBlobWithDialog = async (
   return target.save(blob);
 };
 
-export const exportEditableExamDocx = async (
+const createEditableExamDocxChildren = (
+  docx: DocxModule,
   exam: Exam,
   summary: ExamSummary,
   identity?: PrintIdentity,
   options?: { hideResults?: boolean },
 ) => {
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
-  const textCell = (text: string, bold = false) =>
-    new TableCell({
-      children: [
-        new Paragraph({
-          children: [new TextRun({ text, bold })],
-        }),
-      ],
-    });
+  const { Paragraph, TableRow, TextRun } = docx;
   const meta = [
     ["Fach", identity?.subject || exam.meta.subject || "—"],
     ["Klasse", identity?.className || exam.meta.course || "—"],
@@ -125,19 +232,16 @@ export const exportEditableExamDocx = async (
   ];
   const children = [
     new Paragraph({
-      children: [new TextRun({ text: exam.meta.title || "Bewertungsbogen", bold: true, size: 30 })],
-      spacing: { after: 120 },
+      children: [new TextRun({ text: exam.meta.title || "Bewertungsbogen", bold: true, size: 32, color: DOCX_COLORS.ink })],
+      spacing: { after: 80 },
     }),
     ...(exam.meta.unit
-      ? [new Paragraph({ children: [new TextRun({ text: exam.meta.unit, italics: true })], spacing: { after: 180 } })]
+      ? [new Paragraph({ children: [new TextRun({ text: exam.meta.unit, italics: true, color: DOCX_COLORS.muted })], spacing: { after: 180 } })]
       : []),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: meta.map(([label, value]) => new TableRow({ children: [textCell(label, true), textCell(value)] })),
-    }),
+    createDocxTable(docx, meta.map(([label, value]) => new TableRow({ children: [createDocxCell(docx, label, { bold: true }), createDocxCell(docx, value)] }))),
     new Paragraph({
-      children: [new TextRun({ text: "Bewertung", bold: true, size: 24 })],
-      spacing: { before: 300, after: 100 },
+      children: [new TextRun({ text: "Bewertung", bold: true, size: 24, color: DOCX_COLORS.accent })],
+      spacing: { before: 300, after: 120 },
     }),
   ];
 
@@ -145,56 +249,68 @@ export const exportEditableExamDocx = async (
     const sectionPoints = section.tasks.reduce((total, task) => total + task.maxPoints, 0);
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `${sectionIndex + 1}. ${section.title || "Aufgabenteil"}`, bold: true, size: 22 })],
-        spacing: { before: 220, after: 80 },
+        children: [new TextRun({ text: `${sectionIndex + 1}. ${section.title || "Aufgabenteil"}`, bold: true, size: 22, color: DOCX_COLORS.accent })],
+        spacing: { before: 240, after: 70 },
+        keepNext: true,
       }),
     );
     if (section.description.trim()) {
-      children.push(new Paragraph({ children: [new TextRun({ text: section.description })], spacing: { after: 80 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: section.description, color: DOCX_COLORS.muted })], spacing: { after: 100 }, keepNext: true }));
     }
     children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
+      createDocxTable(docx, [
           new TableRow({
-            children: [textCell("Aufgabe", true), textCell("Erwartung / mögliche Antwort", true), textCell("Punkte", true)],
+            tableHeader: true,
+            children: [createDocxCell(docx, "Aufgabe", { header: true }), createDocxCell(docx, "Erwartung / mögliche Antwort", { header: true }), createDocxCell(docx, "Punkte", { header: true, align: "center" })],
           }),
           ...section.tasks.map((task, taskIndex) =>
             new TableRow({
               children: [
-                textCell(`${taskIndex + 1}. ${task.title || "Aufgabe"}`),
-                textCell(task.expectation || task.description || "—"),
-                textCell(options?.hideResults ? `— / ${formatNumber(task.maxPoints)}` : `${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`),
+                createDocxCell(docx, `${taskIndex + 1}. ${task.title || "Aufgabe"}`),
+                createDocxCell(docx, task.expectation || task.description || "—"),
+                createDocxCell(docx, options?.hideResults ? `— / ${formatNumber(task.maxPoints)}` : `${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`, { align: "center" }),
               ],
             }),
           ),
           new TableRow({
-            children: [textCell("Summe", true), textCell("", true), textCell(`${formatNumber(sectionPoints)} Punkte`, true)],
+            children: [createDocxCell(docx, "Summe", { bold: true }), createDocxCell(docx, ""), createDocxCell(docx, `${formatNumber(sectionPoints)} Punkte`, { bold: true, align: "center" })],
           }),
-        ],
-      }),
+        ]),
     );
   });
 
   if (!options?.hideResults) {
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "Ergebnis", bold: true, size: 24 })],
-        spacing: { before: 300, after: 100 },
+        children: [new TextRun({ text: "Ergebnis", bold: true, size: 24, color: DOCX_COLORS.accent })],
+        spacing: { before: 300, after: 120 },
       }),
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({ children: [textCell("Gesamtpunkte", true), textCell(`${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
-          new TableRow({ children: [textCell("Prozent", true), textCell(`${formatNumber(summary.finalPercentage)} %`)] }),
-          new TableRow({ children: [textCell("Note", true), textCell(`${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
-          new TableRow({ children: [textCell("Kommentar", true), textCell(identity?.teacherComment || "") ] }),
-        ],
-      }),
+      createDocxTable(docx, [
+          new TableRow({ children: [createDocxCell(docx, "Gesamtpunkte", { bold: true }), createDocxCell(docx, `${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
+          new TableRow({ children: [createDocxCell(docx, "Prozent", { bold: true }), createDocxCell(docx, `${formatNumber(summary.finalPercentage)} %`)] }),
+          new TableRow({ children: [createDocxCell(docx, "Note", { bold: true }), createDocxCell(docx, `${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
+          new TableRow({ children: [createDocxCell(docx, "Kommentar", { bold: true }), createDocxCell(docx, identity?.teacherComment || "") ] }),
+        ]),
     );
   }
 
-  const document = new Document({ sections: [{ children }] });
+  return children;
+};
+
+export const exportEditableExamDocx = async (
+  exam: Exam,
+  summary: ExamSummary,
+  identity?: PrintIdentity,
+  options?: { hideResults?: boolean },
+) => {
+  const docx = await import("docx");
+  const { Packer } = docx;
+  const children = createEditableExamDocxChildren(docx, exam, summary, identity, options);
+  const document = createDocxDocument(docx, {
+    title: exam.meta.title || "Bewertungsbogen",
+    subtitle: [identity?.subject || exam.meta.subject, identity?.className || exam.meta.course].filter(Boolean).join(" · "),
+    children,
+  });
   const blob = await Packer.toBlob(document);
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizeFilenamePart(identity?.alias || exam.meta.title || "Bewertungsbogen")}_${timestamp}.docx`;
@@ -204,60 +320,19 @@ export const exportEditableExamDocx = async (
   });
 };
 
-/** Creates one editable class table. Individual detailed feedback remains available via the current student export. */
+/** Combines the same individual student sheets into one editable class document. */
 export const exportClassEditableExamDocx = async (exam: Exam, reports: PrintPayload[]) => {
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
-  const textCell = (text: string, bold = false) =>
-    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
-  const tasks = exam.sections.flatMap((section, sectionIndex) =>
-    section.tasks.map((task, taskIndex) => ({
-      label: `${sectionIndex + 1}.${taskIndex + 1} ${task.title || "Aufgabe"}`,
-      maxPoints: task.maxPoints,
-    })),
-  );
-  const children = [
-    new Paragraph({
-      children: [new TextRun({ text: `${exam.meta.title || "Bewertungsbogen"} – Klasse`, bold: true, size: 30 })],
-      spacing: { after: 120 },
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: [exam.meta.subject, exam.meta.course, exam.meta.examDate].filter(Boolean).join(" · ") || "Klassenübersicht" })],
-      spacing: { after: 180 },
-    }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({
-          children: [
-            textCell("Schüler:in", true),
-            ...tasks.map((task) => textCell(`${task.label}\nmax. ${formatNumber(task.maxPoints)}`, true)),
-            textCell("Gesamt", true),
-            textCell("%", true),
-            textCell("Note", true),
-            textCell("Kommentar", true),
-          ],
-        }),
-        ...reports.map((report) => {
-          const scores = report.exam.sections.flatMap((section) => section.tasks.map((task) => task.achievedPoints));
-          return new TableRow({
-            children: [
-              textCell(report.identity?.fullName || report.identity?.alias || "—"),
-              ...tasks.map((_, index) => textCell(formatNumber(scores[index] ?? 0))),
-              textCell(`${formatNumber(report.summary.totalAchievedPoints)} / ${formatNumber(report.summary.totalMaxPoints)}`),
-              textCell(`${formatNumber(report.summary.finalPercentage)} %`),
-              textCell(report.summary.grade.schoolDisplay),
-              textCell(report.identity?.teacherComment || ""),
-            ],
-          });
-        }),
-      ],
-    }),
-    new Paragraph({
-      children: [new TextRun({ text: "Hinweis: Die Tabelle ist editierbar. Für einen vollständigen Einzelbogen wähle den jeweiligen Schüler bzw. die jeweilige Schülerin im Editor.", italics: true })],
-      spacing: { before: 180 },
-    }),
-  ];
-  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const docx = await import("docx");
+  const { Packer, PageBreak, Paragraph } = docx;
+  const children = reports.flatMap((report, index) => [
+    ...createEditableExamDocxChildren(docx, report.exam, report.summary, report.identity),
+    ...(index < reports.length - 1 ? [new Paragraph({ children: [new PageBreak()] })] : []),
+  ]);
+  const blob = await Packer.toBlob(createDocxDocument(docx, {
+    title: `${exam.meta.title || "Bewertungsbogen"} – Klasse`,
+    subtitle: [exam.meta.subject, exam.meta.course].filter(Boolean).join(" · "),
+    children,
+  }));
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizeFilenamePart(reports[0]?.identity?.className || exam.meta.course || exam.meta.title || "Klasse")}_${timestamp}.docx`;
   return saveBlobWithDialog(filename, blob, {
@@ -267,29 +342,29 @@ export const exportClassEditableExamDocx = async (exam: Exam, reports: PrintPayl
 };
 
 export const exportGradeScaleDocx = async (exam: Exam, summary: ExamSummary, filenamePrefix?: string) => {
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
-  const textCell = (text: string, bold = false) =>
-    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const docx = await import("docx");
+  const { Packer, Paragraph, TableRow, TextRun } = docx;
   const ranges = getGradeScaleRanges(exam, summary.totalMaxPoints);
   const digits = getGradeScaleRangeDigits(exam, summary.totalMaxPoints);
   const children = [
-    new Paragraph({ children: [new TextRun({ text: exam.meta.title || "Notenbereiche", bold: true, size: 30 })], spacing: { after: 100 } }),
-    new Paragraph({ children: [new TextRun({ text: `${exam.gradeScale.title || "Notenschlüssel"} · ${formatNumber(summary.totalMaxPoints)} Gesamtpunkte` })], spacing: { after: 180 } }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [textCell("Note", true), textCell("Von", true), textCell("Bis", true)] }),
+    new Paragraph({ children: [new TextRun({ text: exam.meta.title || "Notenbereiche", bold: true, size: 32, color: DOCX_COLORS.ink })], spacing: { after: 80 } }),
+    new Paragraph({ children: [new TextRun({ text: `${exam.gradeScale.title || "Notenschlüssel"} · ${formatNumber(summary.totalMaxPoints)} Gesamtpunkte`, color: DOCX_COLORS.muted })], spacing: { after: 180 } }),
+    createDocxTable(docx, [
+        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Note", { header: true, align: "center" }), createDocxCell(docx, "Von", { header: true, align: "center" }), createDocxCell(docx, "Bis", { header: true, align: "center" })] }),
         ...ranges.map((range) => new TableRow({
           children: [
-            textCell(range.label),
-            textCell(formatNumber(Number(range.lowerBound.toFixed(digits)))),
-            textCell(formatNumber(Number(range.upperBound.toFixed(digits)))),
+            createDocxCell(docx, range.label, { bold: true, align: "center" }),
+            createDocxCell(docx, formatNumber(Number(range.lowerBound.toFixed(digits))), { align: "center" }),
+            createDocxCell(docx, formatNumber(Number(range.upperBound.toFixed(digits))), { align: "center" }),
           ],
         })),
-      ],
-    }),
+      ]),
   ];
-  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const blob = await Packer.toBlob(createDocxDocument(docx, {
+    title: exam.meta.title || "Notenbereiche",
+    subtitle: exam.gradeScale.title || "Notenschlüssel",
+    children,
+  }));
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche")}_Notenbereiche_${timestamp}.docx`;
   return saveBlobWithDialog(filename, blob, {
@@ -303,37 +378,31 @@ export const exportClassOverviewDocx = async (
   overview: ClassOverviewData,
   context?: { subject?: string; className?: string },
 ) => {
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("docx");
-  const textCell = (text: string, bold = false) =>
-    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold })] })] });
+  const docx = await import("docx");
+  const { Packer, Paragraph, TableRow, TextRun } = docx;
   const children = [
-    new Paragraph({ children: [new TextRun({ text: `${exam.meta.title || "Klassenübersicht"} – Klassenübersicht`, bold: true, size: 30 })], spacing: { after: 100 } }),
-    new Paragraph({ children: [new TextRun({ text: [context?.subject, context?.className, exam.meta.examDate].filter(Boolean).join(" · ") })], spacing: { after: 180 } }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [textCell("Schüler:innen", true), textCell("Ø Prozent", true), textCell("Median", true), textCell("Beste Leistung", true), textCell("Schwächste Leistung", true)] }),
-        new TableRow({ children: [textCell(formatNumber(overview.studentCount)), textCell(`${formatNumber(overview.averagePercentage)} %`), textCell(`${formatNumber(overview.medianPercentage)} %`), textCell(`${formatNumber(overview.bestPercentage)} %`), textCell(`${formatNumber(overview.lowestPercentage)} %`)] }),
-      ],
-    }),
-    new Paragraph({ children: [new TextRun({ text: "Notenspiegel", bold: true, size: 24 })], spacing: { before: 260, after: 80 } }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [textCell("Note", true), textCell("Anzahl", true)] }),
-        ...overview.gradeDistribution.map((entry) => new TableRow({ children: [textCell(entry.display), textCell(formatNumber(entry.count))] })),
-      ],
-    }),
-    new Paragraph({ children: [new TextRun({ text: "Aufgaben im Überblick", bold: true, size: 24 })], spacing: { before: 260, after: 80 } }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({ children: [textCell("Bereich", true), textCell("Aufgabe", true), textCell("Ø Prozent", true)] }),
-        ...overview.taskDistribution.map((entry) => new TableRow({ children: [textCell(entry.sectionTitle), textCell(entry.taskTitle), textCell(`${formatNumber(entry.percentage)} %`)] })),
-      ],
-    }),
+    new Paragraph({ children: [new TextRun({ text: `${exam.meta.title || "Klassenübersicht"} – Klassenübersicht`, bold: true, size: 32, color: DOCX_COLORS.ink })], spacing: { after: 80 } }),
+    new Paragraph({ children: [new TextRun({ text: [context?.subject, context?.className, exam.meta.examDate].filter(Boolean).join(" · "), color: DOCX_COLORS.muted })], spacing: { after: 180 } }),
+    createDocxTable(docx, [
+        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Schüler:innen", { header: true, align: "center" }), createDocxCell(docx, "Ø Prozent", { header: true, align: "center" }), createDocxCell(docx, "Median", { header: true, align: "center" }), createDocxCell(docx, "Beste Leistung", { header: true, align: "center" }), createDocxCell(docx, "Schwächste Leistung", { header: true, align: "center" })] }),
+        new TableRow({ children: [createDocxCell(docx, formatNumber(overview.studentCount), { bold: true, align: "center" }), createDocxCell(docx, `${formatNumber(overview.averagePercentage)} %`, { bold: true, align: "center" }), createDocxCell(docx, `${formatNumber(overview.medianPercentage)} %`, { align: "center" }), createDocxCell(docx, `${formatNumber(overview.bestPercentage)} %`, { align: "center" }), createDocxCell(docx, `${formatNumber(overview.lowestPercentage)} %`, { align: "center" })] }),
+      ]),
+    new Paragraph({ children: [new TextRun({ text: "Notenspiegel", bold: true, size: 24, color: DOCX_COLORS.accent })], spacing: { before: 280, after: 100 }, keepNext: true }),
+    createDocxTable(docx, [
+        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Note", { header: true, align: "center" }), createDocxCell(docx, "Anzahl", { header: true, align: "center" })] }),
+        ...overview.gradeDistribution.map((entry) => new TableRow({ children: [createDocxCell(docx, entry.display, { bold: true, align: "center" }), createDocxCell(docx, formatNumber(entry.count), { align: "center" })] })),
+      ]),
+    new Paragraph({ children: [new TextRun({ text: "Aufgaben im Überblick", bold: true, size: 24, color: DOCX_COLORS.accent })], spacing: { before: 280, after: 100 }, keepNext: true }),
+    createDocxTable(docx, [
+        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Bereich", { header: true }), createDocxCell(docx, "Aufgabe", { header: true }), createDocxCell(docx, "Ø Prozent", { header: true, align: "center" })] }),
+        ...overview.taskDistribution.map((entry) => new TableRow({ children: [createDocxCell(docx, entry.sectionTitle), createDocxCell(docx, entry.taskTitle), createDocxCell(docx, `${formatNumber(entry.percentage)} %`, { align: "center" })] })),
+      ]),
   ];
-  const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+  const blob = await Packer.toBlob(createDocxDocument(docx, {
+    title: `${exam.meta.title || "Klassenübersicht"} – Klassenübersicht`,
+    subtitle: [context?.subject, context?.className].filter(Boolean).join(" · "),
+    children,
+  }));
   const timestamp = new Date().toISOString().slice(0, 10);
   const filename = `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Klassenuebersicht")}_${timestamp}.docx`;
   return saveBlobWithDialog(filename, blob, {
@@ -1307,8 +1376,8 @@ const openPrintPopup = (reports: PrintPayload[], filename?: string, popup?: Prin
           h1 { font-size: 15px; }
           h2 { font-size: 10.5px; font-weight: 400; }
           h3 { font-size: 10px; }
-          .report { page-break-after: auto; }
-          .report-break { page-break-after: always; }
+          .report { break-after: auto; page-break-after: auto; }
+          .report-break { break-after: page; page-break-after: always; }
           .sheet { border: 1px solid #bbb; padding: 4px; margin-bottom: 4px; page-break-inside: auto; }
           .meta-row { margin-bottom: 4px; padding-bottom: 2px; border-bottom: 1px solid #bbb; font-size: 8.1px; line-height: 1.05; }
           .meta-row span { display: inline; }
