@@ -5151,6 +5151,7 @@
 
   .workspace-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.85rem;
     min-height: 3.75rem;
@@ -5272,7 +5273,7 @@
   .workspace-actions-menu button:disabled { cursor: not-allowed; opacity: 0.5; }
   .workspace-actions-menu svg { width: 0.9rem; height: 0.9rem; }
   .workspace-history-button:focus-visible, .workspace-icon-button:focus-visible, .workspace-actions > summary:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
-  .workspace-inline-notice { width: 100%; margin: -0.25rem 0 0; padding-bottom: 0.5rem; color: var(--app-label); font-size: 0.75rem; }
+  .workspace-inline-notice { flex: 0 0 100%; width: 100%; margin: -0.25rem 0 0; padding-bottom: 0.5rem; color: var(--app-label); font-size: 0.75rem; }
   .workspace-version-drawer { border-color: var(--app-secondary-border); background: color-mix(in srgb, var(--app-panel-bg) 96%, transparent); box-shadow: 0 0.75rem 1.8rem color-mix(in srgb, var(--app-text-strong) 5%, transparent); }
 
   .local-save-status {
