@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ExamSummary } from "../types";
 import { formatNumber } from "../utils/format";
 import { ChevronDownIcon, ChevronRightIcon, WarningIcon } from "./icons";
-import { Badge, Card } from "./ui";
+import { Badge, Card, DismissibleCallout } from "./ui";
 
 export const SummaryPanel = ({
   summary,
@@ -10,6 +10,9 @@ export const SummaryPanel = ({
   studentLabelTitle = "Aktiver Schülercode",
   correctionCoverage,
   locked = false,
+  hasSelectedGroup = false,
+  hasSelectedStudent = false,
+  showSelectionReminder = true,
 }: {
   summary: ExamSummary;
   studentLabel?: string | null;
@@ -22,6 +25,9 @@ export const SummaryPanel = ({
     absentCount: number;
   } | null;
   locked?: boolean;
+  hasSelectedGroup?: boolean;
+  hasSelectedStudent?: boolean;
+  showSelectionReminder?: boolean;
 }) => {
   const [issuesCollapsed, setIssuesCollapsed] = useState(summary.issues.length > 0);
 
@@ -56,6 +62,16 @@ export const SummaryPanel = ({
       ) : null}
       {!locked ? (
         <>
+      {showSelectionReminder && !hasSelectedStudent ? (
+        <DismissibleCallout tone="warning" resetKey={`selection-reminder-${hasSelectedGroup}`}>
+          <p className="font-semibold">Noch keine individuelle Auswertung</p>
+          <p>
+            {hasSelectedGroup
+              ? "Wähle in der Auswahl eine bereits angelegte Schüler*in aus. Erst dann werden ihre Punkte, Prozentwerte und Note angezeigt."
+              : "Wähle in der Auswahl zuerst eine Lerngruppe und anschließend eine bereits angelegte Schüler*in aus. Erst dann werden individuelle Punkte, Prozentwerte und Noten angezeigt."}
+          </p>
+        </DismissibleCallout>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="metric-primary rounded-3xl p-4">
           <p className="label !text-current opacity-80">Gesamtpunkte</p>

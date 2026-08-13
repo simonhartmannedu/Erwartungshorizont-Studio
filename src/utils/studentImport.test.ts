@@ -9,6 +9,13 @@ describe("Schülerimport", () => {
     expect(() => parseStudentImport("Name;Klasse\nAlex;8b")).toThrow("Erwartete Spalten");
   });
 
+  it("liest auch kopfzeilenlose TXT-Listen im dokumentierten Nachname-Vorname-Klasse-Format", () => {
+    expect(parseStudentImport("Beispiel, Alex, 8b\nMuster, Samira, 8b")).toEqual([
+      { firstName: "Alex", lastName: "Beispiel", className: "8b" },
+      { firstName: "Samira", lastName: "Muster", className: "8b" },
+    ]);
+  });
+
   it("sortiert Importdaten stabil nach Klasse und dem gewählten Feld", () => {
     const sorted = sortImportedStudentRows(
       [

@@ -142,6 +142,8 @@ export interface DraftWorkspace {
   exam: Exam;
   activeArchiveEntryId: string | null;
   assignedGroupId: string | null;
+  /** Set once an EWH has been deliberately created or edited, independent of its title. */
+  setupCompletedAt?: string | null;
   updatedAt: string;
   versions: DraftWorkspaceVersion[];
 }

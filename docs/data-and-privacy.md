@@ -12,6 +12,12 @@ EWH-Studio verarbeitet Arbeitsstände und Schülerdaten grundsätzlich lokal im 
 
 Löscht du Browserdaten, verwendest ein privates Fenster oder wechselst das Gerät, können lokale Daten verloren gehen. Deshalb sind regelmäßige verschlüsselte Backups wichtig.
 
+## Was speichern, wann?
+
+- **Automatisches Speichern:** während der Arbeit. Änderungen liegen direkt im aktuellen Browser und benötigen keinen zusätzlichen Klick.
+- **EWH-Version:** vor größeren Änderungen an Aufgaben, Punkten oder Notenschlüssel. Sie stellt nur einen früheren Erwartungshorizont wieder her, keine Schülerpunkte.
+- **Vollbackup:** regelmäßig, nach einer abgeschlossenen Korrektur und vor einem Geräte- oder Browserwechsel. Die verschlüsselte Datei enthält Arbeitsstände, EWH-Versionen, Archiv und Schülerdaten.
+
 ## Schutz geschützter Lerngruppen
 
 Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare und Unterschriften werden während einer entsperrten Sitzung im Arbeitsspeicher benötigt und beim Speichern beziehungsweise Sperren wieder verschlüsselt oder aus dem aktiven Zustand entfernt. Die globale Suche lädt Klarnamen nur für aktuell entsperrte Lerngruppen; beim Sperren oder automatischen Sitzungs-Timeout werden diese Suchdaten und die aktuelle Suchanfrage verworfen. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.

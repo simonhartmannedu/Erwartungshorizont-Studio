@@ -72,6 +72,22 @@ export const GradeScaleEditor = ({
     });
   };
 
+  const switchManualScaleMode = (nextMode: GradeScaleMode) => {
+    if (nextMode === scale.mode) return;
+
+    const conversionFactor = totalMaxPoints > 0 ? 100 / totalMaxPoints : 1;
+    const convertBound = (lowerBound: number) =>
+      nextMode === "percentage"
+        ? Number((lowerBound * conversionFactor).toFixed(4))
+        : Number((lowerBound / conversionFactor).toFixed(4));
+
+    onChange({
+      ...scale,
+      mode: nextMode,
+      bands: scale.bands.map((band) => ({ ...band, lowerBound: convertBound(band.lowerBound) })),
+    });
+  };
+
   return (
     <Card
       title="Notenschlüssel"
@@ -245,9 +261,9 @@ export const GradeScaleEditor = ({
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="Grenzwerte beziehen sich auf">
               <select
-                className="field"
-                value={scale.mode}
-                onChange={(event) => updateManualScale({ mode: event.target.value as GradeScaleMode })}
+              className="field"
+              value={scale.mode}
+              onChange={(event) => switchManualScaleMode(event.target.value as GradeScaleMode)}
               >
                 {modeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -266,6 +282,12 @@ export const GradeScaleEditor = ({
               ? "Die Untergrenzen werden mit den erreichten Gesamtpunkten verglichen. Trage hier echte Punktwerte ein."
               : "Die Untergrenzen werden mit der finalen Bewertungsbasis in Prozent verglichen. Trage hier Prozentwerte ein."}
         </p>
+
+        {scale.generator.source === "manual" && (
+          <p className="themed-muted -mt-3 text-xs leading-5">
+            Beim Wechsel zwischen Punkten und Prozent werden die vorhandenen Notengrenzen anhand der Gesamtpunktzahl umgerechnet.
+          </p>
+        )}
 
         <div className="themed-table-shell overflow-hidden rounded-3xl border">
           <div className="overflow-x-auto">

@@ -1,4 +1,4 @@
-import { FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SunIcon } from "../components/icons";
+import { FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SettingsIcon, SunIcon } from "../components/icons";
 import type { ThemeMode, VisualTheme } from "../types";
 
 export const visualThemeOptions: { value: VisualTheme; label: string }[] = [
@@ -30,6 +30,8 @@ type AppHeaderProps = {
   isFullscreenAvailable: boolean;
   onToggleAppFullscreen: () => void;
   onOpenUserGuide: () => void;
+  showSelectionReminder: boolean;
+  onShowSelectionReminderChange: (enabled: boolean) => void;
 };
 
 /** Presentational application header; state and persistence remain in App. */
@@ -43,6 +45,8 @@ export const AppHeader = ({
   isFullscreenAvailable,
   onToggleAppFullscreen,
   onOpenUserGuide,
+  showSelectionReminder,
+  onShowSelectionReminderChange,
 }: AppHeaderProps) => (
   <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
     <div className="max-w-4xl">
@@ -92,15 +96,35 @@ export const AppHeader = ({
         {isAppFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
         <span>{isAppFullscreen ? "Vollbild aus" : "Vollbild"}</span>
       </button>
-      <button
-        type="button"
-        className="button-secondary header-control w-full gap-2 sm:w-auto"
-        onClick={onOpenUserGuide}
-        title="Kurze Einführung öffnen"
-      >
-        <InfoIcon />
-        Hilfe
-      </button>
+      <details className="header-settings w-full sm:w-auto">
+        <summary className="button-secondary header-control w-full cursor-pointer list-none gap-2 sm:w-auto">
+          <SettingsIcon />
+          Einstellungen
+        </summary>
+        <div className="header-settings-panel mt-2 space-y-4 p-4">
+          <div>
+            <p className="label">Hilfen</p>
+            <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-5">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={showSelectionReminder}
+                onChange={(event) => onShowSelectionReminderChange(event.target.checked)}
+              />
+              <span>
+                <strong className="themed-strong block">Auswahl-Hinweis zeigen</strong>
+                <span className="themed-muted">Erinnert bei der Live-Auswertung an Klasse und Schüler*in.</span>
+              </span>
+            </label>
+          </div>
+          <div className="border-t pt-3">
+            <button type="button" className="button-secondary w-full justify-center gap-2" onClick={onOpenUserGuide}>
+              <InfoIcon />
+              Einführung erneut öffnen
+            </button>
+          </div>
+        </div>
+      </details>
     </div>
   </header>
 );

@@ -83,6 +83,7 @@ const workspaceSchema = v.object({
   exam: examSchema,
   activeArchiveEntryId: v.nullable(v.string()),
   assignedGroupId: v.nullable(v.string()),
+  setupCompletedAt: v.optional(v.nullable(v.string())),
   updatedAt: v.string(),
   versions: v.array(
     v.object({

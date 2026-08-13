@@ -63,6 +63,29 @@ describe("Storage-Normalisierung", () => {
     expect(bundle?.workspaces[0]?.exam.meta.title).toBe("Alte Klassenarbeit");
   });
 
+  it("behält den gespeicherten EWH-Einrichtungsstatus unabhängig vom Titel", () => {
+    const setupCompletedAt = "2026-08-13T09:00:00.000Z";
+    const bundle = parseDraftBundle(
+      JSON.stringify({
+        activeWorkspaceId: "workspace-1",
+        workspaces: [
+          {
+            id: "workspace-1",
+            label: "Klassenarbeit 1",
+            exam: { ...legacyExam, meta: { ...legacyExam.meta, title: "" } },
+            activeArchiveEntryId: null,
+            assignedGroupId: null,
+            setupCompletedAt,
+            updatedAt: setupCompletedAt,
+            versions: [],
+          },
+        ],
+      }),
+    );
+
+    expect(bundle?.workspaces[0]?.setupCompletedAt).toBe(setupCompletedAt);
+  });
+
   it("normalisiert ein älteres Archiv vor der strengen Laufzeitvalidierung", () => {
     const legacyArchive = [
       {

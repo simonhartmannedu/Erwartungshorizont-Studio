@@ -22,28 +22,37 @@ export const WorkspaceVersionPanel = ({
   onToggleCollapsed,
   onSaveVersion,
   onRestoreVersion,
-}: WorkspaceVersionPanelProps) => (
-  <section className="workspace-version-drawer mt-3 rounded-2xl border p-4">
+}: WorkspaceVersionPanelProps) => {
+  const versionCountLabel =
+    workspace.versions.length === 1
+      ? "1 gespeicherte EWH-Version"
+      : `${workspace.versions.length} gespeicherte EWH-Versionen`;
+
+  return (
+    <section className="workspace-version-drawer mt-3 rounded-2xl border p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="label">Versionsverlauf</p>
+        <p className="label">EWH-Versionen</p>
         <p className="themed-strong text-sm font-semibold">{workspaceLabel}</p>
       </div>
       <div className="flex items-center gap-2">
         <span className="themed-muted text-xs font-semibold">{workspace.versions.length} / {maxVersions}</span>
-        <IconButton onClick={onSaveVersion} title="Schnappschuss jetzt speichern" className="px-2.5 py-2 text-xs">
+        <IconButton onClick={onSaveVersion} title="Aktuellen EWH als Version speichern" className="px-2.5 py-2 text-xs">
           <SaveIcon />
         </IconButton>
-        <IconButton onClick={onToggleCollapsed} title="Versionsverlauf schließen" className="px-2.5 py-2 text-xs">
+        <IconButton onClick={onToggleCollapsed} title="EWH-Versionen schließen" className="px-2.5 py-2 text-xs">
           {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
         </IconButton>
       </div>
     </div>
+    <p className="themed-muted mt-3 text-xs leading-5">
+      EWH-Versionen helfen bei versehentlichen Änderungen am Erwartungshorizont. Schülerpunkte gehören nicht dazu; dafür brauchst du ein Vollbackup.
+    </p>
     {collapsed ? (
       <p className="themed-muted mt-3 text-sm">
         {workspace.versions.length > 0
-          ? `${workspace.versions.length} gespeicherte Schnappschüsse`
-          : "Noch keine gespeicherten Schnappschüsse"}
+          ? versionCountLabel
+          : "Noch keine gespeicherten EWH-Versionen"}
       </p>
     ) : workspace.versions.length > 0 ? (
       <div className="mt-3 space-y-2">
@@ -60,7 +69,8 @@ export const WorkspaceVersionPanel = ({
         ))}
       </div>
     ) : (
-      <p className="themed-muted mt-3 text-sm">Noch keine gespeicherten Versionen vorhanden.</p>
+      <p className="themed-muted mt-3 text-sm">Noch keine gespeicherten EWH-Versionen vorhanden.</p>
     )}
-  </section>
-);
+    </section>
+  );
+};

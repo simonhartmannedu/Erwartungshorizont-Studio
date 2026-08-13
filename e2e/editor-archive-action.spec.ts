@@ -6,6 +6,6 @@ test("bietet das Archivieren nur im Kontext des Editors an", async ({ page }) =>
 
   await page.getByRole("tab", { name: "EWH-Editor" }).click();
 
-  await expect(page.getByRole("button", { name: "Diese Arbeit archivieren" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vorlage im Archiv speichern" })).toBeVisible();
   await expect(page.getByText("Lokal gespeichert")).toBeVisible();
 });

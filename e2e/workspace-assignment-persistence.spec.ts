@@ -10,7 +10,7 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.evaluate(() => window.history.replaceState({}, "", "/?demo=1"));
 
   await page.getByRole("tab", { name: "EWH-Editor" }).click();
-  await page.getByRole("button", { name: "Diese Arbeit archivieren" }).click();
+  await page.getByRole("button", { name: "Vorlage im Archiv speichern" }).click();
   await expect(page.getByRole("heading", { name: "Erwartungshorizont-Archiv" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Lerngruppen" }).click();

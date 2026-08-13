@@ -16,7 +16,7 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
   await expect(page.getByText("Klassenpasswort")).toContainText("demo");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Übersicht", exact: true })).toBeVisible();
   const globalSearch = page.getByRole("textbox", { name: "Schüler:innen und Klassenarbeiten durchsuchen" });
   const globalSearchResults = page.locator("#global-search-results");
   await globalSearch.fill("Unit 5");

@@ -300,6 +300,13 @@ export const InfoIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const SettingsIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.17 2.17-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56V20.4h-3.07v-.13A1.7 1.7 0 0 0 10.54 18.7a1.7 1.7 0 0 0-1.88.34l-.06.06-2.17-2.17.06-.06A1.7 1.7 0 0 0 6.83 15a1.7 1.7 0 0 0-1.56-1.04h-.13v-3.07h.13A1.7 1.7 0 0 0 6.83 9.85a1.7 1.7 0 0 0-.34-1.88l-.06-.06L8.6 5.74l.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.04-1.56v-.13h3.07v.13a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.17 2.17-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.04h.13v3.07h-.13A1.7 1.7 0 0 0 19.4 15Z" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const WarningIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <path d="M12 4.5 20 19H4l8-14.5Z" strokeLinejoin="round" />

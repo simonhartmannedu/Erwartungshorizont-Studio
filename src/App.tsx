@@ -169,6 +169,7 @@ import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { ImportedExamSuggestion } from "./pdf/types";
 import { isDemoStorageScope, scopedStorageKey } from "./utils/storageScope";
+import { loadUserPreferences, saveUserPreferences, type UserPreferences } from "./utils/preferences";
 
 const GuidedExamBuilder = lazy(async () => {
   const module = await import("./components/GuidedExamBuilder");
@@ -420,12 +421,14 @@ const createDraftWorkspace = (
   label: string,
   activeArchiveEntryId: string | null = null,
   assignedGroupId: string | null = null,
+  setupCompletedAt: string | null = null,
 ): DraftWorkspace => ({
   id: crypto.randomUUID(),
   label,
   exam: cloneExam(exam),
   activeArchiveEntryId,
   assignedGroupId,
+  setupCompletedAt,
   updatedAt: new Date().toISOString(),
   versions: [],
 });
@@ -858,6 +861,7 @@ function App() {
   const skipInitialStudentDatabasePersistenceRef = useRef(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => loadUserPreferences());
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
   const [guideStepIndex, setGuideStepIndex] = useState(0);
@@ -1267,6 +1271,10 @@ function App() {
     saveVisualTheme(visualTheme);
     document.documentElement.dataset.theme = visualTheme;
   }, [visualTheme]);
+
+  useEffect(() => {
+    saveUserPreferences(userPreferences);
+  }, [userPreferences]);
 
   useEffect(() => {
     if (!guideOpen) return;
@@ -2001,7 +2009,12 @@ function App() {
       workspaces: current.workspaces.map((workspace) => {
         if (workspace.id !== activeWorkspaceId) return workspace;
         const nextExam = typeof updater === "function" ? (updater as (current: Exam) => Exam)(workspace.exam) : updater;
-        return { ...workspace, exam: nextExam, updatedAt: new Date().toISOString() };
+        return {
+          ...workspace,
+          exam: nextExam,
+          setupCompletedAt: workspace.setupCompletedAt ?? new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }),
     }));
   };
@@ -2043,6 +2056,7 @@ function App() {
                 exam: normalizedExam,
                 activeArchiveEntryId: null,
                 assignedGroupId,
+                setupCompletedAt: workspace.setupCompletedAt ?? new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               }
             : workspace,
@@ -2062,6 +2076,7 @@ function App() {
           getNextWorkspaceLabel(draftBundle.workspaces),
           null,
           assignedGroupId,
+          new Date().toISOString(),
         ),
         id: workspaceId,
       };
@@ -2518,6 +2533,7 @@ function App() {
       getNextWorkspaceLabel(draftBundle.workspaces),
       entry.id,
       targetGroup.id,
+      new Date().toISOString(),
     );
     const nextBundle = {
       activeWorkspaceId: workspace.id,
@@ -2628,12 +2644,15 @@ function App() {
     return true;
   };
 
-  const openHeaderUnlockDialog = () => {
+  const [headerUnlockPurpose, setHeaderUnlockPurpose] = useState<"general" | "scores">("general");
+
+  const openHeaderUnlockDialog = (purpose: "general" | "scores" = "general") => {
     if (!activeGroup?.passwordVerifier) {
       pushNotice("warning", "Keine geschützte Klasse aktiv", "Wähle zuerst eine passwortgeschützte Lerngruppe aus.");
       return;
     }
 
+    setHeaderUnlockPurpose(purpose);
     setHeaderUnlockDialogOpen(true);
     setHeaderUnlockPasswordInput("");
     setHeaderUnlockError("");
@@ -3041,7 +3060,7 @@ function App() {
             setPendingImportPreview({
               kind: "schoolyear-workspace-archive",
               sourceLabel: file.name,
-              summary: `${importedArchive.draftBundle.workspaces.length} Klassenarbeiten und ${snapshotCount} Schnappschüsse aus ${importedArchive.schoolYear}. EWH-Archiv-Einträge sind nicht enthalten.`,
+              summary: `${importedArchive.draftBundle.workspaces.length} Klassenarbeiten und ${snapshotCount} EWH-Versionen aus ${importedArchive.schoolYear}. EWH-Archiv-Einträge sind nicht enthalten.`,
               data: {
                 draftBundle: importedArchive.draftBundle,
                 studentDatabase: importedArchive.studentDatabase,
@@ -3940,6 +3959,10 @@ function App() {
           isFullscreenAvailable={document.fullscreenEnabled}
           onToggleAppFullscreen={toggleAppFullscreen}
           onOpenUserGuide={openUserGuide}
+          showSelectionReminder={userPreferences.showSelectionReminder}
+          onShowSelectionReminderChange={(showSelectionReminder) =>
+            setUserPreferences((current) => ({ ...current, showSelectionReminder }))
+          }
         />
 
         <AppStatusArea
@@ -4019,7 +4042,7 @@ function App() {
                   onClick={() => setVersionListCollapsed((current) => !current)}
                   aria-expanded={!versionListCollapsed}
                 >
-                  Verlauf{activeWorkspace.versions.length > 0 ? ` · ${activeWorkspace.versions.length}` : ""}
+                  EWH-Verlauf{activeWorkspace.versions.length > 0 ? ` · ${activeWorkspace.versions.length}` : ""}
                   {versionListCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
                 </button>
               ) : null}
@@ -4110,6 +4133,8 @@ function App() {
                 <HomeDashboard
                   activeWorkspaceLabel={activeWorkspace ? getWorkspaceDisplayLabel(activeWorkspace) : null}
                   activeWorkspaceUpdatedAt={activeWorkspace?.updatedAt ?? null}
+                  hasPreparedWorkspace={Boolean(activeWorkspace?.setupCompletedAt || activeWorkspace?.exam.meta.title.trim())}
+                  activeWorkspaceHasAssignedGroup={Boolean(activeWorkspace?.assignedGroupId)}
                   hasActiveGroup={Boolean(activeGroup)}
                   activeGroupLabel={activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : null}
                   activeGroupStudentCount={activeGroup?.students.length ?? 0}
@@ -4122,6 +4147,7 @@ function App() {
                   backupSummary={backupStatus.summary}
                   backupDetail={backupStatus.detail}
                   backupTone={backupStatus.tone}
+                  lastBackupAt={lastBackupAt}
                   recentWorkspaces={[...draftBundle.workspaces]
                     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
                     .slice(0, 4)
@@ -4303,12 +4329,12 @@ function App() {
                       <div>
                         <p className="label">Wiederverwenden</p>
                         <p className="themed-muted mt-1 text-sm leading-6">
-                          Lege diese Arbeit als eigenständige Vorlage im Archiv ab.
+                          Das Archiv speichert nur die Vorlage. Schülerergebnisse bleiben an dieser Klassenarbeit.
                         </p>
                       </div>
                       <button type="button" className="button-secondary shrink-0 gap-2" onClick={saveExpectationsToArchive}>
                         <ArchiveIcon />
-                        Diese Arbeit archivieren
+                        Vorlage im Archiv speichern
                       </button>
                     </div>
                     <Card
@@ -4511,6 +4537,7 @@ function App() {
                         }
                         onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
                         scoresLocked={assessmentLocked}
+                        onLockedScoreAttempt={() => openHeaderUnlockDialog("scores")}
                         onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
                         onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
                         onDuplicate={() => duplicateSection(entry.id)}
@@ -4730,6 +4757,9 @@ function App() {
                 studentLabel={activeStudentLiveLabel}
                 studentLabelTitle={activeStudentLiveLabelTitle}
                 locked={assessmentLocked}
+                hasSelectedGroup={Boolean(activeGroupId)}
+                hasSelectedStudent={Boolean(selectedStudent)}
+                showSelectionReminder={userPreferences.showSelectionReminder}
                 correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
               />
               {activeTab === "builder" && activeWorkspace ? (
@@ -4887,14 +4917,19 @@ function App() {
 
       <ConfirmDialog
         open={headerUnlockDialogOpen}
-        title="Klassenpasswort eingeben"
-        description="Nach erfolgreicher Prüfung werden Bewertungsdaten, Kommentare, Signaturen und Klarnamen dieser Lerngruppe nur lokal für die aktuelle Sitzung geladen."
+        title={headerUnlockPurpose === "scores" ? "Punkteingabe entsperren" : "Klassenpasswort eingeben"}
+        description={
+          headerUnlockPurpose === "scores"
+            ? "Die Punkte dieser Lerngruppe sind geschützt. Gib das Klassenpasswort ein, um die Leistungsdaten nur lokal für diese Sitzung zu bearbeiten."
+            : "Nach erfolgreicher Prüfung werden Bewertungsdaten, Kommentare, Signaturen und Klarnamen dieser Lerngruppe nur lokal für die aktuelle Sitzung geladen."
+        }
         onCancel={() => {
           if (headerUnlockLoading) return;
           setHeaderUnlockDialogOpen(false);
           setHeaderUnlockPasswordInput("");
           setHeaderUnlockError("");
           setHeaderUnlockLoading(false);
+          setHeaderUnlockPurpose("general");
         }}
         onConfirm={async () => {
           if (headerUnlockLoading) return;
@@ -4917,9 +4952,10 @@ function App() {
             setHeaderUnlockDialogOpen(false);
             setHeaderUnlockPasswordInput("");
             setHeaderUnlockError("");
+            setHeaderUnlockPurpose("general");
             pushNotice(
               "success",
-              "Lerngruppe entschlüsselt",
+              headerUnlockPurpose === "scores" ? "Punkteingabe entsperrt" : "Lerngruppe entschlüsselt",
               "Bewertungen, Kommentare und Namen wurden lokal für diese Sitzung geladen.",
             );
           } finally {

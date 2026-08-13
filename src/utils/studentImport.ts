@@ -44,8 +44,8 @@ const parseStudentRows = (rows: string[][]): ImportedStudentRow[] => {
     .map((row) => row.map((value) => value.trim()))
     .filter((row) => row.some(Boolean));
 
-  if (normalizedRows.length < 2) {
-    throw new Error("Die Importdatei braucht eine Kopfzeile und mindestens einen Datensatz.");
+  if (normalizedRows.length === 0) {
+    throw new Error("Die Importdatei enthält keine Schülerdaten.");
   }
 
   const headers = normalizedRows[0].map(normalizeHeader);
@@ -55,7 +55,25 @@ const parseStudentRows = (rows: string[][]): ImportedStudentRow[] => {
   const classNameIndex = headers.findIndex((header) => HEADER_ALIASES.className.has(header));
 
   if (firstNameIndex === -1 || lastNameIndex === -1 || classNameIndex === -1) {
-    throw new Error("Erwartete Spalten: Nachname, Name/Vorname, Klasse.");
+    const headerlessRowsAreValid = normalizedRows.every(
+      (cells) => cells.length >= 3 && Boolean(cells[0]) && Boolean(cells[1]) && Boolean(cells[2]),
+    );
+
+    if (!headerlessRowsAreValid) {
+      throw new Error("Erwartete Spalten: Nachname, Name/Vorname, Klasse. Alternativ ist eine kopfzeilenlose Liste im Format Nachname, Vorname, Klasse möglich.");
+    }
+
+    return normalizedRows.map((cells, index) => {
+      const [lastName, firstName, className] = cells;
+      if (!lastName || !firstName || !className) {
+        throw new Error(`Zeile ${index + 1} ist unvollständig.`);
+      }
+      return { firstName, lastName, className };
+    });
+  }
+
+  if (normalizedRows.length < 2) {
+    throw new Error("Die Importdatei braucht nach der Kopfzeile mindestens einen Datensatz.");
   }
 
   return normalizedRows.slice(1).flatMap((cells, index) => {
@@ -78,11 +96,11 @@ const parseStudentRows = (rows: string[][]): ImportedStudentRow[] => {
 export const parseStudentImport = (content: string): ImportedStudentRow[] => {
   const lines = content
     .split(/\r?\n/)
-    .map((line) => line.trim())
+    .map((line) => line.replace(/^\uFEFF/, "").trim())
     .filter(Boolean);
 
-  if (lines.length < 2) {
-    throw new Error("Die Importdatei braucht eine Kopfzeile und mindestens einen Datensatz.");
+  if (lines.length === 0) {
+    throw new Error("Die Importdatei enthält keine Schülerdaten.");
   }
 
   const delimiter = detectDelimiter(lines[0]);

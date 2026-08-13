@@ -25,23 +25,23 @@ export const firstRunGuideSteps: FirstRunGuideStep[] = [
     eyebrow: "2. Startpunkt",
     title: "Erstelle deinen Erwartungshorizont",
     body:
-      "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Das nimmt neuen Nutzern die Entscheidung ab, wo sie beginnen sollen.",
+      "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Dabei wird eine Klassenarbeit angelegt, an der später die Schülerergebnisse hängen.",
     actionLabel: "EWH erstellen",
   },
   {
     tabId: "builder",
     eyebrow: "3. Korrektur",
-    title: "Bearbeite Erwartungen, Punkte und Notenlogik",
+    title: "Ordne zu und korrigiere",
     body:
-      "Im Editor entsteht der eigentliche Erwartungshorizont. Abschnittsnavigation, Skalierung und Notentabelle bleiben nah an der Arbeit.",
-    actionLabel: "Editor öffnen",
+      "Wähle in der Seitenleiste erst die Klasse und anschließend die bereits angelegten Schüler*innen aus. Punkte werden dann direkt dieser Klassenarbeit und den ausgewählten Schüler*innen zugeordnet und automatisch gespeichert.",
+    actionLabel: "Korrektur öffnen",
   },
   {
     tabId: "archive",
     eyebrow: "4. Wiederverwendung",
     title: "Speichere fertige Horizonte im Archiv",
     body:
-      "Das Archiv macht alte Arbeiten wiederverwendbar und reduziert späteres Suchen in Dateien oder Browser-Downloads.",
+      "Das Archiv bewahrt nur die wiederverwendbare Vorlage. Schülerergebnisse bleiben an der jeweiligen Klassenarbeit und werden nicht in den Archiv-Eintrag kopiert.",
     actionLabel: "Archiv öffnen",
   },
   {
@@ -49,7 +49,7 @@ export const firstRunGuideSteps: FirstRunGuideStep[] = [
     eyebrow: "5. Sicherheit",
     title: "Sichere Arbeitsstände regelmäßig",
     body:
-      "Backups und Wiederherstellungspunkte schützen lokale Browserdaten, bevor du geräteübergreifend oder im Schuljahrarchiv arbeitest.",
+      "Die Daten liegen lokal im Browser, nicht in Cookies. Ein verschlüsseltes Vollbackup enthält Arbeitsstände, Archiv und Schülerdaten und kann später wieder importiert werden.",
     actionLabel: "Backup öffnen",
   },
 ];
