@@ -13,6 +13,4 @@ Die Schriftdateien sind unveränderte Webfont-Teilmengen. Der Projektcode bleibt
 
 Die in der Landingpage verwendeten SVG-Marken-Icons für GitHub, Ko-fi und Bluesky stammen von [Simple Icons](https://simpleicons.org/) und stehen unter [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
-## Projektdateien
 
-`public/signature.svg` wird weder versioniert noch ausgeliefert. Die Herkunft der Favicons muss vor einem öffentlichen Release bestätigt oder durch eindeutig dokumentierte Ersatzgrafiken ersetzt werden.
