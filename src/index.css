@@ -1634,6 +1634,137 @@
     padding-top: 0.25rem;
   }
 
+  .group-overview-card,
+  .group-guide-step,
+  .group-action-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .group-overview-card {
+    border-color: color-mix(in srgb, var(--app-field-focus) 24%, var(--app-secondary-border));
+    background:
+      radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--app-field-focus) 16%, transparent), transparent 20rem),
+      var(--app-secondary-bg);
+  }
+
+  .group-overview-primary,
+  .group-overview-stat {
+    background: color-mix(in srgb, var(--app-panel-bg) 88%, transparent);
+  }
+
+  .group-overview-icon,
+  .group-guide-icon,
+  .group-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 1rem;
+  }
+
+  .group-overview-icon {
+    width: 3rem;
+    height: 3rem;
+    background: var(--app-primary-bg);
+    box-shadow: 0 0.65rem 1.4rem color-mix(in srgb, var(--app-primary-bg) 20%, transparent);
+    color: var(--app-primary-text);
+  }
+
+  .group-overview-icon svg,
+  .group-guide-icon svg,
+  .group-action-icon svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .group-guide-step {
+    min-height: 10.2rem;
+    background: var(--app-secondary-bg);
+  }
+
+  .group-guide-step::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 0 0 0 100%;
+    background: color-mix(in srgb, var(--app-field-focus) 8%, transparent);
+    content: "";
+    pointer-events: none;
+  }
+
+  .group-guide-step-import {
+    border-color: color-mix(in srgb, var(--app-field-focus) 36%, var(--app-border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-field-focus) 11%, transparent), transparent 62%), var(--app-panel-bg);
+  }
+
+  .group-guide-icon {
+    width: 2.7rem;
+    height: 2.7rem;
+    border: 1px solid var(--app-secondary-border);
+    background: var(--app-panel-bg);
+    color: var(--app-text-strong);
+  }
+
+  .group-guide-step-import .group-guide-icon,
+  .group-action-card-import .group-action-icon {
+    background: var(--app-primary-bg);
+    border-color: var(--app-primary-bg);
+    color: var(--app-primary-text);
+  }
+
+  .group-action-card {
+    border-color: var(--app-secondary-border);
+    background: var(--app-secondary-bg);
+  }
+
+  .group-action-card-import {
+    border-color: color-mix(in srgb, var(--app-field-focus) 40%, var(--app-border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-field-focus) 10%, transparent), transparent 46%), var(--app-panel-bg);
+  }
+
+  .group-action-card-manual {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-soft-text) 8%, transparent), transparent 48%), var(--app-secondary-bg);
+  }
+
+  .group-action-icon {
+    width: 3.1rem;
+    height: 3.1rem;
+    background: color-mix(in srgb, var(--app-soft-text) 15%, var(--app-panel-bg));
+    color: var(--app-text-strong);
+  }
+
+  .group-list-intro {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.9rem;
+    border-color: color-mix(in srgb, var(--app-field-focus) 20%, var(--app-secondary-border));
+    background: color-mix(in srgb, var(--app-field-focus) 5%, var(--app-secondary-bg));
+  }
+
+  .group-roster-card {
+    border-color: color-mix(in srgb, var(--app-secondary-border) 90%, var(--app-border));
+  }
+
+  .group-roster-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, var(--app-field-focus) 12%, var(--app-secondary-bg));
+    color: var(--app-text-strong);
+  }
+
+  .group-roster-icon svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
   .archive-info-card {
     border-color: color-mix(in srgb, var(--app-field-focus) 28%, var(--app-secondary-border));
     background:

@@ -1,7 +1,18 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { DraftWorkspace, GroupAccessMode, StudentDatabase, StudentGroup, StudentRecord } from "../types";
 import { ImportSortOptions } from "../utils/studentImport";
-import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, EyeIcon, PlusIcon, TrashIcon, UploadIcon, UserIcon } from "./icons";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  EyeIcon,
+  GroupIcon,
+  LockIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadIcon,
+  UserIcon,
+} from "./icons";
 import { Badge, Card, DismissibleCallout, Field, IconButton } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StudentPerformanceView } from "./StudentPerformanceView";
@@ -344,26 +355,27 @@ export const StudentRosterPanel = ({
     <div className="space-y-6 no-print">
       <Card
         title="Lerngruppen"
-        subtitle="Fach, Klasse und Schülercodes lokal verwalten. Klarnamen bleiben verschlüsselt."
+        subtitle="Lege Klassen an, verwalte Schülercodes und schütze Klarnamen lokal auf diesem Gerät."
       >
-        <div className="surface-muted grid gap-3 rounded-3xl p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
+        <div className="group-overview-card grid gap-4 rounded-3xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
-            <div className="surface-elevated rounded-2xl border p-4 md:row-span-2">
-              <p className="label">Aktive Lerngruppe</p>
+            <div className="group-overview-primary rounded-2xl border p-4 md:row-span-2">
+              <span className="group-overview-icon"><GroupIcon /></span>
+              <p className="label mt-3">Aktive Lerngruppe</p>
               <p className="themed-strong text-lg font-semibold">{activeGroupLabel}</p>
-              <p className="themed-muted mt-2 text-sm">
-                {selectedStudentRecord ? `Schülercode ${selectedStudentRecord.alias} ausgewählt` : "Noch kein Schülercode ausgewählt"}
+              <p className="themed-muted mt-2 text-sm leading-6">
+                {selectedStudentRecord ? `Schülercode ${selectedStudentRecord.alias} ist ausgewählt.` : "Wähle später einen Schülercode für die Korrektur aus."}
               </p>
             </div>
-            <div className="surface-elevated rounded-2xl border p-3">
+            <div className="group-overview-stat rounded-2xl border p-3">
               <p className="label">Gruppen</p>
               <p className="themed-strong text-xl font-semibold">{database.groups.length}</p>
             </div>
-            <div className="surface-elevated rounded-2xl border p-3">
+            <div className="group-overview-stat rounded-2xl border p-3">
               <p className="label">Schüler</p>
               <p className="themed-strong text-xl font-semibold">{totalStudents}</p>
             </div>
-            <div className="surface-elevated col-span-2 rounded-2xl border p-3 md:col-span-1">
+            <div className="group-overview-stat col-span-2 rounded-2xl border p-3 md:col-span-1">
               <p className="label">Letzte Sicherung</p>
               <p className="themed-strong text-sm font-semibold">
                 {lastBackupAt ? new Date(lastBackupAt).toLocaleDateString("de-DE") : "Noch keine"}
@@ -392,24 +404,50 @@ export const StudentRosterPanel = ({
 
       <div className="space-y-6">
         <Card
-          title="Lerngruppen anlegen & importieren"
-          subtitle="Neue Klassen anlegen oder Listen importieren."
+          title="Lerngruppen anlegen"
+          subtitle="Wähle den einfachen Weg, der zu deiner Ausgangslage passt."
         >
+          <div className="mb-5 grid gap-3 lg:grid-cols-3">
+            <div className="group-guide-step group-guide-step-import rounded-2xl border p-4">
+              <span className="group-guide-icon"><UploadIcon /></span>
+              <p className="label mt-3">Der schnelle Weg</p>
+              <p className="themed-strong mt-1 text-sm font-semibold">Liste importieren</p>
+              <p className="themed-muted mt-1 text-xs leading-5">Nutze eine CSV-, Excel- oder ODS-Datei, wenn du bereits eine Klassenliste hast.</p>
+            </div>
+            <div className="group-guide-step rounded-2xl border p-4">
+              <span className="group-guide-icon"><PlusIcon /></span>
+              <p className="label mt-3">Oder einzeln starten</p>
+              <p className="themed-strong mt-1 text-sm font-semibold">Klasse manuell anlegen</p>
+              <p className="themed-muted mt-1 text-xs leading-5">Lege Fach und Klasse an; Schülercodes kannst du anschließend ergänzen.</p>
+            </div>
+            <div className="group-guide-step rounded-2xl border p-4">
+              <span className="group-guide-icon"><LockIcon /></span>
+              <p className="label mt-3">Gut geschützt</p>
+              <p className="themed-strong mt-1 text-sm font-semibold">Zugang sichern</p>
+              <p className="themed-muted mt-1 text-xs leading-5">Ein Token schützt Klarnamen und Bewertungen. Bewahre es getrennt von der Liste auf.</p>
+            </div>
+          </div>
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="surface-elevated rounded-3xl border p-4">
+            <div className="group-action-card group-action-card-import rounded-3xl border p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">
-                  Klassenimport
-                </p>
-                <Badge tone="emerald">Empfohlen</Badge>
+                <span className="group-action-icon"><UploadIcon /></span>
+                <div>
+                  <p className="label">Schritt 1 · Empfohlen bei vorhandenen Listen</p>
+                  <p className="themed-strong text-base font-semibold">Klassenliste importieren</p>
+                </div>
               </div>
+              <p className="themed-muted mt-3 text-sm leading-6">
+                Die App legt für jede Klasse eine Lerngruppe an und erzeugt Schülercodes. Du kannst die Sortierung vor dem Import festlegen.
+              </p>
               <div className="mt-4 grid gap-3">
-                <input
-                  className="field"
-                  value={importSubject}
-                  placeholder="Fach fuer neu importierte Klassen"
-                  onChange={(event) => setImportSubject(event.target.value)}
-                />
+                <Field label="Fach für importierte Klassen">
+                  <input
+                    className="field"
+                    value={importSubject}
+                    placeholder="z. B. Englisch"
+                    onChange={(event) => setImportSubject(event.target.value)}
+                  />
+                </Field>
                 <Field as="div" label="Zugangsschutz für neue Klassen">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <button
@@ -442,22 +480,26 @@ export const StudentRosterPanel = ({
                   </p>
                 )}
                 <div className="grid gap-3 md:grid-cols-2">
-                  <select
-                    className="field"
-                    value={importSortField}
-                    onChange={(event) => setImportSortField(event.target.value as ImportSortOptions["field"])}
-                  >
-                    <option value="lastName">Nachname sortieren</option>
-                    <option value="firstName">Vorname sortieren</option>
-                  </select>
-                  <select
-                    className="field"
-                    value={importSortDirection}
-                    onChange={(event) => setImportSortDirection(event.target.value as ImportSortOptions["direction"])}
-                  >
-                    <option value="ascending">Aufsteigend</option>
-                    <option value="descending">Absteigend</option>
-                  </select>
+                  <Field label="Sortieren nach">
+                    <select
+                      className="field"
+                      value={importSortField}
+                      onChange={(event) => setImportSortField(event.target.value as ImportSortOptions["field"])}
+                    >
+                      <option value="lastName">Nachname</option>
+                      <option value="firstName">Vorname</option>
+                    </select>
+                  </Field>
+                  <Field label="Reihenfolge">
+                    <select
+                      className="field"
+                      value={importSortDirection}
+                      onChange={(event) => setImportSortDirection(event.target.value as ImportSortOptions["direction"])}
+                    >
+                      <option value="ascending">A bis Z</option>
+                      <option value="descending">Z bis A</option>
+                    </select>
+                  </Field>
                 </div>
                 <label className="button-primary w-full cursor-pointer gap-2 sm:w-auto">
                   <UploadIcon />
@@ -483,8 +525,15 @@ export const StudentRosterPanel = ({
               </p>
             </div>
 
-            <div className="surface-elevated space-y-4 rounded-3xl border p-4">
-              <p className="themed-muted text-xs font-semibold uppercase tracking-[0.18em]">Manuelle Lerngruppe anlegen</p>
+            <div className="group-action-card group-action-card-manual space-y-4 rounded-3xl border p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="group-action-icon"><GroupIcon /></span>
+                <div>
+                  <p className="label">Schritt 1 · Für eine einzelne Klasse</p>
+                  <p className="themed-strong text-base font-semibold">Manuelle Lerngruppe anlegen</p>
+                </div>
+              </div>
+              <p className="themed-muted text-sm leading-6">Danach kannst du in der Klassenliste Schülercodes und verschlüsselte Klarnamen hinzufügen.</p>
               <Field label="Fach">
                 <input className="field" placeholder="Fach, z. B. Englisch" value={subject} onChange={(event) => setSubject(event.target.value)} />
               </Field>
@@ -549,9 +598,16 @@ export const StudentRosterPanel = ({
 
         <Card
           title="Klassenlisten"
-          subtitle="Eine Tabelle pro Klasse."
+          subtitle="Öffne eine Klasse, ergänze bei Bedarf Schüler und wähle einen Schülercode für die Korrektur aus."
         >
           <div className="space-y-4">
+            <div className="group-list-intro rounded-2xl border p-4">
+              <span className="group-guide-icon"><UserIcon /></span>
+              <div>
+                <p className="themed-strong text-sm font-semibold">So arbeitest du mit einer Klassenliste</p>
+                <p className="themed-muted mt-1 text-sm leading-6">Klasse öffnen, bei Bedarf entsperren, dann Schülercode auswählen oder weitere Schüler hinzufügen. Klarnamen bleiben bis zum Entsperren verborgen.</p>
+              </div>
+            </div>
             {database.groups.length === 0 ? (
               <p className="status-note text-sm leading-6">
                 Noch keine Lerngruppen vorhanden. Lege zuerst eine Klasse an oder importiere eine Klassenliste.
@@ -563,10 +619,11 @@ export const StudentRosterPanel = ({
                 const namesByStudentId = resolvedNamesByGroupId[group.id];
 
                 return (
-                  <section key={group.id} className="surface-elevated overflow-hidden rounded-[32px] border">
+                  <section key={group.id} className="group-roster-card surface-elevated overflow-hidden rounded-[32px] border">
                     <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
+                          <span className="group-roster-icon" aria-hidden="true"><GroupIcon /></span>
                           <button
                             type="button"
                             className="button-secondary gap-2 px-3 py-2 text-xs"
@@ -582,10 +639,10 @@ export const StudentRosterPanel = ({
                             {isUnlocked ? "Klarnamen sichtbar" : "Nur Schülercodes sichtbar"}
                           </Badge>
                         </div>
-                        <p className="subsection-copy mt-3 text-sm">
+                        <p className="subsection-copy mt-3 text-sm leading-6">
                           {group.students.length === 0
-                            ? "Für diese Klasse sind noch keine Schüler angelegt."
-                            : `${group.students.length} Schüler in dieser Liste.`}
+                            ? "Hier sind noch keine Schüler angelegt. Öffne die Klasse und füge sie unten hinzu."
+                            : `${group.students.length} Schülercodes in dieser Liste.`}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-start justify-end gap-2">
