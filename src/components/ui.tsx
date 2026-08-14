@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { CheckIcon, CloseIcon, CompactIcon, InfoIcon, ListIcon } from "./icons";
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, CloseIcon, CompactIcon, InfoIcon, ListIcon } from "./icons";
 
 export const Card = ({
   title,
@@ -17,6 +17,9 @@ export const Card = ({
   children,
   className = "",
   headerLayout = "split",
+  collapsible = false,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   title?: string;
   subtitle?: string;
@@ -24,9 +27,12 @@ export const Card = ({
   children: ReactNode;
   className?: string;
   headerLayout?: "split" | "stacked";
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) => (
   <section className={`panel p-4 sm:p-6 ${className}`}>
-    {(title || actions) && (
+    {(title || actions || collapsible) && (
       <div
         className={`mb-5 ${
           headerLayout === "stacked"
@@ -38,10 +44,22 @@ export const Card = ({
           {title && <h2 className="card-title text-lg font-semibold">{title}</h2>}
           {subtitle && <p className="card-subtitle mt-1 text-sm">{subtitle}</p>}
         </div>
-        {actions}
+        {collapsible ? (
+          <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1 shadow-sm sm:flex-nowrap">
+            {actions}
+            <IconButton
+              onClick={() => onToggleCollapse?.()}
+              title={collapsed ? "Aufklappen" : "Zuklappen"}
+              ariaExpanded={!collapsed}
+              className="px-2.5 py-2 text-xs"
+            >
+              {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+            </IconButton>
+          </div>
+        ) : actions}
       </div>
     )}
-    {children}
+    {(!collapsible || !collapsed) && children}
   </section>
 );
 
@@ -325,6 +343,7 @@ export const IconButton = ({
   className = "",
   disabled = false,
   showTooltip = true,
+  ariaExpanded,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -333,12 +352,14 @@ export const IconButton = ({
   className?: string;
   disabled?: boolean;
   showTooltip?: boolean;
+  ariaExpanded?: boolean;
 }) => (
   <span className="tooltip-anchor inline-flex">
     <button
       type="button"
       onClick={onClick}
       aria-label={title}
+      aria-expanded={ariaExpanded}
       title={title}
       disabled={disabled}
       className={`${variant === "soft" ? "button-soft gap-2" : "button-secondary gap-2"} ${className}`}

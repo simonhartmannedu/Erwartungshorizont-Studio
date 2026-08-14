@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { DraftWorkspace, ExpectationArchiveEntry, StudentDatabase } from "../types";
 import { formatDateTime, formatNumber } from "../utils/format";
 import { getStudentAssessment } from "../utils/students";
-import { CheckIcon, ChevronDownIcon, CloseIcon, DuplicateIcon, GroupIcon, OpenIcon, TrashIcon } from "./icons";
+import { ArchiveIcon, CheckIcon, ChevronDownIcon, CloseIcon, DuplicateIcon, GroupIcon, OpenIcon, TrashIcon } from "./icons";
 import { Card, Field, IconButton } from "./ui";
 
 interface Props {
@@ -184,6 +184,36 @@ export const ExpectationArchiveDashboard = ({
       title="Erwartungshorizont-Archiv"
       subtitle="Wiederverwendbare Vorlagen ohne Schülerergebnisse. Für eine Klasse wird daraus jeweils eine neue Klassenarbeit erstellt."
     >
+      <div className="archive-info-card mb-5 rounded-3xl border p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start">
+          <span className="archive-info-icon"><ArchiveIcon /></span>
+          <div className="min-w-0 flex-1">
+            <p className="label">Vorlagen wiederverwenden</p>
+            <h3 className="themed-strong text-lg font-semibold">Das Archiv bewahrt deine fertigen EWH-Vorlagen</h3>
+            <p className="themed-muted mt-2 text-sm leading-6">
+              Gespeichert werden Aufgaben, Punkte und Erwartungshorizonte – niemals Schülerergebnisse. So kannst du bewährte Arbeiten sicher für andere Lerngruppen oder spätere Jahre nutzen.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="archive-info-step rounded-2xl p-4">
+            <span className="archive-info-step-icon"><ArchiveIcon /></span>
+            <p className="themed-strong mt-3 text-sm font-semibold">1. Vorlage speichern</p>
+            <p className="themed-muted mt-1 text-sm leading-6">In „Ergebnis & Druck“ speicherst du einen fertig bearbeiteten EWH im Archiv.</p>
+          </div>
+          <div className="archive-info-step rounded-2xl p-4">
+            <span className="archive-info-step-icon"><DuplicateIcon /></span>
+            <p className="themed-strong mt-3 text-sm font-semibold">2. Neue Arbeit erstellen</p>
+            <p className="themed-muted mt-1 text-sm leading-6">Erstelle aus einer Vorlage eine neue, eigenständige Klassenarbeit und passe sie bei Bedarf an.</p>
+          </div>
+          <div className="archive-info-step rounded-2xl p-4">
+            <span className="archive-info-step-icon"><GroupIcon /></span>
+            <p className="themed-strong mt-3 text-sm font-semibold">3. Lerngruppe zuordnen</p>
+            <p className="themed-muted mt-1 text-sm leading-6">Ordne die neue Arbeit direkt einer Lerngruppe zu und beginne danach mit der Bewertung.</p>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-5 grid gap-3 md:grid-cols-5">
         <Field label="Suche">
           <input className="field" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Titel, Fach, Lehrkraft, Kurs ..." />

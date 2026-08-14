@@ -25,3 +25,25 @@ test("nutzt auf kleinen Displays die verfügbare Breite ohne horizontalen Seiten
 
   expect(layout).toEqual({ documentFits: true, mainFits: true, asideFits: true });
 });
+
+test("richtet die Auswahl ab Tabletbreite bündig zum Inhaltsbereich aus", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/?demo=1&freshDemo=1");
+  await page.getByRole("button", { name: "Einführung schließen" }).click();
+  await page.getByRole("tab", { name: "Lerngruppen" }).click();
+
+  const positions = await page.evaluate(() => {
+    const selectionCard = Array.from(document.querySelectorAll("h2"))
+      .find((heading) => heading.textContent === "Auswahl")
+      ?.closest("section");
+    const activePanel = Array.from(document.querySelectorAll<HTMLElement>("main [role=tabpanel]"))
+      .find((panel) => panel.getClientRects().length > 0);
+
+    return {
+      selectionTop: selectionCard?.getBoundingClientRect().top,
+      contentTop: activePanel?.getBoundingClientRect().top,
+    };
+  });
+
+  expect(positions.selectionTop).toBe(positions.contentTop);
+});

@@ -15,8 +15,8 @@ interface Props {
   onExportScoringCsv?: () => void;
   onExportScoringOds?: () => void;
   onExportScoringXlsx?: () => void;
-  onImportBackup: (file: File, passphrase: string) => void;
-  onExportBackup: (passphrase: string) => Promise<boolean>;
+  onImportBackup?: (file: File, passphrase: string) => void;
+  onExportBackup?: (passphrase: string) => Promise<boolean>;
   onExportDocx?: () => void;
   onExportClassDocx?: () => void;
   onExportClassOverviewDocx?: () => void;
@@ -83,6 +83,7 @@ export const ImportExportControls = ({
     ...(onPrintGradeScale ? [{ value: "grade-scale", label: printGradeScaleLabel || "Notenbereiche", action: onPrintGradeScale, docxAction: onExportGradeScaleDocx }] : []),
   ];
   const selectedPdfOutput = pdfOutputs.find((output) => output.value === selectedDocumentOutput) ?? null;
+  const showBackupControls = Boolean(onImportBackup && onExportBackup);
 
   const tableOutputs = [
     {
@@ -102,6 +103,7 @@ export const ImportExportControls = ({
   const selectedTableOutput = tableOutputs.find((output) => output.value === selectedTableOutputValue) ?? null;
 
   const handleBackupImport = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!onImportBackup) return;
     const file = event.target.files?.[0];
     if (!file) return;
     onImportBackup(file, backupPassphrase);
@@ -188,41 +190,43 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
-        <div className="surface-elevated rounded-3xl border p-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-            <div className="min-w-0 flex-1">
-              <Field label="Backup-Passwort">
-                <input
-                  className="field"
-                  type="password"
-                  value={backupPassphrase}
-                  placeholder="Backup-Passwort"
-                  onChange={(event) => setBackupPassphrase(event.target.value)}
-                />
-              </Field>
+        {showBackupControls ? (
+          <div className="surface-elevated rounded-3xl border p-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+              <div className="min-w-0 flex-1">
+                <Field label="Backup-Passwort">
+                  <input
+                    className="field"
+                    type="password"
+                    value={backupPassphrase}
+                    placeholder="Backup-Passwort"
+                    onChange={(event) => setBackupPassphrase(event.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-wrap gap-3 xl:flex-none">
+                <button
+                  type="button"
+                  className="button-primary gap-2"
+                  onClick={() => {
+                    void onExportBackup?.(backupPassphrase);
+                  }}
+                >
+                  <DownloadIcon />
+                  Speicherort wählen und Backup sichern
+                </button>
+                <label className="button-secondary cursor-pointer gap-2">
+                  <UploadIcon />
+                  Arbeitsstand-Backup importieren
+                  <input type="file" accept="application/json" className="hidden" onChange={handleBackupImport} />
+                </label>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3 xl:flex-none">
-              <button
-                type="button"
-                className="button-primary gap-2"
-                onClick={() => {
-                  void onExportBackup(backupPassphrase);
-                }}
-              >
-                <DownloadIcon />
-                Speicherort wählen und Backup sichern
-              </button>
-              <label className="button-secondary cursor-pointer gap-2">
-                <UploadIcon />
-                Arbeitsstand-Backup importieren
-                <input type="file" accept="application/json" className="hidden" onChange={handleBackupImport} />
-              </label>
-            </div>
+            <p className="status-note mt-3 text-xs leading-5">
+              In Chromium-basierten Browsern öffnet sich ein Systemdialog zur Ordnerwahl. Andere Browser nutzen den normalen Download-Dialog.
+            </p>
           </div>
-          <p className="status-note mt-3 text-xs leading-5">
-            In Chromium-basierten Browsern öffnet sich ein Systemdialog zur Ordnerwahl. Andere Browser nutzen den normalen Download-Dialog.
-          </p>
-        </div>
+        ) : null}
       </div>
     </Card>
   );
