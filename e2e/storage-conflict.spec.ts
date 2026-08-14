@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const addManualGroup = async (page: import("@playwright/test").Page, subject: string, className: string) => {
   await page.getByRole("tab", { name: "Lerngruppen" }).click();
-  const form = page.getByText("Manuelle Lerngruppe anlegen", { exact: true }).locator("..");
+  const form = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
   await form.getByLabel("Fach").fill(subject);
   await form.getByLabel("Klasse").fill(className);
   await form.getByRole("button", { name: "Eigenes Passwort" }).click();

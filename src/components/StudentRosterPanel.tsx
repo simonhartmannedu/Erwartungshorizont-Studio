@@ -525,12 +525,12 @@ export const StudentRosterPanel = ({
               </p>
             </div>
 
-            <div className="group-action-card group-action-card-manual space-y-4 rounded-3xl border p-5">
+            <section className="group-action-card group-action-card-manual space-y-4 rounded-3xl border p-5" aria-labelledby="manual-group-heading">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><GroupIcon /></span>
                 <div>
                   <p className="label">Schritt 1 · Für eine einzelne Klasse</p>
-                  <p className="themed-strong text-base font-semibold">Manuelle Lerngruppe anlegen</p>
+                  <h3 id="manual-group-heading" className="themed-strong text-base font-semibold">Manuelle Lerngruppe anlegen</h3>
                 </div>
               </div>
               <p className="themed-muted text-sm leading-6">Danach kannst du in der Klassenliste Schülercodes und verschlüsselte Klarnamen hinzufügen.</p>
@@ -592,7 +592,7 @@ export const StudentRosterPanel = ({
                 <PlusIcon />
                 Lerngruppe anlegen
               </button>
-            </div>
+            </section>
           </div>
         </Card>
 

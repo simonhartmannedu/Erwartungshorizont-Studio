@@ -13,7 +13,7 @@ npm run test
 npm run build
 ```
 
-Vor einem Release führst du zusätzlich `npm run test:regression`, `npm run test:e2e` und `npm run build:demo` aus. `npm run check:release` bündelt die wichtigsten nicht-browserbasierten Prüfungen.
+Vor einem Release führst du zusätzlich `npm run test:regression` und `npm run build:demo` aus. `npm run check:release` bündelt alle Qualitätsprüfungen: Es baut die Produktionsversion und führt die E2E-Tests anschließend gegen diese Build-Ausgabe aus. Für einen einzelnen Lauf nach einem vorhandenen Build verwendest du `npm run test:e2e:preview`.
 
 ## Wo Änderungen hingehören
 
