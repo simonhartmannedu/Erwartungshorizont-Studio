@@ -10,7 +10,7 @@ test("searches clear names only during an unlocked class session", async ({ page
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.getByRole("tab", { name: "Lerngruppen" }).click();
 
-  const manualGroupForm = page.getByText("Manuelle Lerngruppe anlegen", { exact: true }).locator("..");
+  const manualGroupForm = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
   await manualGroupForm.getByLabel("Klasse").fill(className);
   await manualGroupForm.getByRole("button", { name: "Eigenes Passwort" }).click();

@@ -47,6 +47,15 @@ jobs:
       - name: Run unit tests
         run: npm run test
 
+      - name: Build and test the production app
+        run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run end-to-end tests against the production build
+        run: npm run test:e2e:preview
+
       - name: Build app bundles
         run: |
           rm -rf .pages
@@ -59,12 +68,6 @@ jobs:
 
       - name: Add landing page
         run: cp -R landing/. .pages/
-
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium firefox
-
-      - name: Run end-to-end tests
-        run: npm run test:e2e
 
       - name: Upload Playwright diagnostics
         if: failure()
