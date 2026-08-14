@@ -146,6 +146,7 @@ import {
   EditorToc,
   getEditorSectionAnchorId,
 } from "./components/EditorToc";
+import { EditorSectionTabs, getEditorSectionPanelId, type EditorSectionTabId } from "./components/EditorSectionTabs";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
@@ -164,7 +165,7 @@ import {
   LoadingIcon,
   PlusIcon,
 } from "./components/icons";
-import { Card, Field, IconButton } from "./components/ui";
+import { Card, Field } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { ImportedExamSuggestion } from "./pdf/types";
@@ -945,12 +946,42 @@ function App() {
   const [headerUnlockLoading, setHeaderUnlockLoading] = useState(false);
   const [pendingSecurityTokenCards, setPendingSecurityTokenCards] = useState<SecurityTokenCard[]>([]);
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
+  const [activeEditorTab, setActiveEditorTab] = useState<EditorSectionTabId>("setup");
+  const [metadataSectionCollapsed, setMetadataSectionCollapsed] = useState(false);
   const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
+  const [resultSectionCollapsed, setResultSectionCollapsed] = useState(false);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
   const [loadedExamTemplates, setLoadedExamTemplates] = useState<ExamTemplateDefinition[] | null>(null);
   const completedCorrectionCelebrationKeysRef = useRef<Record<string, boolean>>({});
   const lastVersionedExamByWorkspaceRef = useRef<Record<string, string>>({});
   const previousActiveGroupIdRef = useRef<string>("");
+  const resetEditorCollapses = useCallback(() => {
+    setCollapsedSectionIds([]);
+    setActiveEditorTab("setup");
+    setMetadataSectionCollapsed(false);
+    setPointsAndGradeSectionCollapsed(false);
+    setResultSectionCollapsed(false);
+  }, []);
+  const navigateEditorToc = useCallback((anchorId: string) => {
+    const setupAnchorIds = new Set([
+      EDITOR_METADATA_ANCHOR_ID,
+      EDITOR_POINTS_ANCHOR_ID,
+      EDITOR_POINT_SCALING_ANCHOR_ID,
+      EDITOR_GRADE_SCALE_ANCHOR_ID,
+      EDITOR_GRADE_RANGES_ANCHOR_ID,
+    ]);
+    setActiveEditorTab(
+      setupAnchorIds.has(anchorId) ? "setup" : anchorId === EDITOR_RESULT_ANCHOR_ID ? "result" : "tasks",
+    );
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const target = document.getElementById(anchorId)
+          ?? document.querySelector<HTMLElement>(`[data-editor-anchor="${CSS.escape(anchorId)}"]`);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }, []);
   const { saveVersion: saveWorkspaceVersion, restoreVersion: restoreWorkspaceVersion } = useWorkspaceVersionController({
     draftBundle,
     setDraftBundle,
@@ -960,12 +991,12 @@ function App() {
     normalizeExam: normalizeExamStructure,
     onRestoreCompleted: () => {
       setPendingVersionRestore(null);
-      setCollapsedSectionIds([]);
+      resetEditorCollapses();
     },
   });
   const { selectWorkspace: setActiveWorkspaceId } = useWorkspaceSelectionController({
     setDraftBundle,
-    onWorkspaceSelected: () => setCollapsedSectionIds([]),
+    onWorkspaceSelected: resetEditorCollapses,
   });
   const { addWorkspace, removeWorkspace } = useWorkspaceLifecycleController({
     activeGroupId,
@@ -973,7 +1004,7 @@ function App() {
     lastVersionedExamByWorkspaceRef,
     normalizeExam: normalizeExamStructure,
     createWorkspace: createDraftWorkspace,
-    onLifecycleChanged: () => setCollapsedSectionIds([]),
+    onLifecycleChanged: resetEditorCollapses,
   });
 
   const pushNotice = (tone: AppNoticeTone, title: string, detail?: string) => {
@@ -1701,7 +1732,7 @@ function App() {
       ...current,
       activeWorkspaceId: (pickPreferredWorkspaceForGroup(visibleWorkspaces, activeGroup, studentDatabase) ?? visibleWorkspaces[0])!.id,
     }));
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
   }, [activeGroup, activeGroupId, activeWorkspace, studentDatabase, visibleWorkspaces]);
 
   useEffect(() => {
@@ -1716,7 +1747,7 @@ function App() {
       ...current,
       activeWorkspaceId: preferredWorkspaceForActiveGroup.id,
     }));
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
   }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup]);
 
   const displayExam = useMemo(
@@ -2093,7 +2124,7 @@ function App() {
       syncBuilderToGroup(assignedGroupId);
     }
 
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
     setActiveTab("builder");
     setPendingSchoolYearCreation(null);
     const assignedGroup =
@@ -2509,7 +2540,7 @@ function App() {
 
   const openArchiveEntryInBuilder = (entry: ExpectationArchiveEntry) => {
     setActiveWorkspaceExam(normalizeExamStructure(createEditableExamFromArchive(entry)));
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
     setActiveWorkspaceArchiveEntryId(entry.id);
     setActiveWorkspaceGroupId(activeGroupId || null);
     setActiveTab("builder");
@@ -2520,7 +2551,7 @@ function App() {
       activeArchiveEntryId: null,
       assignedGroupId: activeGroupId || null,
     });
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
     setActiveTab("builder");
   };
 
@@ -2548,7 +2579,7 @@ function App() {
     };
     setActiveGroupId(targetGroup.id);
     setActiveStudentId(targetGroup.students[0]?.id ?? "");
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
     setActiveTab("builder");
     pushNotice(
       "success",
@@ -2988,7 +3019,7 @@ function App() {
     });
     setActiveSchoolYearFilter(normalizedSchoolYear);
     setActiveTab("guidedBuilder");
-    setCollapsedSectionIds([]);
+    resetEditorCollapses();
 
     if (studentListMode === "delete") {
       const emptyDatabase = createEmptyStudentDatabase();
@@ -4225,26 +4256,37 @@ function App() {
               className="space-y-6"
             >
             {activeTab === "builder" && (
-              <div id={EDITOR_METADATA_ANCHOR_ID} className="scroll-mt-24">
-                <Card title="Metadaten" subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft.">
-                  <ExamHeaderForm
-                    meta={exam.meta}
-                    disabled={!activeWorkspace}
-                    onChange={(key, value) =>
-                      setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
-                    }
-                  />
-                  {!activeWorkspace ? (
-                    <div className="surface-muted mt-4 rounded-2xl p-4">
-                      <p className="label">Noch kein EWH zugeordnet</p>
-                      <p className="themed-muted mt-2 text-sm leading-6">
-                        Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
-                        bis du einen EWH über „EWH erstellen“ anlegst oder aus dem Archiv zuweist.
-                      </p>
-                    </div>
-                  ) : null}
-                </Card>
-              </div>
+              <>
+                <EditorSectionTabs activeTab={activeEditorTab} onSelectTab={setActiveEditorTab} />
+                <div hidden={activeEditorTab !== "setup"}>
+                  <div id={EDITOR_METADATA_ANCHOR_ID} className="scroll-mt-24">
+                    <Card
+                      title="Metadaten"
+                      subtitle="Rahmendaten der Klassenarbeit, der Lerngruppe und der Lehrkraft."
+                      collapsible
+                      collapsed={metadataSectionCollapsed}
+                      onToggleCollapse={() => setMetadataSectionCollapsed((current) => !current)}
+                    >
+                      <ExamHeaderForm
+                        meta={exam.meta}
+                        disabled={!activeWorkspace}
+                        onChange={(key, value) =>
+                          setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
+                        }
+                      />
+                      {!activeWorkspace ? (
+                        <div className="surface-muted mt-4 rounded-2xl p-4">
+                          <p className="label">Noch kein EWH zugeordnet</p>
+                          <p className="themed-muted mt-2 text-sm leading-6">
+                            Für diese Lerngruppe ist noch keine Klassenarbeit hinterlegt. Die Felder bleiben leer,
+                            bis du einen EWH über „EWH erstellen“ anlegst oder aus dem Archiv zuweist.
+                          </p>
+                        </div>
+                      ) : null}
+                    </Card>
+                  </div>
+                </div>
+              </>
             )}
             </div>
 
@@ -4323,37 +4365,23 @@ function App() {
             <div hidden={activeTab !== "builder"} className="space-y-6">
             {activeTab === "builder" && (
               <>
+                <div
+                  id={getEditorSectionPanelId("setup")}
+                  role="tabpanel"
+                  aria-labelledby="ewh-editor-tab-setup"
+                  hidden={activeEditorTab !== "setup"}
+                  className="space-y-6"
+                >
                 {activeWorkspace ? (
                   <div id={EDITOR_POINTS_ANCHOR_ID} className="scroll-mt-24 space-y-6">
-                    <div className="flex flex-col gap-3 rounded-3xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="label">Wiederverwenden</p>
-                        <p className="themed-muted mt-1 text-sm leading-6">
-                          Das Archiv speichert nur die Vorlage. Schülerergebnisse bleiben an dieser Klassenarbeit.
-                        </p>
-                      </div>
-                      <button type="button" className="button-secondary shrink-0 gap-2" onClick={saveExpectationsToArchive}>
-                        <ArchiveIcon />
-                        Vorlage im Archiv speichern
-                      </button>
-                    </div>
                     <Card
                       title="Punkte und Note"
                       subtitle="Skaliere bei Bedarf die Gesamtpunktzahl und passe darunter den Notenschlüssel an. Die Gesamtnote wird weiterhin direkt über die erreichten Gesamtpunkte berechnet."
-                      actions={
-                        <div className="control-shell inline-flex items-center gap-1 rounded-full border p-1">
-                          <IconButton
-                            onClick={() => setPointsAndGradeSectionCollapsed((current) => !current)}
-                            title={pointsAndGradeSectionCollapsed ? "Aufklappen" : "Zuklappen"}
-                            className="px-2.5 py-2 text-xs"
-                          >
-                            {pointsAndGradeSectionCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-                          </IconButton>
-                        </div>
-                      }
+                      collapsible
+                      collapsed={pointsAndGradeSectionCollapsed}
+                      onToggleCollapse={() => setPointsAndGradeSectionCollapsed((current) => !current)}
                     >
-                      {!pointsAndGradeSectionCollapsed && (
-                        <>
+                      <>
                           <section aria-labelledby={EDITOR_POINT_SCALING_ANCHOR_ID}>
                             <div className="mb-4">
                               <h3 id={EDITOR_POINT_SCALING_ANCHOR_ID} className="scroll-mt-24 subsection-title text-lg font-semibold">
@@ -4410,8 +4438,7 @@ function App() {
                               subtitle="Ausgeschriebene Punktespannen je Note auf Basis der aktuellen Gesamtpunktzahl."
                             />
                           </div>
-                        </>
-                      )}
+                      </>
                     </Card>
 
                     {showGradeScaleEditor && !pointsAndGradeSectionCollapsed && (
@@ -4436,6 +4463,9 @@ function App() {
                   <Card
                     title="Punkte und Note"
                     subtitle="Für diese Lerngruppe ist noch kein EWH vorhanden."
+                    collapsible
+                    collapsed={pointsAndGradeSectionCollapsed}
+                    onToggleCollapse={() => setPointsAndGradeSectionCollapsed((current) => !current)}
                   >
                     <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-strong text-base font-semibold">Noch kein Erwartungshorizont vorhanden</p>
@@ -4463,7 +4493,15 @@ function App() {
                     </div>
                   </Card>
                 )}
+                </div>
 
+                <div
+                  id={getEditorSectionPanelId("tasks")}
+                  role="tabpanel"
+                  aria-labelledby="ewh-editor-tab-tasks"
+                  hidden={activeEditorTab !== "tasks"}
+                  className="space-y-6"
+                >
                 {activeWorkspace ? (
                   <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-3xl border px-4 py-3 surface-muted">
                     <div>
@@ -4607,7 +4645,6 @@ function App() {
                 })}
 
                 {activeWorkspace ? (
-                  <>
                     <div className="no-print">
                       <button
                         type="button"
@@ -4618,15 +4655,23 @@ function App() {
                         Abschnitt manuell ergänzen
                       </button>
                     </div>
+                ) : null}
+                </div>
 
-                    <div className="my-8 flex justify-center">
-                      <hr className="section-divider w-[90%]" />
-                    </div>
-
+                <div
+                  id={getEditorSectionPanelId("result")}
+                  role="tabpanel"
+                  aria-labelledby="ewh-editor-tab-result"
+                  hidden={activeEditorTab !== "result"}
+                >
+                  {activeWorkspace ? (
                     <div id={EDITOR_RESULT_ANCHOR_ID} className="scroll-mt-24">
                       <Card
                         title="Ergebnis und Abschlussbereich"
                         subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
+                        collapsible
+                        collapsed={resultSectionCollapsed}
+                        onToggleCollapse={() => setResultSectionCollapsed((current) => !current)}
                       >
                         <ReportSummarySection
                           exam={displayExam}
@@ -4646,9 +4691,55 @@ function App() {
                           }
                         />
                       </Card>
+                      <div className="mt-6 flex flex-col gap-3 rounded-3xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="label">Wiederverwenden</p>
+                          <p className="themed-muted mt-1 text-sm leading-6">
+                            Speichere die fertige Vorlage im EWH-Archiv. Schülerergebnisse bleiben an dieser Klassenarbeit.
+                          </p>
+                        </div>
+                        <button type="button" className="button-secondary shrink-0 gap-2" onClick={saveExpectationsToArchive}>
+                          <ArchiveIcon />
+                          Vorlage im Archiv speichern
+                        </button>
+                      </div>
+                      <div className="mt-6 no-print">
+                        <ImportExportControls
+                          onPrint={handlePrint}
+                          onExportDocx={handleExportDocx}
+                          onExportClassDocx={activeGroup ? handleExportClassDocx : undefined}
+                          onExportClassOverviewDocx={activeGroup && classOverview ? handleExportClassOverviewDocx : undefined}
+                          onExportEmptyDocx={handleExportEmptyDocx}
+                          onExportGradeScaleDocx={handleExportGradeScaleDocx}
+                          onPrintWithoutDetails={handlePrintWithoutDetails}
+                          onPrintGradeScale={handlePrintGradeScale}
+                          onPrintClass={activeGroup ? handlePrintClass : undefined}
+                          onPrintClassOverview={activeGroup && classOverview ? handlePrintClassOverview : undefined}
+                          onExportCsvStudent={handleExportStudentCsv}
+                          onExportCsvClass={activeGroup ? () => void handleExportClassCsv() : undefined}
+                          onExportCsvClassOverview={activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
+                          onExportCsvGradeScale={handleExportGradeScaleCsv}
+                          onExportScoringCsv={handleExportScoringCsv}
+                          onExportScoringOds={handleExportScoringOds}
+                          onExportScoringXlsx={handleExportScoringXlsx}
+                          printLabel={printLabel}
+                          printWithoutDetailsLabel={printWithoutDetailsLabel}
+                          printGradeScaleLabel={printGradeScaleLabel}
+                          classPrintLabel={classPrintLabel}
+                          classOverviewPrintLabel={classOverviewPrintLabel}
+                          exportCsvStudentLabel={exportCsvStudentLabel}
+                          exportCsvClassLabel={exportCsvClassLabel}
+                          exportCsvClassOverviewLabel={exportCsvClassOverviewLabel}
+                          exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
+                          exportScoringCsvLabel={exportScoringCsvLabel}
+                          exportScoringOdsLabel={exportScoringOdsLabel}
+                          exportScoringXlsxLabel={exportScoringXlsxLabel}
+                          printHint={printHint}
+                        />
+                      </div>
                     </div>
-                  </>
-                ) : null}
+                  ) : null}
+                </div>
               </>
             )}
             </div>
@@ -4710,44 +4801,6 @@ function App() {
             )}
             </div>
 
-            {activeTab === "builder" && activeWorkspace && (
-              <div className="no-print">
-                <ImportExportControls
-                  onImportBackup={handleImportDatabase}
-                  onExportBackup={handleExportDatabase}
-                  onPrint={handlePrint}
-                  onExportDocx={handleExportDocx}
-                  onExportClassDocx={activeGroup ? handleExportClassDocx : undefined}
-                  onExportClassOverviewDocx={activeGroup && classOverview ? handleExportClassOverviewDocx : undefined}
-                  onExportEmptyDocx={handleExportEmptyDocx}
-                  onExportGradeScaleDocx={handleExportGradeScaleDocx}
-                  onPrintWithoutDetails={handlePrintWithoutDetails}
-                  onPrintGradeScale={handlePrintGradeScale}
-                  onPrintClass={activeGroup ? handlePrintClass : undefined}
-                  onPrintClassOverview={activeGroup && classOverview ? handlePrintClassOverview : undefined}
-                  onExportCsvStudent={handleExportStudentCsv}
-                  onExportCsvClass={activeGroup ? () => void handleExportClassCsv() : undefined}
-                  onExportCsvClassOverview={activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
-                  onExportCsvGradeScale={handleExportGradeScaleCsv}
-                  onExportScoringCsv={handleExportScoringCsv}
-                  onExportScoringOds={handleExportScoringOds}
-                  onExportScoringXlsx={handleExportScoringXlsx}
-                  printLabel={printLabel}
-                  printWithoutDetailsLabel={printWithoutDetailsLabel}
-                  printGradeScaleLabel={printGradeScaleLabel}
-                  classPrintLabel={classPrintLabel}
-                  classOverviewPrintLabel={classOverviewPrintLabel}
-                  exportCsvStudentLabel={exportCsvStudentLabel}
-                  exportCsvClassLabel={exportCsvClassLabel}
-                  exportCsvClassOverviewLabel={exportCsvClassOverviewLabel}
-                  exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
-                  exportScoringCsvLabel={exportScoringCsvLabel}
-                  exportScoringOdsLabel={exportScoringOdsLabel}
-                  exportScoringXlsxLabel={exportScoringXlsxLabel}
-                  printHint={printHint}
-                />
-              </div>
-            )}
           </main>
 
           {activeTab !== "guidedBuilder" && activeTab !== "home" ? (
@@ -4766,6 +4819,7 @@ function App() {
                 <EditorToc
                   sections={displayExam.sections}
                   showPointSubsections={!pointsAndGradeSectionCollapsed}
+                  onNavigate={navigateEditorToc}
                 />
               ) : null}
               {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}

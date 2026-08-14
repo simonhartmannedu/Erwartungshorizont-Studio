@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DraftWorkspace, Exam, StudentDatabase } from "../types";
 import { getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
-import { ChevronDownIcon, ChevronRightIcon, KeyIcon, LockIcon, UnlockIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, LockIcon, UnlockIcon } from "./icons";
 import { Card, Field } from "./ui";
 
 interface Props {
@@ -102,9 +102,31 @@ export const StudentSelectionPanel = ({
   };
 
   const activeGroupLabel = activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : "Noch keine Lerngruppe gewählt";
+  const renderGroupSecurityStatus = () => {
+    if (!activeGroup || !activeGroupIsProtected) return null;
+
+    const isUnlocked = isSelectedGroupUnlocked;
+    return (
+      <button
+        type="button"
+        className={`group-security-status ${isUnlocked ? "is-unlocked" : "is-locked"}`}
+        onClick={onToggleSecurity}
+        aria-label={securityActionLabel}
+      >
+        <span className="group-security-status-icon" aria-hidden="true">
+          {isUnlocked ? <UnlockIcon className="h-4 w-4" /> : <LockIcon className="h-4 w-4" />}
+        </span>
+        <span className="group-security-status-copy">
+          <strong>Klasse {isUnlocked ? "entsperrt" : "gesperrt"}</strong>
+          <small>{isUnlocked ? "Bewertungsdaten und Klarnamen sind sichtbar." : "Bewertungsdaten und Klarnamen sind geschützt."}</small>
+        </span>
+        <span className="group-security-status-action">{isUnlocked ? "Sperren" : "Entsperren"}</span>
+      </button>
+    );
+  };
 
   return (
-    <div className="space-y-3 no-print xl:sticky xl:top-6">
+    <div className="space-y-3 no-print md:space-y-0 xl:sticky xl:top-6">
       <button
         type="button"
         className="mobile-selection-toggle md:hidden"
@@ -123,36 +145,6 @@ export const StudentSelectionPanel = ({
         title="Auswahl"
         subtitle="Im Arbeitsbereich erscheinen Schülercodes. Klarnamen werden nur lokal entschlüsselt."
       >
-        {activeGroup ? (
-          <div className="mb-4">
-            <button
-              type="button"
-              className={`security-key-trigger ${isSelectedGroupUnlocked ? "is-unlocked" : "is-locked"}`}
-              onClick={onToggleSecurity}
-              disabled={!activeGroupIsProtected}
-              aria-label={securityActionLabel}
-            >
-              <span className="security-key-trigger-orb" aria-hidden="true">
-                <span className="security-key-trigger-ring security-key-trigger-ring-outer" />
-                <span className="security-key-trigger-ring security-key-trigger-ring-inner" />
-                <span className="security-key-trigger-key">
-                  <KeyIcon className="h-10 w-10 sm:h-12 sm:w-12" />
-                </span>
-                <span className="security-key-trigger-lock">
-                  {isSelectedGroupUnlocked ? <UnlockIcon className="h-6 w-6" /> : <LockIcon className="h-6 w-6" />}
-                </span>
-              </span>
-              <span className="security-key-trigger-copy">
-                <span className="security-key-trigger-kicker">Datenschutz</span>
-                <span className="security-key-trigger-title">{securityActionLabel}</span>
-                <span className="security-key-trigger-meta">
-                  {activeGroup.subject} · {activeGroup.className}
-                  {activeGroupIsProtected ? "" : " · ungeschützt"}
-                </span>
-              </span>
-            </button>
-          </div>
-        ) : null}
         {selectedStudentRecord && activeGroup ? (
           <div className="space-y-4">
             <Field label="Klassenarbeit">
@@ -186,6 +178,7 @@ export const StudentSelectionPanel = ({
                 ))}
               </select>
             </Field>
+            {renderGroupSecurityStatus()}
             <Field label="Schülercode">
               <select
                 className="field"
@@ -202,11 +195,7 @@ export const StudentSelectionPanel = ({
                 ))}
               </select>
             </Field>
-            {activeGroup.passwordVerifier && !isSelectedGroupUnlocked ? (
-              <p className="warning-note text-xs leading-5">
-                Bewertungsdaten und Klarnamen bleiben gesperrt, bis du die aktive Klasse oben über das Schlüsselmodul entsperrst.
-              </p>
-            ) : selectedStudentRecord && taskCount > 0 ? (
+            {selectedStudentRecord && taskCount > 0 ? (
               <p className="status-note text-xs leading-5">
                 Korrekturfortschritt: <strong>{scoredTaskCount} von {taskCount}</strong> Punkteingaben erfasst.
               </p>
@@ -245,6 +234,7 @@ export const StudentSelectionPanel = ({
                 ))}
               </select>
             </Field>
+            {renderGroupSecurityStatus()}
             <Field label="Schülercode">
               <select
                 className="field"

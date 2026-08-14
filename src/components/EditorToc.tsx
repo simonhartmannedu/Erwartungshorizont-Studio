@@ -39,9 +39,11 @@ const getAnchorElement = (id: string) => {
 export const EditorToc = ({
   sections,
   showPointSubsections,
+  onNavigate,
 }: {
   sections: Section[];
   showPointSubsections: boolean;
+  onNavigate?: (id: string) => void;
 }) => {
   const items = useMemo<EditorTocItem[]>(() => [
     { id: EDITOR_METADATA_ANCHOR_ID, label: "Metadaten" },
@@ -106,6 +108,12 @@ export const EditorToc = ({
   }, [flatItems]);
 
   const scrollToItem = (id: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (onNavigate) {
+      event.preventDefault();
+      onNavigate(id);
+      return;
+    }
+
     const target = document.getElementById(id);
     const logicalTarget = getAnchorElement(id);
     if (!logicalTarget && !target) return;
