@@ -14,6 +14,7 @@ test("imports a local SVG signature without shipping it with the app", async ({ 
   await page.getByRole("button", { name: "Lerngruppe entschlüsseln" }).click();
 
   await page.getByLabel("Schülercode").selectOption({ label: "Ananya Patel · Student 8 · korrigiert" });
+  await page.getByRole("tab", { name: "Ergebnis & Druck", exact: true }).click();
 
   const fileInput = page.locator('input[type="file"][accept="image/svg+xml,.svg"]');
   await expect(fileInput).toBeAttached();
