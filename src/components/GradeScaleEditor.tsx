@@ -289,7 +289,7 @@ export const GradeScaleEditor = ({
           </p>
         )}
 
-        <div className="themed-table-shell overflow-hidden rounded-3xl border">
+        <div className="themed-table-shell overflow-hidden rounded-2xl border">
           <div className="overflow-x-auto">
             <table className="min-w-[640px] text-sm md:min-w-full">
               <thead className="themed-table-head text-left text-xs uppercase tracking-[0.16em]">

@@ -1,5 +1,6 @@
 import { ChangeEvent, useState } from "react";
-import { ArchiveIcon, DownloadIcon, DuplicateIcon, GroupIcon, PlusIcon, SaveIcon, TrashIcon, UploadIcon } from "./icons";
+import { ArchiveIcon, DownloadIcon, DuplicateIcon, PlusIcon, UploadIcon } from "./icons";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { Badge, Card, DismissibleCallout, Field } from "./ui";
 
 export interface SchoolYearBackupOption {
@@ -18,7 +19,6 @@ interface Props {
   };
   lastBackupAt: string | null;
   schoolYearOptions: SchoolYearBackupOption[];
-  totalSnapshotCount: number;
   canRollbackImport: boolean;
   onExportFullBackup: (passphrase: string) => Promise<boolean>;
   onImportBackup: (file: File, passphrase: string) => void;
@@ -27,11 +27,49 @@ interface Props {
   onStartSchoolYear: (schoolYear: string, studentListMode: "keep" | "delete") => void;
 }
 
+const PasswordField = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) => {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <Field label={label}>
+      <div className="flex gap-2">
+        <input
+          className="field min-w-0 flex-1"
+          type={visible ? "text" : "password"}
+          value={value}
+          placeholder={placeholder}
+          autoComplete="new-password"
+          spellCheck={false}
+          autoCapitalize="off"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          type="button"
+          className="button-secondary shrink-0 px-3"
+          aria-pressed={visible}
+          onClick={() => setVisible((current) => !current)}
+        >
+          {visible ? "Verbergen" : "Anzeigen"}
+        </button>
+      </div>
+    </Field>
+  );
+};
+
 export const BackupPanel = ({
   backupStatus,
   lastBackupAt,
   schoolYearOptions,
-  totalSnapshotCount,
   canRollbackImport,
   onExportFullBackup,
   onImportBackup,
@@ -39,340 +77,263 @@ export const BackupPanel = ({
   onArchiveSchoolYear,
   onStartSchoolYear,
 }: Props) => {
+  const [backupDialog, setBackupDialog] = useState<"save" | "restore" | "archive-school-year" | null>(null);
   const [fullBackupPassphrase, setFullBackupPassphrase] = useState("");
+  const [selectedFullBackupFile, setSelectedFullBackupFile] = useState<File | null>(null);
   const [schoolYearPassphrase, setSchoolYearPassphrase] = useState("");
   const [schoolYearRestorePassphrase, setSchoolYearRestorePassphrase] = useState("");
+  const [selectedSchoolYearRestoreFile, setSelectedSchoolYearRestoreFile] = useState<File | null>(null);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState(schoolYearOptions[0]?.value ?? "");
   const [newSchoolYear, setNewSchoolYear] = useState("");
   const [studentListMode, setStudentListMode] = useState<"keep" | "delete">("keep");
+  const [deleteStudentListsConfirmed, setDeleteStudentListsConfirmed] = useState(false);
 
   const effectiveSchoolYear = schoolYearOptions.some((option) => option.value === selectedSchoolYear)
     ? selectedSchoolYear
     : schoolYearOptions[0]?.value ?? "";
   const selectedOption = schoolYearOptions.find((option) => option.value === effectiveSchoolYear) ?? null;
 
-  const handleImport = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    onImportBackup(file, fullBackupPassphrase);
+  const selectFullBackupFile = (event: ChangeEvent<HTMLInputElement>) => {
+    setSelectedFullBackupFile(event.target.files?.[0] ?? null);
     event.target.value = "";
   };
 
-  const handleSchoolYearRestore = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    onImportBackup(file, schoolYearRestorePassphrase);
+  const selectSchoolYearArchive = (event: ChangeEvent<HTMLInputElement>) => {
+    setSelectedSchoolYearRestoreFile(event.target.files?.[0] ?? null);
     event.target.value = "";
+  };
+
+  const startNewSchoolYear = () => {
+    if (studentListMode === "delete" && !deleteStudentListsConfirmed) return;
+    onStartSchoolYear(newSchoolYear, studentListMode);
+  };
+
+  const saveFullBackup = async () => {
+    const saved = await onExportFullBackup(fullBackupPassphrase);
+    if (saved) {
+      setBackupDialog(null);
+      setFullBackupPassphrase("");
+    }
+  };
+
+  const inspectFullBackup = () => {
+    if (!selectedFullBackupFile || !fullBackupPassphrase.trim()) return;
+    onImportBackup(selectedFullBackupFile, fullBackupPassphrase);
+    setBackupDialog(null);
+  };
+
+  const archiveSchoolYear = async () => {
+    const archived = await onArchiveSchoolYear(effectiveSchoolYear, schoolYearPassphrase);
+    if (archived) {
+      setBackupDialog(null);
+      setSchoolYearPassphrase("");
+    }
   };
 
   return (
     <div className="space-y-6 no-print">
-      <Card
-        title="Speichern verstehen"
-        subtitle="Drei Ebenen mit unterschiedlichen Aufgaben – sie ergänzen sich, ersetzen sich aber nicht."
-      >
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="backup-level-card surface-elevated rounded-3xl border p-4">
-            <span className="backup-level-icon backup-level-icon-auto"><SaveIcon /></span>
-            <p className="label mt-4">1. Automatisch speichern</p>
-            <p className="themed-strong mt-2 text-base font-semibold">Während der Arbeit</p>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Änderungen an Klassenarbeiten und Schülerergebnissen werden direkt in diesem Browser gespeichert. Du musst dafür nichts anklicken.
-            </p>
-            <p className="status-note mt-3 text-xs leading-5">Gut für: normales Weiterarbeiten. Nicht genug bei Gerätewechsel, Browserbereinigung oder Verlust des Geräts.</p>
-          </div>
-          <div className="backup-level-card surface-elevated rounded-3xl border p-4">
-            <span className="backup-level-icon backup-level-icon-version"><DuplicateIcon /></span>
-            <p className="label mt-4">2. EWH-Version</p>
-            <p className="themed-strong mt-2 text-base font-semibold">Vor größeren Änderungen</p>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Eine EWH-Version bewahrt einen früheren Stand des Erwartungshorizonts, zum Beispiel vor dem Umbau von Aufgaben oder Notenschlüssel.
-            </p>
-            <p className="status-note mt-3 text-xs leading-5">Gut für: „Ich möchte diese Änderung zurücknehmen.“ Enthält keine Schülerpunkte und bleibt nur in diesem Browser.</p>
-          </div>
-          <div className="backup-level-card surface-elevated rounded-3xl border p-4">
-            <span className="backup-level-icon backup-level-icon-backup"><DownloadIcon /></span>
-            <p className="label mt-4">3. Verschlüsseltes Vollbackup</p>
-            <p className="themed-strong mt-2 text-base font-semibold">Regelmäßig und vor Risiken</p>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Eine heruntergeladene Datei enthält Klassenarbeiten, EWH-Versionen, Archiv und Schülerdaten. Sie lässt sich später wieder importieren.
-            </p>
-            <p className="status-note mt-3 text-xs leading-5">Gut für: mindestens wöchentlich, nach abgeschlossener Korrektur sowie vor Browser-/Gerätewechsel.</p>
-          </div>
+      <details className="surface-muted rounded-2xl border p-4">
+        <summary className="themed-strong cursor-pointer text-sm font-semibold">Wie sind meine Daten gespeichert und geschützt?</summary>
+        <div className="mt-4 grid gap-3 text-sm leading-6 md:grid-cols-3">
+          <p><strong>Automatisch speichern:</strong> Änderungen bleiben in diesem Browser.</p>
+          <p><strong>EWH-Versionen:</strong> sichern frühere Erwartungshorizonte, aber keine Schülerpunkte.</p>
+          <p><strong>Backup-Datei:</strong> ist verschlüsselt und schützt bei Gerätewechsel oder Datenverlust.</p>
         </div>
-      </Card>
+      </details>
 
-      <Card
-        title="Backup-Datei sichern oder wiederherstellen"
-        subtitle="1. Passwort eingeben. 2. Datei speichern oder eine vorhandene Datei wiederherstellen."
-      >
+      <Card title="Sicherungen" subtitle="Erstelle regelmäßig eine verschlüsselte Datei oder stelle eine vorhandene Datei wieder her.">
         <div className="space-y-4">
           <DismissibleCallout tone={backupStatus.tone} resetKey={`${backupStatus.summary}-${lastBackupAt ?? "none"}`}>
             <p className="font-semibold">{backupStatus.summary}</p>
             <p>{backupStatus.detail}</p>
           </DismissibleCallout>
-          <div className="backup-password-step surface-elevated rounded-3xl border p-4">
-            <div className="flex items-start gap-3">
-              <span className="backup-level-icon backup-level-icon-password"><ArchiveIcon /></span>
-              <div className="min-w-0 flex-1">
-                <p className="label">Schritt 1</p>
-                <p className="themed-strong text-sm font-semibold">Backup-Passwort festlegen</p>
-                <p className="themed-muted mt-1 text-sm leading-6">Du brauchst dasselbe Passwort später auch zum Wiederherstellen.</p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <Field label="Backup-Passwort">
-                <input
-                  className="field"
-                  type="password"
-                  value={fullBackupPassphrase}
-                  placeholder="Passwort für Export und Import"
-                  onChange={(event) => setFullBackupPassphrase(event.target.value)}
-                />
-              </Field>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="backup-action-card backup-action-card-save rounded-3xl border p-5">
-              <span className="backup-action-icon"><DownloadIcon /></span>
-              <p className="label mt-4">Schritt 2a · Regelmäßig nutzen</p>
-              <h3 className="themed-strong text-lg font-semibold">Backup-Datei speichern</h3>
-              <p className="themed-muted mt-2 text-sm leading-6">
-                Lege eine verschlüsselte Datei auf deinem Rechner, einem USB-Stick oder in deinem sicheren Speicher ab.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  className="button-primary w-full gap-2 sm:w-auto"
-                  onClick={() => {
-                    void onExportFullBackup(fullBackupPassphrase);
-                  }}
-                >
-                  <DownloadIcon />
-                  Backup-Datei speichern
-                </button>
-              </div>
-              <p className="status-note mt-3 text-xs leading-5">Empfohlen: mindestens wöchentlich und vor einem Geräte- oder Browserwechsel.</p>
-            </div>
-            <div className="backup-action-card backup-action-card-restore rounded-3xl border p-5">
-              <span className="backup-action-icon"><UploadIcon /></span>
-              <p className="label mt-4">Schritt 2b · Nur bei Bedarf</p>
-              <h3 className="themed-strong text-lg font-semibold">Backup-Datei wiederherstellen</h3>
-              <p className="themed-muted mt-2 text-sm leading-6">
-                Nutze dies auf einem neuen Gerät oder wenn du einen früher gesicherten Arbeitsstand zurückholen möchtest.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <label className="button-secondary cursor-pointer gap-2">
-                  <UploadIcon />
-                  Backup-Datei auswählen
-                  <input type="file" accept="application/json" className="hidden" onChange={handleImport} />
-                </label>
-                {canRollbackImport ? (
-                  <button type="button" className="button-secondary" onClick={onRollbackImport}>
-                    <DuplicateIcon />
-                    Letzten Import rückgängig
-                  </button>
-                ) : null}
-              </div>
-              <p className="status-note mt-3 text-xs leading-5">Die ausgewählte Datei wird vor dem Wiederherstellen geprüft.</p>
-            </div>
-          </div>
-          <div className="backup-last-saved">
-            {lastBackupAt ? (
-              <p className="status-note mt-3 text-xs leading-5">
-                Letzte erfolgreiche Sicherung: {new Date(lastBackupAt).toLocaleString("de-DE")}
-              </p>
-            ) : <p className="status-note text-xs leading-5">Noch keine Backup-Datei gespeichert.</p>}
-          </div>
-        </div>
-      </Card>
 
-      <Card
-        title="Neues Schuljahr starten"
-        subtitle="1. Neues Schuljahr benennen. 2. Entscheiden, was mit den bisherigen Schülerlisten geschehen soll."
-      >
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
-          <div className="backup-action-card backup-action-card-restore rounded-3xl border p-4">
-            <span className="backup-action-icon"><PlusIcon /></span>
-            <p className="label mt-4">Schritt 1</p>
-            <p className="themed-strong text-base font-semibold">Neues Schuljahr benennen</p>
-            <p className="themed-muted mt-2 text-sm leading-6">Die Angabe erscheint künftig in der Schuljahr-Auswahl und trennt die neue Arbeit vom bisherigen Jahr.</p>
-            <Field label="Neues Schuljahr">
-              <input
-                className="field"
-                value={newSchoolYear}
-                placeholder="z. B. 2026/27"
-                onChange={(event) => setNewSchoolYear(event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="backup-action-card backup-action-card-save rounded-3xl border p-4">
-            <span className="backup-action-icon"><GroupIcon /></span>
-            <p className="label mt-4">Schritt 2</p>
-            <p className="themed-strong text-base font-semibold">Schülerlisten erhalten oder löschen</p>
-            <p className="themed-muted mt-2 text-sm leading-6">Wähle, ob die vorhandenen Lerngruppen im neuen Schuljahr weiterverwendet oder aus diesem Browserprofil entfernt werden.</p>
-            <Field as="div" label="Schülerlisten">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className={`${studentListMode === "keep" ? "button-primary" : "button-secondary"} backup-choice-button w-full`}
-                  onClick={() => setStudentListMode("keep")}
-                >
-                  <GroupIcon />
-                  Listen behalten
-                </button>
-                <button
-                  type="button"
-                  className={`${studentListMode === "delete" ? "button-primary" : "button-secondary"} backup-choice-button w-full`}
-                  onClick={() => setStudentListMode("delete")}
-                >
-                  <TrashIcon />
-                  Listen löschen
-                </button>
-              </div>
-            </Field>
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              className="button-primary mt-4 w-full gap-2 sm:w-auto"
-              onClick={() => onStartSchoolYear(newSchoolYear, studentListMode)}
+              className="button-primary backup-choice-button w-full"
+              onClick={() => setBackupDialog("save")}
             >
-              <PlusIcon />
-              Schuljahr anlegen
+              <DownloadIcon />
+              Backup speichern
             </button>
-            <p className="status-note mt-3 text-xs leading-5">
-              Was passiert beim Anlegen: Es wird ein neues Arbeitsjahr geöffnet. Meist richtig: Listen erhalten. Bestehende Klassenarbeiten bleiben über die Schuljahr-Auswahl erreichbar; Listen löschen entfernt Lerngruppen und Bewertungen aus diesem Browserprofil.
-            </p>
+            <button
+              type="button"
+              className="button-secondary backup-choice-button w-full"
+              onClick={() => setBackupDialog("restore")}
+            >
+              <UploadIcon />
+              Backup wiederherstellen
+            </button>
           </div>
+
+          {canRollbackImport ? (
+            <button type="button" className="button-secondary gap-2" onClick={onRollbackImport}>
+              <DuplicateIcon />
+              Letzten Import rückgängig
+            </button>
+          ) : null}
+
+          <p className="status-note text-xs leading-5">
+            {lastBackupAt ? `Letzte erfolgreiche Sicherung: ${new Date(lastBackupAt).toLocaleString("de-DE")}` : "Noch keine Backup-Datei gespeichert."}
+          </p>
         </div>
       </Card>
 
-      <Card
-        title="Schuljahr archivieren"
-        subtitle="Für abgeschlossene Schuljahre: Datei sichern, dann die Arbeit aus der laufenden Oberfläche ausblenden."
-      >
-        {schoolYearOptions.length === 0 ? (
-          <p className="status-note text-sm leading-6">Es gibt noch keine Klassenarbeiten, die archiviert werden können.</p>
-        ) : (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
-            <div className="backup-action-card backup-action-card-restore rounded-3xl border p-4">
-              <span className="backup-action-icon"><ArchiveIcon /></span>
-              <p className="label mt-4">Schritt 1</p>
-              <p className="themed-strong text-base font-semibold">Abgeschlossenes Schuljahr auswählen</p>
-              <p className="themed-muted mt-2 text-sm leading-6">Die angezeigten Klassenarbeiten, EWH-Versionen und Bewertungen dieses Schuljahrs werden in die Archivdatei übernommen.</p>
-              <Field label="Schuljahr">
-                <select
-                  className="field"
-                  value={effectiveSchoolYear}
-                  onChange={(event) => setSelectedSchoolYear(event.target.value)}
-                >
-                  {schoolYearOptions.map((option) => (
-                    <option key={option.value || "empty-school-year"} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+      <Card title="Schuljahr verwalten" subtitle="Starte ein neues Schuljahr, archiviere abgeschlossene Arbeit oder stelle ein Archiv zurück.">
+        <div className="grid gap-4 xl:grid-cols-3">
+          <section className="backup-action-card backup-action-card-restore rounded-2xl border p-4">
+            <span className="backup-action-icon"><PlusIcon /></span>
+            <h3 className="themed-strong mt-4 text-base font-semibold">Neues Schuljahr starten</h3>
+            <p className="themed-muted mt-1 text-sm leading-6">Lege die Bezeichnung fest und entscheide, ob vorhandene Listen weiterverwendet werden.</p>
+            <div className="mt-4 space-y-4">
+              <Field label="Neues Schuljahr">
+                <input className="field" value={newSchoolYear} placeholder="z. B. 2026/27" onChange={(event) => setNewSchoolYear(event.target.value)} />
               </Field>
-              {selectedOption ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+              <Field as="div" label="Schülerlisten">
+                <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition-colors ${studentListMode === "keep" ? "border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20" : "border-rose-500/40 bg-rose-50/60 dark:bg-rose-950/20"}`}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={studentListMode === "keep"}
+                    onChange={(event) => {
+                      setStudentListMode(event.target.checked ? "keep" : "delete");
+                      if (event.target.checked) setDeleteStudentListsConfirmed(false);
+                    }}
+                  />
+                  <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${studentListMode === "keep" ? "bg-emerald-600" : "bg-rose-600"}`} aria-hidden="true">
+                    <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${studentListMode === "keep" ? "translate-x-6" : "translate-x-1"}`} />
+                  </span>
+                  <span>
+                    <span className="themed-strong block text-sm font-semibold">{studentListMode === "keep" ? "Listen behalten" : "Listen löschen"}</span>
+                    <span className="themed-muted block text-xs leading-5">{studentListMode === "keep" ? "Bestehende Lerngruppen und Bewertungen bleiben verfügbar." : "Lerngruppen und Bewertungen werden aus diesem Browser entfernt."}</span>
+                  </span>
+                </label>
+              </Field>
+              {studentListMode === "delete" ? (
+                <label className="flex items-start gap-3 text-sm leading-5">
+                  <input type="checkbox" checked={deleteStudentListsConfirmed} onChange={(event) => setDeleteStudentListsConfirmed(event.target.checked)} />
+                  <span>Ich verstehe, dass Lerngruppen und Bewertungen aus diesem Browser entfernt werden.</span>
+                </label>
+              ) : null}
+              <button type="button" className="button-primary w-full gap-2" disabled={studentListMode === "delete" && !deleteStudentListsConfirmed} onClick={startNewSchoolYear}>
+                <PlusIcon />
+                Schuljahr anlegen
+              </button>
+            </div>
+          </section>
+
+          <section className="backup-action-card backup-action-card-save rounded-2xl border p-4">
+            <span className="backup-action-icon"><ArchiveIcon /></span>
+            <h3 className="themed-strong mt-4 text-base font-semibold">Schuljahr archivieren</h3>
+            {selectedOption ? (
+              <div className="mt-4 space-y-4">
+                <Field label="Abgeschlossenes Schuljahr">
+                  <select className="field" value={effectiveSchoolYear} onChange={(event) => setSelectedSchoolYear(event.target.value)}>
+                    {schoolYearOptions.map((option) => <option key={option.value || "empty-school-year"} value={option.value}>{option.label}</option>)}
+                  </select>
+                </Field>
+                <div className="flex flex-wrap gap-2">
                   <Badge tone="slate">{selectedOption.workspaceCount} Klassenarbeiten</Badge>
                   <Badge tone="slate">{selectedOption.snapshotCount} EWH-Versionen</Badge>
                   <Badge tone="slate">{selectedOption.assessmentCount} Bewertungen</Badge>
                 </div>
-              ) : null}
-            </div>
-            <div className="backup-action-card backup-action-card-save rounded-3xl border p-4">
-              <span className="backup-action-icon"><DownloadIcon /></span>
-              <p className="label mt-4">Schritt 2</p>
-              <p className="themed-strong text-base font-semibold">Archivdatei sichern und ausblenden</p>
-              <p className="themed-muted mt-2 text-sm leading-6">Nach der Passwort-Eingabe wird eine verschlüsselte Datei gespeichert. Erst danach verschwindet das Schuljahr aus der laufenden Arbeitsliste.</p>
-              <Field label="Archiv-Passwort">
-                <input
-                  className="field"
-                  type="password"
-                  value={schoolYearPassphrase}
-                  placeholder="Passwort für die Schuljahr-Archivdatei"
-                  onChange={(event) => setSchoolYearPassphrase(event.target.value)}
-                />
-              </Field>
-              <button
-                type="button"
-                className="button-primary mt-4 w-full gap-2 sm:w-auto"
-                disabled={!selectedOption}
-                onClick={() => {
-                  void onArchiveSchoolYear(effectiveSchoolYear, schoolYearPassphrase);
-                }}
-              >
-                <DownloadIcon />
-                Schuljahr sichern und ausblenden
-              </button>
-              <p className="status-note mt-3 text-xs leading-5">
-                Nutze dies erst nach Schuljahresende. Nach erfolgreichem Speichern verschwindet das ausgewählte Schuljahr aus der Arbeitsliste; bei Abbruch bleibt alles unverändert.
-              </p>
-            </div>
-          </div>
-        )}
+                <button type="button" className="button-primary w-full gap-2" onClick={() => setBackupDialog("archive-school-year")}>
+                  <DownloadIcon />
+                  Archivieren und ausblenden
+                </button>
+                <p className="status-note text-xs leading-5">Nach erfolgreichem Speichern verschwindet das Schuljahr aus der Arbeitsliste.</p>
+              </div>
+            ) : <p className="status-note mt-3 text-sm leading-6">Es gibt noch keine Klassenarbeiten, die archiviert werden können.</p>}
+          </section>
+
+          <section className="backup-action-card backup-action-card-restore rounded-2xl border p-4">
+            <span className="backup-action-icon"><UploadIcon /></span>
+            <h3 className="themed-strong mt-4 text-base font-semibold">Schuljahr wiederherstellen</h3>
+            <p className="themed-muted mt-1 text-sm leading-6">Wähle eine Archivdatei; anschließend prüfst du ihren Inhalt vor dem Wiederherstellen.</p>
+            {!selectedSchoolYearRestoreFile ? (
+              <label className="button-primary mt-4 w-full cursor-pointer gap-2">
+                <UploadIcon />
+                Schuljahr-Archiv auswählen
+                <input type="file" accept="application/json" className="hidden" onChange={selectSchoolYearArchive} />
+              </label>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div className="surface-muted rounded-2xl border p-3 text-sm">
+                  <p className="label">Ausgewählte Datei</p>
+                  <p className="themed-strong font-medium">{selectedSchoolYearRestoreFile.name}</p>
+                </div>
+                <PasswordField label="Passwort dieser Archivdatei" value={schoolYearRestorePassphrase} onChange={setSchoolYearRestorePassphrase} placeholder="Passwort eingeben" />
+                <button type="button" className="button-primary w-full gap-2" disabled={!schoolYearRestorePassphrase.trim()} onClick={() => onImportBackup(selectedSchoolYearRestoreFile, schoolYearRestorePassphrase)}>
+                  <ArchiveIcon />
+                  Inhalt prüfen
+                </button>
+                <label className="button-secondary w-full cursor-pointer gap-2">
+                  Andere Datei auswählen
+                  <input type="file" accept="application/json" className="hidden" onChange={selectSchoolYearArchive} />
+                </label>
+              </div>
+            )}
+          </section>
+        </div>
       </Card>
 
-      <Card
-        title="Schuljahr wiederherstellen"
-        subtitle="Hole ein zuvor archiviertes Schuljahr zurück, wenn du es wieder bearbeiten oder nachsehen musst."
+      <ConfirmDialog
+        open={backupDialog === "save"}
+        title="Verschlüsseltes Backup speichern"
+        description="Lege ein Passwort für diese Datei fest. Es wird nicht in der App gespeichert und ist für eine spätere Wiederherstellung erforderlich."
+        onCancel={() => setBackupDialog(null)}
+        onConfirm={() => { void saveFullBackup(); }}
+        confirmLabel="Backup speichern"
+        confirmDisabled={!fullBackupPassphrase.trim()}
       >
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
-          <div className="backup-action-card backup-action-card-restore rounded-3xl border p-4">
-            <span className="backup-action-icon"><ArchiveIcon /></span>
-            <p className="label mt-4">Schritt 1</p>
-            <p className="themed-strong text-base font-semibold">Passwort der Archivdatei eingeben</p>
-            <p className="themed-muted mt-2 text-sm leading-6">Mit diesem Passwort wird die ausgewählte Archivdatei entschlüsselt. Es muss dem Passwort beim Archivieren entsprechen.</p>
-            <Field label="Archiv-Passwort">
-              <input
-                className="field"
-                type="password"
-                value={schoolYearRestorePassphrase}
-                placeholder="Passwort der Schuljahr-Archivdatei"
-                onChange={(event) => setSchoolYearRestorePassphrase(event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="backup-action-card backup-action-card-save rounded-3xl border p-4">
-            <span className="backup-action-icon"><UploadIcon /></span>
-            <p className="label mt-4">Schritt 2</p>
-            <p className="themed-strong text-base font-semibold">Archivdatei auswählen</p>
-            <p className="themed-muted mt-2 text-sm leading-6">Wähle die zuvor gesicherte Schuljahr-Archivdatei aus. Die enthaltenen Klassenarbeiten erscheinen anschließend wieder in der Arbeitsliste.</p>
-            <label className="button-primary mt-4 w-full cursor-pointer gap-2 sm:w-auto">
+        <div className="space-y-3">
+          <PasswordField label="Backup-Passwort" value={fullBackupPassphrase} onChange={setFullBackupPassphrase} placeholder="Passwort festlegen" />
+          <p className="text-sm font-medium leading-6 text-amber-700 dark:text-amber-300" role="note">
+            Wichtig: Ohne dieses Passwort kann die Backup-Datei nicht wiederhergestellt werden.
+          </p>
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={backupDialog === "restore"}
+        title="Backup wiederherstellen"
+        description="Wähle die Backup-Datei und gib ihr Passwort ein. Danach prüfst du den Inhalt, bevor Daten wiederhergestellt werden."
+        onCancel={() => setBackupDialog(null)}
+        onConfirm={inspectFullBackup}
+        confirmLabel="Inhalt prüfen"
+        confirmDisabled={!selectedFullBackupFile || !fullBackupPassphrase.trim()}
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="label">Backup-Datei</p>
+            <label className="button-secondary w-full cursor-pointer justify-start gap-2">
               <UploadIcon />
-              Schuljahr-Archiv auswählen
-              <input type="file" accept="application/json" className="hidden" onChange={handleSchoolYearRestore} />
+              {selectedFullBackupFile ? selectedFullBackupFile.name : "Backup-Datei auswählen"}
+              <input type="file" accept="application/json" className="hidden" onChange={selectFullBackupFile} />
             </label>
           </div>
+          <PasswordField label="Passwort dieser Backup-Datei" value={fullBackupPassphrase} onChange={setFullBackupPassphrase} placeholder="Passwort eingeben" />
+          <p className="text-sm leading-6" role="note">Das Passwort muss mit dem beim Speichern verwendeten Passwort übereinstimmen.</p>
         </div>
-        <p className="status-note mt-3 text-xs leading-5">
-          Bereits vorhandene Klassenarbeiten aus derselben Archivdatei werden beim Wiederherstellen übersprungen.
-        </p>
-      </Card>
+      </ConfirmDialog>
 
-      <Card title="EWH-Versionen und Exportdateien" subtitle="Was die Browser-App realistisch verwalten kann.">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="backup-action-card backup-action-card-restore rounded-3xl border p-5">
-            <span className="backup-action-icon"><DuplicateIcon /></span>
-            <p className="label mt-4">Während der Bearbeitung</p>
-            <p className="themed-strong text-lg font-semibold">EWH-Version anlegen</p>
-            <p className="themed-strong text-2xl font-semibold">{totalSnapshotCount}</p>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Öffne bei einer Klassenarbeit „EWH-Verlauf“ und speichere vor größeren Änderungen eine Version. Sie bewahrt den Erwartungshorizont, enthält aber keine Schülerergebnisse.
-            </p>
-            <p className="status-note mt-3 text-xs leading-5">Was passiert: Die Version bleibt bei dieser Klassenarbeit und wird in Vollbackups sowie Schuljahr-Archiven mitgesichert.</p>
-          </div>
-          <div className="backup-action-card backup-action-card-save rounded-3xl border p-5">
-            <span className="backup-action-icon"><DownloadIcon /></span>
-            <p className="label mt-4">Wenn du eine Datei gesichert hast</p>
-            <p className="themed-strong text-lg font-semibold">Exportdatei wiederverwenden</p>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Gespeicherte Backup-Dateien können nicht automatisch gefunden werden. Wähle sie beim Wiederherstellen selbst über die Dateiauswahl aus.
-            </p>
-            <p className="status-note mt-3 text-xs leading-5">Was passiert: Die Datei wird geprüft und mit dem passenden Passwort wiederhergestellt. Bereits vorhandene Daten werden dabei nicht unbemerkt überschrieben.</p>
-          </div>
+      <ConfirmDialog
+        open={backupDialog === "archive-school-year"}
+        title="Schuljahr archivieren"
+        description={`Die Archivdatei enthält ${selectedOption?.workspaceCount ?? 0} Klassenarbeiten aus ${selectedOption?.label ?? "dem ausgewählten Schuljahr"}. Nach dem erfolgreichen Speichern wird dieses Schuljahr aus der laufenden Arbeitsliste ausgeblendet.`}
+        onCancel={() => setBackupDialog(null)}
+        onConfirm={() => { void archiveSchoolYear(); }}
+        confirmLabel="Archivieren und ausblenden"
+        confirmDisabled={!schoolYearPassphrase.trim()}
+      >
+        <div className="space-y-3">
+          <PasswordField label="Passwort für die Archivdatei" value={schoolYearPassphrase} onChange={setSchoolYearPassphrase} placeholder="Passwort festlegen" />
+          <p className="text-sm font-medium leading-6 text-amber-700 dark:text-amber-300" role="note">
+            Wichtig: Ohne dieses Passwort kann das Schuljahr später nicht wiederhergestellt werden.
+          </p>
         </div>
-      </Card>
+      </ConfirmDialog>
     </div>
   );
 };

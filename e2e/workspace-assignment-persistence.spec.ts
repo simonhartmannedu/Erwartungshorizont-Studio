@@ -18,7 +18,7 @@ test("persists a group assignment for an archived workspace copy after reload", 
   const manualGroupForm = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
   await manualGroupForm.getByLabel("Klasse").fill(className);
-  await manualGroupForm.getByRole("button", { name: "Eigenes Passwort" }).click();
+  await manualGroupForm.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
   await manualGroupForm.getByLabel("Klassenpasswort").fill("e2e-test-passwort");
   await manualGroupForm.getByRole("button", { name: "Lerngruppe anlegen" }).click();
   await expect(page.getByRole("button", { name: groupLabel, exact: true })).toBeVisible();

@@ -141,7 +141,7 @@ export const AppNavigation = ({
             type="button"
             onClick={() => onSelectTab(tab.id)}
             onKeyDown={(event) => onTabKeyDown(event, tab.id)}
-            className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} shrink-0 gap-2 whitespace-nowrap`}
+            className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} app-navigation-tab shrink-0 gap-2 whitespace-nowrap`}
           >
             <TabIcon id={tab.id} />
             {tab.label}

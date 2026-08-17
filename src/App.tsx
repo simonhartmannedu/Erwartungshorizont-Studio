@@ -157,6 +157,7 @@ import { PointScaleControl } from "./components/PointScaleControl";
 import { GradeScaleRangeSection } from "./components/GradeScaleRangeSection";
 import { StudentRosterPanel } from "./components/StudentRosterPanel";
 import { StudentSelectionPanel } from "./components/StudentSelectionPanel";
+import { SectionAllocationOverview } from "./components/SectionAllocationOverview";
 import type { GuidedBuilderTarget, GuidedSectionDraft } from "./components/GuidedExamBuilder";
 import {
   ArchiveIcon,
@@ -1564,11 +1565,6 @@ function App() {
       left.label.localeCompare(right.label, "de-DE", { numeric: true }),
     );
   }, [draftBundle.workspaces, studentDatabase.assessments]);
-  const totalSnapshotCount = useMemo(
-    () => draftBundle.workspaces.reduce((sum, workspace) => sum + workspace.versions.length, 0),
-    [draftBundle.workspaces],
-  );
-
   const captureRestoreCheckpoint = (): RestoreCheckpoint => ({
     draftBundle,
     archiveEntries,
@@ -1739,6 +1735,14 @@ function App() {
     const previousGroupId = previousActiveGroupIdRef.current;
     previousActiveGroupIdRef.current = activeGroupId;
 
+    if (storageReady && previousGroupId && previousGroupId !== activeGroupId) {
+      lockGroupSession(previousGroupId, {
+        tone: "info",
+        title: "Vorherige Klasse gesperrt",
+        detail: "Beim Wechsel der aktiven Klasse wurde der Passwortschutz wieder aktiviert.",
+      });
+    }
+
     if (!activeGroupId || previousGroupId === activeGroupId) return;
     if (!preferredWorkspaceForActiveGroup) return;
     if (draftBundle.activeWorkspaceId === preferredWorkspaceForActiveGroup.id) return;
@@ -1748,7 +1752,7 @@ function App() {
       activeWorkspaceId: preferredWorkspaceForActiveGroup.id,
     }));
     resetEditorCollapses();
-  }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup]);
+  }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup, storageReady]);
 
   const displayExam = useMemo(
     () => (storageReady ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
@@ -4130,26 +4134,35 @@ function App() {
               : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
           }`}
         >
-          <aside className="min-w-0">
-            <StudentSelectionPanel
-              database={studentDatabase}
-              workspaces={visibleWorkspaces}
-              activeExam={exam}
-              activeWorkspaceId={draftBundle.activeWorkspaceId}
-              activeGroupId={activeGroupId}
-              activeStudentId={activeStudentId}
-              onSelectGroup={(groupId) => setActiveGroupId(groupId)}
-              onSelectWorkspace={(workspaceId) => {
-                setActiveWorkspaceId(workspaceId);
-                setActiveTab("builder");
-              }}
-              onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
-              onRevealGroupStudentNames={handleRevealGroupStudentNames}
-              isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
-              activeGroupIsProtected={activeGroupIsProtected}
-              securityActionLabel={activeUnlockButtonLabel}
-              onToggleSecurity={handleHeaderLockToggle}
-            />
+          <aside
+            className={`min-w-0 ${
+              activeTab === "builder" ? "xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:self-start xl:overflow-y-auto xl:pr-1" : ""
+            }`}
+          >
+            <div className={activeTab === "builder" ? "space-y-6" : ""}>
+              <StudentSelectionPanel
+                database={studentDatabase}
+                workspaces={visibleWorkspaces}
+                activeExam={exam}
+                activeWorkspaceId={draftBundle.activeWorkspaceId}
+                activeGroupId={activeGroupId}
+                activeStudentId={activeStudentId}
+                onSelectGroup={(groupId) => setActiveGroupId(groupId)}
+                onSelectWorkspace={(workspaceId) => {
+                  setActiveWorkspaceId(workspaceId);
+                  setActiveTab("builder");
+                }}
+                onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
+                onRevealGroupStudentNames={handleRevealGroupStudentNames}
+                isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
+                activeGroupIsProtected={activeGroupIsProtected}
+                securityActionLabel={activeUnlockButtonLabel}
+                onToggleSecurity={handleHeaderLockToggle}
+              />
+              {activeTab === "builder" && activeWorkspace ? (
+                <SectionAllocationOverview exam={displayExam} summary={summary} />
+              ) : null}
+            </div>
           </aside>
 
           <main className="min-w-0 space-y-6">
@@ -4225,7 +4238,6 @@ function App() {
                 activeStudentId={activeStudentId}
                 activeGroupHasPassword={Boolean(activeGroup?.passwordVerifier)}
                 isActiveGroupUnlocked={Boolean(activeGroupPassword)}
-                backupStatus={backupStatus}
                 lastBackupAt={lastBackupAt}
                 onSelectGroup={(groupId) => setActiveGroupId(groupId)}
                 onSelectStudent={(studentId) => setActiveStudentId(studentId)}
@@ -4239,10 +4251,6 @@ function App() {
                 }
                 onRevealGroupStudentNames={handleRevealGroupStudentNames}
                 onApplyStudentOrder={handleApplyStudentOrder}
-                onExportDatabase={handleExportDatabase}
-                onImportDatabase={handleImportDatabase}
-                canRollbackImport={Boolean(restoreCheckpoint)}
-                onRollbackImport={rollbackLastImport}
               />
             )}
             </div>
@@ -4302,7 +4310,7 @@ function App() {
               <Suspense
                 fallback={(
                   <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">
-                    <div className="surface-muted rounded-3xl p-5">
+                    <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-muted text-sm leading-6">
                         Die Vorlagenoberfläche wird vorbereitet.
                       </p>
@@ -4351,7 +4359,7 @@ function App() {
                   />
                 ) : (
                   <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">
-                    <div className="surface-muted rounded-3xl p-5">
+                    <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-muted text-sm leading-6">
                         Die Template-Daten werden vorbereitet.
                       </p>
@@ -4503,7 +4511,7 @@ function App() {
                   className="space-y-6"
                 >
                 {activeWorkspace ? (
-                  <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-3xl border px-4 py-3 surface-muted">
+                  <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 surface-muted">
                     <div>
                       <p className="label">Abschnitte</p>
                       <p className="themed-muted text-sm">
@@ -4621,7 +4629,7 @@ function App() {
                   return (
                     <div
                       key={`linked-block-${section.id}`}
-                      className="linked-section-block rounded-[32px] border p-4 shadow-sm"
+                      className="linked-section-block rounded-2xl border p-4 shadow-sm"
                     >
                       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 px-1">
                         <div>
@@ -4691,7 +4699,7 @@ function App() {
                           }
                         />
                       </Card>
-                      <div className="mt-6 flex flex-col gap-3 rounded-3xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
+                      <div className="mt-6 flex flex-col gap-3 rounded-2xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="label">Wiederverwenden</p>
                           <p className="themed-muted mt-1 text-sm leading-6">
@@ -4756,7 +4764,7 @@ function App() {
               <Suspense
                 fallback={(
                   <Card title="Archiv lädt" subtitle="Die Archivansicht wird bei Bedarf nachgeladen.">
-                    <div className="surface-muted rounded-3xl p-5">
+                    <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-muted text-sm leading-6">
                         Das Archiv-Dashboard wird vorbereitet.
                       </p>
@@ -4790,7 +4798,6 @@ function App() {
                 backupStatus={backupStatus}
                 lastBackupAt={lastBackupAt}
                 schoolYearOptions={schoolYearBackupOptions}
-                totalSnapshotCount={totalSnapshotCount}
                 canRollbackImport={Boolean(restoreCheckpoint)}
                 onExportFullBackup={handleExportDatabase}
                 onImportBackup={handleImportDatabase}

@@ -50,9 +50,9 @@ export const PointScaleControl = ({ currentTotal, onApply, embedded = false }: P
 
   const content = (
     <>
-      <div className="point-calibrator rounded-[28px] border p-4 sm:p-5">
+      <div className="point-calibrator rounded-2xl border p-4 sm:p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(250px,0.8fr)]">
-          <div className="point-calibrator-panel rounded-[24px] border p-4 sm:p-5">
+          <div className="point-calibrator-panel rounded-2xl border p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="point-hero-label text-xs font-semibold uppercase tracking-[0.18em]">Zielsumme</p>
@@ -64,13 +64,13 @@ export const PointScaleControl = ({ currentTotal, onApply, embedded = false }: P
                   Ausgangswert: {formatNumber(preview.originalTotal, 0)} Punkte
                 </p>
               </div>
-              <div className="point-factor-badge rounded-3xl px-4 py-3 text-right">
+              <div className="point-factor-badge rounded-2xl px-4 py-3 text-right">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">Skalierungsfaktor</p>
                 <p className="mt-1 text-2xl font-semibold">{formatNumber(preview.factor, 3)}</p>
               </div>
             </div>
 
-            <div className="point-stepper mt-5 rounded-[22px] border p-2">
+            <div className="point-stepper mt-5 rounded-2xl border p-2">
               <div className="grid grid-cols-4 gap-2">
                 <button type="button" className="point-step-button rounded-2xl border px-3 py-3 text-sm font-semibold" onClick={() => adjustTarget(-10)}>
                   <span className="inline-flex items-center gap-2"><MinusIcon className="h-4 w-4" />10</span>
@@ -88,7 +88,7 @@ export const PointScaleControl = ({ currentTotal, onApply, embedded = false }: P
             </div>
           </div>
 
-          <div className="point-calibrator-panel rounded-[24px] border p-4 sm:p-5">
+          <div className="point-calibrator-panel rounded-2xl border p-4 sm:p-5">
             <Field label="Exakte Zielsumme">
               <input
                 className="field text-lg font-semibold"
@@ -120,7 +120,7 @@ export const PointScaleControl = ({ currentTotal, onApply, embedded = false }: P
         </div>
       </div>
 
-      <div className="point-preview-grid mt-4 grid gap-3 rounded-3xl p-4 md:grid-cols-3">
+      <div className="point-preview-grid mt-4 grid gap-3 rounded-2xl p-4 md:grid-cols-3">
         <div>
           <p className="label">Alte Punkte</p>
           <p className="themed-strong text-xl font-semibold">{formatNumber(preview.originalTotal, 0)}</p>

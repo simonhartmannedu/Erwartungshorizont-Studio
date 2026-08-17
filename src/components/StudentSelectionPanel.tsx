@@ -126,7 +126,7 @@ export const StudentSelectionPanel = ({
   };
 
   return (
-    <div className="space-y-3 no-print md:space-y-0 xl:sticky xl:top-6">
+    <div className="space-y-3 no-print md:space-y-0">
       <button
         type="button"
         className="mobile-selection-toggle md:hidden"

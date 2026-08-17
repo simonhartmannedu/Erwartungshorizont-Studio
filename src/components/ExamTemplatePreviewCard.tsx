@@ -23,7 +23,7 @@ export const ExamTemplatePreviewCard = ({
   >
     <div className="space-y-4">
       <p className="subsection-copy text-sm leading-6">{template.pedagogicalHint}</p>
-      <div className="template-preview-list space-y-3 rounded-3xl border p-4">
+      <div className="template-preview-list space-y-3 rounded-2xl border p-4">
         {template.previewSections.map((section) => (
           <div key={section.title} className="template-preview-item rounded-2xl px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">

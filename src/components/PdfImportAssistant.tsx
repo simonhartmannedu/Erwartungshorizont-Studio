@@ -236,7 +236,7 @@ export const PdfImportAssistant = ({
         </label>
       </div>
 
-      <section className="rounded-3xl border p-4">
+      <section className="rounded-2xl border p-4">
         <div className="flex items-start gap-3">
           <input
             id="pdf-import-consent"
@@ -280,7 +280,7 @@ export const PdfImportAssistant = ({
       </div>
 
       {extraction ? (
-        <div className="rounded-3xl border p-4 space-y-3">
+        <div className="rounded-2xl border p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
             {extraction.pageCountHint ? <Badge tone="slate">{extraction.pageCountHint} Seiten erkannt</Badge> : null}
             <Badge tone={extraction.usedOcr ? "amber" : extraction.isLikelyScan ? "rose" : "emerald"}>
@@ -309,7 +309,7 @@ export const PdfImportAssistant = ({
       ) : null}
 
       {pendingReview ? (
-        <div className="rounded-3xl border border-amber-300 bg-amber-50/70 p-4" role="alert">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4" role="alert">
           <p className="font-semibold">Sensible Inhalte in der PDF erkannt</p>
           <ul className="mt-3 space-y-2 text-sm leading-6">
             {pendingReview.findings.map((finding) => (
@@ -334,7 +334,7 @@ export const PdfImportAssistant = ({
       ) : null}
 
       {error ? (
-        <div className="rounded-3xl border border-rose-300 bg-rose-50/80 p-4 text-sm leading-6">{error}</div>
+        <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-4 text-sm leading-6">{error}</div>
       ) : null}
 
       <div className="flex flex-wrap gap-3">
@@ -359,7 +359,7 @@ export const PdfImportAssistant = ({
       ) : null}
 
       {suggestion ? (
-        <div className="space-y-4 rounded-3xl border p-4">
+        <div className="space-y-4 rounded-2xl border p-4">
           <div className="flex flex-wrap items-center gap-2">
           {PDF_IMPORT_NOTICES.map((line) => (
             <Badge key={line} tone={line === "Automatisch erzeugter Strukturvorschlag" ? "amber" : "slate"}>

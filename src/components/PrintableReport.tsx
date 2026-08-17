@@ -50,7 +50,7 @@ export const PrintableReport = ({
         {metadataItems.map(([label, value]) => (
           <div
             key={`screen-${label}`}
-            className="surface-panel rounded-3xl border px-5 py-4 backdrop-blur-xl"
+            className="surface-panel rounded-2xl border px-5 py-4 backdrop-blur-xl"
             style={{ borderColor: "var(--app-border)", boxShadow: "var(--app-panel-shadow)" }}
           >
             <p className="label">{label}</p>
@@ -200,7 +200,7 @@ export const PrintableReport = ({
           const shareOfTotalPoints = summary.totalMaxPoints > 0 ? (result.maxPoints / summary.totalMaxPoints) * 100 : 0;
 
           return (
-            <section key={entry.id} className="surface-elevated rounded-3xl border p-4 print-sheet print-hidden">
+            <section key={entry.id} className="surface-elevated rounded-2xl border p-4 print-sheet print-hidden">
             <div className="mb-3 flex items-start justify-between gap-4">
               <div>
                 <h3 className="themed-strong text-base font-semibold">

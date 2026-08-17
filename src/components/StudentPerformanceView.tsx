@@ -294,7 +294,7 @@ const RadarGraph = ({
 
   if (scoredEntries.length === 0) {
     return (
-      <div className="student-performance-empty rounded-3xl border p-5 text-sm leading-6">
+      <div className="student-performance-empty rounded-2xl border p-5 text-sm leading-6">
         Für diesen Schülercode liegen noch keine auswertbaren Kompetenzdaten vor.
       </div>
     );
@@ -428,7 +428,7 @@ export const StudentPerformanceView = ({
   };
 
   return (
-    <div id={viewId} ref={viewRef} className="student-performance-view rounded-[28px] border p-4 sm:p-5">
+    <div id={viewId} ref={viewRef} className="student-performance-view rounded-2xl border p-4 sm:p-5">
       <div className="student-performance-header flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="label">Konferenzansicht</p>

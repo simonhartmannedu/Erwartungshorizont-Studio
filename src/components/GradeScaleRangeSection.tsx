@@ -20,7 +20,7 @@ export const GradeScaleRangeSection = ({
   const rangeDigits = getGradeScaleRangeDigits(exam, totalMaxPoints);
 
   return (
-    <section className={`surface-elevated rounded-3xl border p-4 ${className}`.trim()}>
+    <section className={`surface-elevated rounded-2xl border p-4 ${className}`.trim()}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="themed-strong text-base font-semibold">{title}</h3>

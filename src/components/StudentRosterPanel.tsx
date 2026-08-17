@@ -13,7 +13,7 @@ import {
   UploadIcon,
   UserIcon,
 } from "./icons";
-import { Badge, Card, DismissibleCallout, Field, IconButton } from "./ui";
+import { Badge, Card, Field, IconButton } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { StudentPerformanceView } from "./StudentPerformanceView";
 
@@ -29,11 +29,6 @@ interface Props {
   activeGroupHasPassword: boolean;
   isActiveGroupUnlocked: boolean;
   unlockedGroupIds: string[];
-  backupStatus: {
-    tone: "info" | "warning" | "success" | "danger";
-    summary: string;
-    detail: string;
-  };
   lastBackupAt: string | null;
   onSelectGroup: (groupId: string) => void;
   onSelectStudent: (studentId: string) => void;
@@ -49,10 +44,6 @@ interface Props {
   onRemoveGroup: (groupId: string, groupLabel: string, studentCount: number) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   onApplyStudentOrder: (groupId: string, orderedStudentIds: string[]) => void;
-  onExportDatabase: (passphrase: string) => Promise<boolean>;
-  onImportDatabase: (file: File, passphrase: string) => void;
-  canRollbackImport: boolean;
-  onRollbackImport: () => void;
 }
 
 const collator = new Intl.Collator("de-DE", { sensitivity: "base", numeric: true });
@@ -104,6 +95,62 @@ const getStudentDisplayLabel = (student: StudentRecord, namesByStudentId: Record
   return fullName ? `${fullName} · ${student.alias}` : student.alias;
 };
 
+const GroupAccessToggle = ({
+  mode,
+  onChange,
+}: {
+  mode: GroupAccessMode;
+  onChange: (mode: GroupAccessMode) => void;
+}) => {
+  const generatesToken = mode === "generated";
+
+  return (
+    <div className={`flex items-center gap-3 rounded-2xl border p-3 transition-colors ${generatesToken ? "border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20" : "border-amber-500/40 bg-amber-50/70 dark:bg-amber-950/20"}`}>
+      <button
+        type="button"
+        role="switch"
+        aria-label="Automatisches Security-Token verwenden"
+        aria-checked={generatesToken}
+        className={`group-access-switch ${generatesToken ? "group-access-switch-generated" : "group-access-switch-manual"}`}
+        onClick={() => onChange(generatesToken ? "manual" : "generated")}
+      >
+        <span className="group-access-switch-handle" aria-hidden="true" />
+      </button>
+      <span>
+        <span className="themed-strong block text-sm font-semibold">{generatesToken ? "Security-Token automatisch erzeugen" : "Eigenes Passwort verwenden"}</span>
+        <span className="themed-muted block text-xs leading-5">{generatesToken ? "Das Token wird nach dem Anlegen als Druckkarte angezeigt." : "Du legst das Passwort für diese Lerngruppe selbst fest."}</span>
+      </span>
+    </div>
+  );
+};
+
+const ClassActivityToggle = ({
+  label,
+  active,
+  onActivate,
+}: {
+  label: string;
+  active: boolean;
+  onActivate: () => void;
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={active}
+    aria-label={`${label}: ${active ? "Klasse aktiv" : "Klasse inaktiv"}`}
+    title={active ? "Diese Klasse ist aktiv" : "Diese Klasse aktivieren"}
+    className={`class-activity-toggle ${active ? "class-activity-toggle-active" : "class-activity-toggle-inactive"}`}
+    onClick={() => {
+      if (!active) onActivate();
+    }}
+  >
+    <span className="class-activity-toggle-track" aria-hidden="true">
+      <span className="class-activity-toggle-handle" />
+    </span>
+    <span>{active ? "Klasse aktiv" : "Klasse inaktiv"}</span>
+  </button>
+);
+
 export const StudentRosterPanel = ({
   database,
   workspaces,
@@ -113,7 +160,6 @@ export const StudentRosterPanel = ({
   activeGroupHasPassword,
   isActiveGroupUnlocked,
   unlockedGroupIds,
-  backupStatus,
   lastBackupAt,
   onSelectGroup,
   onSelectStudent,
@@ -124,10 +170,6 @@ export const StudentRosterPanel = ({
   onRemoveGroup,
   onRevealGroupStudentNames,
   onApplyStudentOrder,
-  onExportDatabase,
-  onImportDatabase,
-  canRollbackImport,
-  onRollbackImport,
 }: Props) => {
   const [subject, setSubject] = useState("");
   const [className, setClassName] = useState("");
@@ -135,7 +177,6 @@ export const StudentRosterPanel = ({
   const [groupPassword, setGroupPassword] = useState("");
   const [importAccessMode, setImportAccessMode] = useState<GroupAccessMode>("generated");
   const [importPassword, setImportPassword] = useState("");
-  const [backupPassphrase, setBackupPassphrase] = useState("");
   const [importSubject, setImportSubject] = useState(defaultImportSubject);
   const [importSortField, setImportSortField] = useState<ImportSortOptions["field"]>("lastName");
   const [importSortDirection, setImportSortDirection] = useState<ImportSortOptions["direction"]>("ascending");
@@ -226,13 +267,6 @@ export const StudentRosterPanel = ({
 
   const totalStudents = database.groups.reduce((sum, group) => sum + group.students.length, 0);
   const activeGroupLabel = activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : "Keine Lerngruppe aktiv";
-
-  const handleImport = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    onImportDatabase(file, backupPassphrase);
-    event.target.value = "";
-  };
 
   const handleStudentImport = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -357,7 +391,7 @@ export const StudentRosterPanel = ({
         title="Lerngruppen"
         subtitle="Lege Klassen an, verwalte Schülercodes und schütze Klarnamen lokal auf diesem Gerät."
       >
-        <div className="group-overview-card grid gap-4 rounded-3xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
+        <div className="group-overview-card grid gap-4 rounded-2xl border p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
             <div className="group-overview-primary rounded-2xl border p-4 md:row-span-2">
               <span className="group-overview-icon"><GroupIcon /></span>
@@ -428,7 +462,7 @@ export const StudentRosterPanel = ({
             </div>
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="group-action-card group-action-card-import rounded-3xl border p-5">
+            <div className="group-action-card group-action-card-import rounded-2xl border p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><UploadIcon /></span>
                 <div>
@@ -449,22 +483,13 @@ export const StudentRosterPanel = ({
                   />
                 </Field>
                 <Field as="div" label="Zugangsschutz für neue Klassen">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className={importAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
-                      onClick={() => setImportAccessMode("generated")}
-                    >
-                      Token generieren
-                    </button>
-                    <button
-                      type="button"
-                      className={importAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
-                      onClick={() => setImportAccessMode("manual")}
-                    >
-                      Eigenes Passwort
-                    </button>
-                  </div>
+                  <GroupAccessToggle
+                    mode={importAccessMode}
+                    onChange={(mode) => {
+                      setImportAccessMode(mode);
+                      if (mode === "generated") setImportPassword("");
+                    }}
+                  />
                 </Field>
                 {importAccessMode === "manual" ? (
                   <input
@@ -525,7 +550,7 @@ export const StudentRosterPanel = ({
               </p>
             </div>
 
-            <section className="group-action-card group-action-card-manual space-y-4 rounded-3xl border p-5" aria-labelledby="manual-group-heading">
+            <section className="group-action-card group-action-card-manual space-y-4 rounded-2xl border p-5" aria-labelledby="manual-group-heading">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><GroupIcon /></span>
                 <div>
@@ -541,22 +566,13 @@ export const StudentRosterPanel = ({
                 <input className="field" placeholder="Klasse, z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
               </Field>
               <Field as="div" label="Zugangsschutz">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    className={groupAccessMode === "generated" ? "button-primary w-full" : "button-secondary w-full"}
-                    onClick={() => setGroupAccessMode("generated")}
-                  >
-                    Token generieren
-                  </button>
-                  <button
-                    type="button"
-                    className={groupAccessMode === "manual" ? "button-primary w-full" : "button-secondary w-full"}
-                    onClick={() => setGroupAccessMode("manual")}
-                  >
-                    Eigenes Passwort
-                  </button>
-                </div>
+                <GroupAccessToggle
+                  mode={groupAccessMode}
+                  onChange={(mode) => {
+                    setGroupAccessMode(mode);
+                    if (mode === "generated") setGroupPassword("");
+                  }}
+                />
               </Field>
               {groupAccessMode === "manual" ? (
                 <Field label="Klassenpasswort">
@@ -613,13 +629,16 @@ export const StudentRosterPanel = ({
                 Noch keine Lerngruppen vorhanden. Lege zuerst eine Klasse an oder importiere eine Klassenliste.
               </p>
             ) : (
-              database.groups.map((group) => {
+              <div className="space-y-4">
+              {database.groups.map((group) => {
                 const isCollapsed = collapsedGroupIds.includes(group.id);
                 const isUnlocked = unlockedGroupIds.includes(group.id);
                 const namesByStudentId = resolvedNamesByGroupId[group.id];
+                const isActive = group.id === activeGroupId;
+                const groupLabel = `${group.subject} · ${group.className}`;
 
                 return (
-                  <section key={group.id} className="group-roster-card surface-elevated overflow-hidden rounded-[32px] border">
+                  <section key={group.id} className="group-roster-card surface-elevated overflow-hidden rounded-2xl border">
                     <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -632,9 +651,6 @@ export const StudentRosterPanel = ({
                             {isCollapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
                             {group.subject} · {group.className}
                           </button>
-                          <Badge tone={group.id === activeGroupId ? "emerald" : "slate"}>
-                            {group.id === activeGroupId ? "Aktiv" : "Klasse"}
-                          </Badge>
                           <Badge tone={isUnlocked ? "emerald" : "amber"}>
                             {isUnlocked ? "Klarnamen sichtbar" : "Nur Schülercodes sichtbar"}
                           </Badge>
@@ -646,17 +662,14 @@ export const StudentRosterPanel = ({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-start justify-end gap-2">
-                        {group.id === activeGroupId ? <Badge tone="emerald">Ausgewählt</Badge> : null}
-                        <button
-                          type="button"
-                          className="button-secondary gap-2 px-3 py-2 text-xs"
-                          onClick={() => {
+                        <ClassActivityToggle
+                          label={groupLabel}
+                          active={isActive}
+                          onActivate={() => {
                             onSelectGroup(group.id);
                             onSelectStudent(group.students[0]?.id ?? "");
                           }}
-                        >
-                          Aktivieren
-                        </button>
+                        />
                         <IconButton
                           onClick={() => onRemoveGroup(group.id, `${group.subject} · ${group.className}`, group.students.length)}
                           title="Lerngruppe entfernen"
@@ -673,7 +686,7 @@ export const StudentRosterPanel = ({
                     {!isCollapsed && (
                       <div className="border-t px-5 py-5" style={{ borderColor: "var(--app-border)" }}>
                         <div className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(260px,0.95fr)]">
-                          <div className="surface-muted rounded-3xl p-4">
+                          <div className="surface-muted rounded-2xl p-4">
                             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
                               <input
                                 className="field"
@@ -711,7 +724,7 @@ export const StudentRosterPanel = ({
                               <p className="warning-note mt-3 text-xs">Zum Hinzufügen bitte diese Klasse zuerst entsperren.</p>
                             ) : null}
                           </div>
-                          <div className="surface-elevated rounded-3xl border p-4">
+                          <div className="surface-elevated rounded-2xl border p-4">
                             <p className="label">Aktive Tabellenaktion</p>
                             <p className="themed-strong text-sm font-semibold">
                               {selectedStudentRecord ? getStudentDisplayLabel(selectedStudentRecord, namesByStudentId) : "Noch kein Schüler ausgewählt"}
@@ -724,7 +737,7 @@ export const StudentRosterPanel = ({
                         {group.students.length === 0 ? (
                           <p className="status-note text-sm leading-6">Keine Schülercodes in dieser Klasse.</p>
                         ) : (
-                          <div className="themed-table-shell overflow-hidden rounded-3xl border">
+                          <div className="themed-table-shell overflow-hidden rounded-2xl border">
                             <div className="overflow-x-auto">
                               <table className="min-w-full text-sm">
                                 <thead className="themed-table-head">
@@ -860,62 +873,12 @@ export const StudentRosterPanel = ({
                     )}
                   </section>
                 );
-              })
+              })}
+              </div>
             )}
           </div>
         </Card>
 
-        <div className="space-y-6">
-          <Card
-            title="Backup & Wiederherstellung"
-            subtitle="Arbeitsstand exportieren oder wieder einspielen."
-          >
-            <div className="space-y-4">
-              <DismissibleCallout tone={backupStatus.tone} resetKey={`${backupStatus.summary}-${lastBackupAt ?? "none"}`}>
-                <p className="font-semibold">{backupStatus.summary}</p>
-                <p>{backupStatus.detail}</p>
-              </DismissibleCallout>
-              <div className="surface-elevated rounded-3xl border p-4">
-                <div className="grid gap-3">
-                  <input
-                    className="field"
-                    type="password"
-                    value={backupPassphrase}
-                    placeholder="Backup-Passwort für Export und verschlüsselte Importe"
-                    onChange={(event) => setBackupPassphrase(event.target.value)}
-                  />
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <button
-                      type="button"
-                      className="button-primary w-full gap-2 sm:w-auto"
-                      onClick={() => {
-                        void onExportDatabase(backupPassphrase);
-                      }}
-                    >
-                      <DownloadIcon />
-                      Speicherort wählen und Backup sichern
-                    </button>
-                    <label className="button-secondary w-full cursor-pointer gap-2 sm:w-auto">
-                      <UploadIcon />
-                      Arbeitsstand-Backup importieren
-                      <input type="file" accept="application/json" className="hidden" onChange={handleImport} />
-                    </label>
-                    {canRollbackImport ? (
-                      <button type="button" className="button-secondary w-full gap-2 sm:w-auto" onClick={onRollbackImport}>
-                        Letzten Import rückgängig
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-              {lastBackupAt && (
-                <p className="status-note text-xs leading-5">
-                  Letzte erfolgreiche Sicherung: {new Date(lastBackupAt).toLocaleString("de-DE")}
-                </p>
-              )}
-            </div>
-          </Card>
-        </div>
       </div>
 
       <ConfirmDialog

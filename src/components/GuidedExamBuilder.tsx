@@ -332,10 +332,7 @@ const createAdjustedTemplate = (template: ExamTemplateDefinition, sectionPoints:
 
 const polarToCartesian = (cx: number, cy: number, radius: number, angleInDegrees: number) => {
   const radians = ((angleInDegrees - 90) * Math.PI) / 180;
-  return {
-    x: cx + radius * Math.cos(radians),
-    y: cy + radius * Math.sin(radians),
-  };
+  return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
 };
 
 const describeDonutSlice = (
@@ -393,7 +390,6 @@ const TemplateAllocationChart = ({
 
   const handleSliceKeyDown = (event: KeyboardEvent<SVGPathElement>, index: number, currentPoints: number) => {
     if (!["ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"].includes(event.key)) return;
-
     event.preventDefault();
     const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
     onActiveIndexChange(index);
@@ -407,20 +403,17 @@ const TemplateAllocationChart = ({
           <circle className="template-donut-track" cx={cx} cy={cy} r={(innerRadius + outerRadius) / 2} />
           {sections.map((section, index) => {
             const points = Math.max(0, section.points);
-            const angleSpan = (points / safeTotal) * 360;
             const startAngle = currentAngle;
-            const endAngle = currentAngle + angleSpan;
-            currentAngle = endAngle;
+            currentAngle += (points / safeTotal) * 360;
             const percentage = safeTotal > 0 ? (points / safeTotal) * 100 : 0;
-            const color = SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length];
             const active = index === activeIndex;
 
             return (
               <path
                 key={`${section.title}-${index}`}
                 className={`template-donut-slice ${active ? "template-donut-slice-active" : ""}`}
-                d={describeDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, endAngle)}
-                fill={color}
+                d={describeDonutSlice(cx, cy, innerRadius, outerRadius, startAngle, currentAngle)}
+                fill={SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length]}
                 role="button"
                 tabIndex={0}
                 aria-label={`${section.title}: ${formatNumber(points)} Punkte, ${formatNumber(percentage)} Prozent`}
@@ -440,9 +433,7 @@ const TemplateAllocationChart = ({
       {activeSection ? (
         <div className="template-donut-active">
           <span>{activeSection.title}</span>
-          <strong>
-            {formatNumber(activeSection.points)} P. · {formatNumber((activeSection.points / safeTotal) * 100)}%
-          </strong>
+          <strong>{formatNumber(activeSection.points)} P. · {formatNumber((activeSection.points / safeTotal) * 100)}%</strong>
         </div>
       ) : null}
 
@@ -451,31 +442,14 @@ const TemplateAllocationChart = ({
           const percentage = safeTotal > 0 ? (section.points / safeTotal) * 100 : 0;
           const color = SECTION_CHART_PALETTE[index % SECTION_CHART_PALETTE.length];
           return (
-            <div
-              key={`${section.title}-control`}
-              className={`template-donut-row ${index === activeIndex ? "template-donut-row-active" : ""}`}
-            >
-              <button
-                type="button"
-                className="template-donut-row-main"
-                onClick={() => onActiveIndexChange(index)}
-                aria-label={`${section.title} markieren`}
-              >
+            <div key={`${section.title}-control`} className={`template-donut-row ${index === activeIndex ? "template-donut-row-active" : ""}`}>
+              <button type="button" className="template-donut-row-main" onClick={() => onActiveIndexChange(index)} aria-label={`${section.title} markieren`}>
                 <span className="template-donut-swatch" style={{ background: color }} aria-hidden="true" />
-                <span>
-                  <strong>{section.title}</strong>
-                  <small>{section.tasks.join(" · ")}</small>
-                </span>
+                <span><strong>{section.title}</strong><small>{section.tasks.join(" · ")}</small></span>
               </button>
               <label className="template-donut-points">
                 <span>{formatNumber(percentage)}%</span>
-                <NumberInput
-                  className="field"
-                  value={section.points}
-                  min={POINT_STEP}
-                  step={POINT_STEP}
-                  onCommit={(value) => onPointChange(index, value)}
-                />
+                <NumberInput className="field" value={section.points} min={POINT_STEP} step={POINT_STEP} onCommit={(value) => onPointChange(index, value)} />
               </label>
             </div>
           );

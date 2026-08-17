@@ -113,7 +113,7 @@ export const ImportExportControls = ({
   return (
     <Card title="Drucken und exportieren" subtitle={printHint}>
       <div className="space-y-4">
-        <div className="surface-muted rounded-3xl p-4">
+        <div className="surface-muted rounded-2xl p-4">
           <p className="label">Dokumentausgabe</p>
           <p className="themed-muted mt-1 text-sm">Wähle zuerst den Inhalt. Danach erscheinen die verfügbaren Formate.</p>
           <div className="export-choice-list mt-3" role="group" aria-label="Dokumentausgabe wählen">
@@ -151,7 +151,7 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
-        <div className="surface-muted rounded-3xl p-4">
+        <div className="surface-muted rounded-2xl p-4">
           <p className="label">Tabellenexport</p>
           <p className="themed-muted mt-1 text-sm">Wähle zuerst den Tabelleninhalt. Danach erscheinen die passenden Formate.</p>
           <div className="export-choice-list mt-3" role="group" aria-label="Tabelleninhalt wählen">
@@ -191,7 +191,7 @@ export const ImportExportControls = ({
           ) : null}
         </div>
         {showBackupControls ? (
-          <div className="surface-elevated rounded-3xl border p-4">
+          <div className="surface-elevated rounded-2xl border p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
               <div className="min-w-0 flex-1">
                 <Field label="Backup-Passwort">

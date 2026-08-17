@@ -184,7 +184,7 @@ export const ExpectationArchiveDashboard = ({
       title="Erwartungshorizont-Archiv"
       subtitle="Wiederverwendbare Vorlagen ohne Schülerergebnisse. Für eine Klasse wird daraus jeweils eine neue Klassenarbeit erstellt."
     >
-      <div className="archive-info-card mb-5 rounded-3xl border p-5">
+      <div className="archive-info-card mb-5 rounded-2xl border p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start">
           <span className="archive-info-icon"><ArchiveIcon /></span>
           <div className="min-w-0 flex-1">
@@ -270,7 +270,7 @@ export const ExpectationArchiveDashboard = ({
         </Field>
       </div>
 
-      <div className="surface-muted mb-5 grid gap-3 rounded-3xl p-4 sm:grid-cols-4">
+      <div className="surface-muted mb-5 grid gap-3 rounded-2xl p-4 sm:grid-cols-4">
         <div>
           <p className="label">Einträge</p>
           <p className="themed-strong text-xl font-semibold">{filteredEntries.length}</p>
@@ -290,7 +290,7 @@ export const ExpectationArchiveDashboard = ({
       </div>
 
       <div
-        className="overflow-hidden rounded-3xl border"
+        className="overflow-hidden rounded-2xl border"
         style={{
           borderColor: "var(--app-secondary-border)",
           background: "var(--app-secondary-bg)",

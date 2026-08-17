@@ -75,7 +75,7 @@ export const TaskTable = ({
         <div
           key={task.id}
           data-editor-anchor={getTaskAnchorId?.(task)}
-          className="surface-elevated scroll-mt-24 rounded-3xl border p-4"
+          className="surface-elevated scroll-mt-24 rounded-2xl border p-4"
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -138,7 +138,7 @@ export const TaskTable = ({
     </div>
 
     <div className="hidden md:block">
-      <div className="themed-table-shell overflow-hidden rounded-3xl border">
+      <div className="themed-table-shell overflow-hidden rounded-2xl border">
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs">
             <colgroup>

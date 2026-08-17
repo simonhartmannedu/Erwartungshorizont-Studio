@@ -44,7 +44,7 @@ export const ReportSummarySection = ({
   };
 
   return (
-    <section className="surface-elevated rounded-3xl border p-5 print-sheet print-summary">
+    <section className="surface-elevated rounded-2xl border p-5 print-sheet print-summary">
       <div className="grid gap-4 md:grid-cols-4 print-summary-grid">
         <div className="metric-primary rounded-2xl p-4">
           <p className="label !text-current opacity-80">Gesamt</p>

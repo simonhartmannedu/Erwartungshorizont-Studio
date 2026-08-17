@@ -234,7 +234,7 @@ export const SectionEditor = ({
               placeholder="Hinweise, Bewertungsraster, Erwartungshorizont"
             />
           </Field>
-          <div className={`surface-muted grid gap-2 rounded-3xl p-4 ${writingMetrics ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+          <div className={`surface-muted grid gap-2 rounded-2xl p-4 ${writingMetrics ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
             <div>
               <p className="label">Maximalpunkte</p>
               <p className="themed-strong text-xl font-semibold">{formatNumber(result.maxPoints)}</p>

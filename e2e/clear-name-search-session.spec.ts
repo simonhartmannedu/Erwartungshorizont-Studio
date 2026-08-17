@@ -13,7 +13,7 @@ test("searches clear names only during an unlocked class session", async ({ page
   const manualGroupForm = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
   await manualGroupForm.getByLabel("Klasse").fill(className);
-  await manualGroupForm.getByRole("button", { name: "Eigenes Passwort" }).click();
+  await manualGroupForm.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
   await manualGroupForm.getByLabel("Klassenpasswort").fill("e2e-test-passwort");
   await manualGroupForm.getByRole("button", { name: "Lerngruppe anlegen" }).click();
 
@@ -27,8 +27,13 @@ test("searches clear names only during an unlocked class session", async ({ page
   await globalSearch.fill(fullName);
   await expect(globalSearchResults.getByRole("option", { name: new RegExp(fullName) })).toBeVisible();
 
-  await page.getByRole("tab", { name: "EWH-Editor" }).click();
-  await page.getByRole("button", { name: "Klasse sperren" }).click();
+  const activeClassToggle = groupSection.getByRole("switch");
+  const inactiveClassToggle = page.getByRole("switch", { name: /Klasse inaktiv/ }).first();
+  await inactiveClassToggle.click();
+
+  await expect(activeClassToggle).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("switch", { name: /Klasse aktiv/ })).toHaveAttribute("aria-checked", "true");
+  await expect(groupSection.getByText("Nur Schülercodes sichtbar")).toBeVisible();
 
   await expect(globalSearch).toHaveValue("");
   await globalSearch.fill(fullName);

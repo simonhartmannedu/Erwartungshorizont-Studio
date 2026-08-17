@@ -5,7 +5,7 @@ const addManualGroup = async (page: import("@playwright/test").Page, subject: st
   const form = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
   await form.getByLabel("Fach").fill(subject);
   await form.getByLabel("Klasse").fill(className);
-  await form.getByRole("button", { name: "Eigenes Passwort" }).click();
+  await form.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
   await form.getByLabel("Klassenpasswort").fill("e2e-test-passwort");
   await form.getByRole("button", { name: "Lerngruppe anlegen" }).click();
   await expect(page.getByRole("button", { name: `${subject} · ${className}`, exact: true })).toBeVisible();

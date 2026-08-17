@@ -17,27 +17,27 @@ export const ClassOverviewPanel = ({
     >
       <div className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="surface-muted rounded-3xl p-4">
+          <div className="surface-muted rounded-2xl p-4">
             <p className="label">Schüler:innen</p>
             <p className="themed-strong text-2xl font-semibold">{overview.studentCount}</p>
           </div>
-          <div className="surface-muted rounded-3xl p-4">
+          <div className="surface-muted rounded-2xl p-4">
             <p className="label">Ø Prozent</p>
             <p className="themed-strong text-2xl font-semibold">{formatNumber(overview.averagePercentage)} %</p>
           </div>
-          <div className="surface-muted rounded-3xl p-4">
+          <div className="surface-muted rounded-2xl p-4">
             <p className="label">Ø Note</p>
             <p className="themed-strong text-2xl font-semibold">
               {formatNumber(overview.averageGrade, 2)}
             </p>
           </div>
-          <div className="surface-muted rounded-3xl p-4">
+          <div className="surface-muted rounded-2xl p-4">
             <p className="label">Median</p>
             <p className="themed-strong text-2xl font-semibold">{formatNumber(overview.medianPercentage)} %</p>
           </div>
         </div>
 
-        <section className="surface-muted rounded-3xl p-4">
+        <section className="surface-muted rounded-2xl p-4">
           <div className="mb-3">
             <p className="themed-strong text-sm font-semibold">Notenverteilung</p>
             <p className="themed-muted text-sm">Horizontaler Balkenvergleich für exakte Anzahlen pro Note.</p>
@@ -61,7 +61,7 @@ export const ClassOverviewPanel = ({
           </div>
         </section>
 
-        <section className="surface-muted rounded-3xl p-4">
+        <section className="surface-muted rounded-2xl p-4">
           <div className="mb-3">
             <p className="themed-strong text-sm font-semibold">Abschnittsergebnisse</p>
             <p className="themed-muted text-sm">Durchschnittlicher Punkteanteil je Abschnitt mit Legende.</p>
