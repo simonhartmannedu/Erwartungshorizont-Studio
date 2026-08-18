@@ -8,7 +8,7 @@ test("opens the unlock dialog when a locked score field is selected", async ({ p
   const globalSearchResults = page.locator("#global-search-results");
   await globalSearch.fill("Unit 5");
   await globalSearchResults.getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ }).click();
-  await page.getByLabel("Schülercode").selectOption({ label: "Student 8 · korrigiert" });
+  await page.getByLabel("Schülercode").selectOption("demo-student-8");
   await page.getByRole("tab", { name: "Bewertung", exact: true }).click();
 
   await page.locator('button[aria-label="Punkteingabe gesperrt – Klasse entsperren"]:visible').first().click();
