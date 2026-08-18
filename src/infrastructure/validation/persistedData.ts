@@ -154,6 +154,8 @@ const studentDatabaseSchema = v.object({
       signatureDataUrl: v.optional(v.nullable(v.string())),
       encryptedTeacherComment: v.optional(v.nullable(encryptedTextSchema)),
       encryptedSignatureDataUrl: v.optional(v.nullable(encryptedTextSchema)),
+      participationStatus: v.optional(v.picklist(["present", "absent", "excused", "makeup"])),
+      encryptedParticipationStatus: v.optional(v.nullable(encryptedTextSchema)),
       updatedAt: v.string(),
       printedAt: v.nullable(v.string()),
     }),

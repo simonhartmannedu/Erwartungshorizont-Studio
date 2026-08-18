@@ -19,6 +19,8 @@ import {
   ExpectationArchiveEntry,
   Section,
   StudentDatabase,
+  StudentAssessment,
+  StudentParticipationStatus,
   Task,
   ClassOverviewData,
   GroupAccessMode,
@@ -92,12 +94,15 @@ import {
   createStudentGroup,
   getStudentAssessment,
   getStudentCorrectionStatus,
+  getStudentParticipationStatus,
+  isStudentParticipating,
   getEffectiveSignatureDataUrl,
   getStudentGroup,
   getStudentRecord,
   hydrateSensitiveAssessmentsForGroup,
   encryptAndScrubSensitiveAssessmentsForGroups,
   markStudentPrinted,
+  migrateLegacyStudentAbsences,
   removeStudentGroup,
   removeStudentFromGroup,
   scrubSensitiveAssessmentsForGroups,
@@ -105,6 +110,7 @@ import {
   setStudentOrderInGroup,
   updateGroupDefaultSignature,
   updateStudentScore,
+  updateStudentParticipationStatus,
   updateStudentSignature,
   updateTeacherComment,
 } from "./utils/students";
@@ -479,7 +485,7 @@ const getWorkspaceCorrectionSnapshot = (
   group: ReturnType<typeof getStudentGroup>,
   database: StudentDatabase,
 ) => {
-  const relevantStudents = (group?.students ?? []).filter((student) => !student.isAbsent);
+  const relevantStudents = (group?.students ?? []).filter((student) => isStudentParticipating(database, student.id, workspace.id));
   const correctedCount = relevantStudents.reduce((count, student) => {
     const correctionStatus = getStudentCorrectionStatus(
       workspace.exam,
@@ -760,7 +766,6 @@ function App() {
         id: `demo-student-${index + 1}`,
         alias: `Student ${index + 1}`,
         encryptedName: await encryptText(fullName, DEMO_CLASS_PASSWORD),
-        isAbsent: index === DEMO_STUDENT_NAMES.length - 1,
         createdAt: DEMO_TIMESTAMP,
       })),
     );
@@ -781,10 +786,10 @@ function App() {
       [-0.05, 0.03, -0.06, 0.01],
     ];
     const unit5Development = [-0.01, 0.03, 0.02, 0.04, 0.01, -0.02, 0.03, 0.02];
-    const assessments = Object.fromEntries(
+    const assessments: Record<string, StudentAssessment> = Object.fromEntries(
       workspaces.flatMap((workspace, workspaceIndex) =>
         students
-          .filter((student) => !student.isAbsent)
+          .filter((student) => student.id !== students[students.length - 1]?.id)
           .map((student, studentIndex) => {
             const profile = skillProfiles[studentIndex % skillProfiles.length];
             const taskScores = Object.fromEntries(
@@ -820,6 +825,23 @@ function App() {
           }),
       ),
     );
+    const absentStudent = students[students.length - 1];
+    if (absentStudent) {
+      assessments[`${DEMO_WORKSPACE_UNIT_4_ID}::${absentStudent.id}`] = {
+        workspaceId: DEMO_WORKSPACE_UNIT_4_ID,
+        studentId: absentStudent.id,
+        taskScores: {},
+        encryptedTaskScores: null,
+        teacherComment: "",
+        signatureDataUrl: null,
+        encryptedTeacherComment: null,
+        encryptedSignatureDataUrl: null,
+        participationStatus: "excused",
+        encryptedParticipationStatus: null,
+        updatedAt: DEMO_TIMESTAMP,
+        printedAt: null,
+      };
+    }
 
     return {
       version: 1,
@@ -1486,7 +1508,7 @@ function App() {
           label: unlockedGroupIdSet.has(group.id) && globalSearchStudentNames[student.id]
             ? `${globalSearchStudentNames[student.id]} · ${student.alias}`
             : student.alias,
-          detail: `${group.subject} · ${group.className}${student.isAbsent ? " · abwesend" : ""}`,
+          detail: `${group.subject} · ${group.className}`,
         })),
       ),
       ];
@@ -1766,7 +1788,7 @@ function App() {
     if (!storageReady) return null;
     if (!activeGroup) return null;
 
-    const presentStudents = activeGroup.students.filter((student) => !student.isAbsent);
+    const presentStudents = activeGroup.students.filter((student) => isStudentParticipating(studentDatabase, student.id, activeWorkspace?.id ?? null));
     if (presentStudents.length === 0) return null;
 
     const studentReports = presentStudents.map((student) => {
@@ -1894,8 +1916,8 @@ function App() {
       };
     }
 
-    const absentCount = activeGroup.students.filter((student) => student.isAbsent).length;
-    const relevantStudents = activeGroup.students.filter((student) => !student.isAbsent);
+    const absentCount = activeGroup.students.filter((student) => !isStudentParticipating(studentDatabase, student.id, activeWorkspace.id)).length;
+    const relevantStudents = activeGroup.students.filter((student) => isStudentParticipating(studentDatabase, student.id, activeWorkspace.id));
     if (relevantStudents.length === 0) {
       return {
         key: `${activeGroup.id}::${activeWorkspace.id}`,
@@ -2200,6 +2222,10 @@ function App() {
 
   const updateTask = (sectionId: string, taskId: string, patch: Partial<Task>) => {
     if (selectedStudent && patch.achievedPoints !== undefined) {
+      if (!isStudentParticipating(studentDatabase, selectedStudent.studentId, activeWorkspace?.id ?? null)) {
+        pushNotice("info", "Teilnahme zuerst festlegen", "Für abwesende, entschuldigte oder nachschreibende Schüler:innen werden keine Punkte erfasst.");
+        return;
+      }
       setStudentDatabase((current) =>
         updateStudentScore(current, activeWorkspace?.id ?? null, selectedStudent.studentId, taskId, Number(patch.achievedPoints)),
       );
@@ -2675,7 +2701,7 @@ function App() {
     unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [groupId]: password };
     setUnlockedGroupIds((current) => (current.includes(groupId) ? current : [...current, groupId]));
     const hydratedDatabase = await hydrateSensitiveAssessmentsForGroup(studentDatabaseRef.current, groupId, password);
-    setStudentDatabase(hydratedDatabase);
+    setStudentDatabase(migrateLegacyStudentAbsences(hydratedDatabase, draftBundle.workspaces, groupId));
     return true;
   };
 
@@ -2757,7 +2783,6 @@ function App() {
         id: studentId,
         alias,
         encryptedName,
-        isAbsent: false,
         createdAt: new Date().toISOString(),
       }),
     );
@@ -2768,6 +2793,17 @@ function App() {
 
   const handleApplyStudentOrder = (groupId: string, orderedStudentIds: string[]) => {
     setStudentDatabase((current) => setStudentOrderInGroup(current, groupId, orderedStudentIds));
+  };
+
+  const handleChangeParticipationStatus = (status: StudentParticipationStatus) => {
+    if (!activeStudentId || !activeWorkspace) return;
+    if (activeGroupIsProtected && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Die Teilnahme wird zusammen mit den Bewertungsdaten verschlüsselt gespeichert.");
+      return;
+    }
+    setStudentDatabase((current) =>
+      updateStudentParticipationStatus(current, activeWorkspace.id, activeStudentId, status),
+    );
   };
 
   const handleRemoveStudent = (groupId: string, studentId: string) => {
@@ -3334,7 +3370,6 @@ function App() {
             id: studentId,
             alias,
             encryptedName,
-            isAbsent: false,
             createdAt: new Date().toISOString(),
           });
 
@@ -3815,7 +3850,12 @@ function App() {
       return {
         Schuelercode: student.alias,
         Schuelername: namesByStudentId[student.id] ?? "",
-        Anwesend: student.isAbsent ? "nein" : "ja",
+        Teilnahme: ({
+          present: "anwesend",
+          absent: "abwesend",
+          excused: "entschuldigt",
+          makeup: "schreibt nach",
+        } as const)[getStudentParticipationStatus(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null)],
         Fach: activeGroup.subject,
         Klasse: activeGroup.className,
         Titel: exam.meta.title,
@@ -3876,7 +3916,7 @@ function App() {
     activeGroup?.students.map((student) => ({
       alias: student.alias,
       fullName: "",
-      isAbsent: student.isAbsent,
+      participationStatus: getStudentParticipationStatus(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null),
       scores: getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null).taskScores,
     }));
 
@@ -4153,6 +4193,7 @@ function App() {
                   setActiveTab("builder");
                 }}
                 onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
+                onChangeParticipationStatus={handleChangeParticipationStatus}
                 onRevealGroupStudentNames={handleRevealGroupStudentNames}
                 isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
                 activeGroupIsProtected={activeGroupIsProtected}

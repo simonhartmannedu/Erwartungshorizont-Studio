@@ -173,7 +173,7 @@ export const SummaryPanel = ({
             <div>
               <p className="themed-strong text-sm font-semibold">Korrekturstand</p>
               <p className="themed-muted text-sm">
-                {correctionCoverage.correctedCount} von {correctionCoverage.relevantStudentCount} anwesenden Arbeiten sind fertig korrigiert.
+                {correctionCoverage.correctedCount} von {correctionCoverage.relevantStudentCount} teilnehmenden Arbeiten sind fertig korrigiert.
               </p>
             </div>
             <strong>{correctionCoverage.relevantStudentCount > 0
@@ -194,7 +194,7 @@ export const SummaryPanel = ({
               <p className="themed-strong text-lg font-semibold">{correctionCoverage.correctedCount}</p>
             </div>
             <div className="rounded-2xl border px-4 py-3">
-              <p className="label">Abwesend</p>
+              <p className="label">Nicht teilnehmend</p>
               <p className="themed-strong text-lg font-semibold">{correctionCoverage.absentCount}</p>
             </div>
           </div>

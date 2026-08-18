@@ -1,4 +1,4 @@
-import { Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentRecord } from "../types";
+import { DraftWorkspace, Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentParticipationStatus, StudentRecord } from "../types";
 import { clamp } from "./format";
 import { decryptText, encryptText } from "./crypto";
 
@@ -40,12 +40,92 @@ const emptyAssessment = (studentId: string, workspaceId: string | null = null): 
   signatureDataUrl: null,
   encryptedTeacherComment: null,
   encryptedSignatureDataUrl: null,
+  participationStatus: "present",
+  encryptedParticipationStatus: null,
   updatedAt: new Date().toISOString(),
   printedAt: null,
 });
 
 export const getStudentAssessment = (database: StudentDatabase, studentId: string, workspaceId: string | null = null) =>
   getStoredStudentAssessment(database, studentId, workspaceId) ?? emptyAssessment(studentId, workspaceId);
+
+export const getStudentParticipationStatus = (
+  database: StudentDatabase,
+  studentId: string,
+  workspaceId: string | null = null,
+): StudentParticipationStatus => getStudentAssessment(database, studentId, workspaceId).participationStatus ?? "present";
+
+export const isStudentParticipating = (
+  database: StudentDatabase,
+  studentId: string,
+  workspaceId: string | null = null,
+) => getStudentParticipationStatus(database, studentId, workspaceId) === "present";
+
+export const updateStudentParticipationStatus = (
+  database: StudentDatabase,
+  workspaceId: string | null,
+  studentId: string,
+  participationStatus: StudentParticipationStatus,
+): StudentDatabase => {
+  const assessment = getStudentAssessment(database, studentId, workspaceId);
+  const assessmentKey = getAssessmentKey(workspaceId, studentId);
+  return {
+    ...database,
+    assessments: {
+      ...database.assessments,
+      [assessmentKey]: {
+        ...assessment,
+        workspaceId,
+        participationStatus,
+        encryptedParticipationStatus: assessment.encryptedParticipationStatus ?? null,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    updatedAt: new Date().toISOString(),
+  };
+};
+
+/** Moves the former class-wide absence flag to every existing work of that class. */
+export const migrateLegacyStudentAbsences = (
+  database: StudentDatabase,
+  workspaces: DraftWorkspace[],
+  groupId?: string,
+): StudentDatabase => {
+  const legacyAbsentStudentIds = new Set(
+    database.groups
+      .filter((group) => !groupId || group.id === groupId)
+      .flatMap((group) => group.students.filter((student) => student.isAbsent).map((student) => student.id)),
+  );
+  if (legacyAbsentStudentIds.size === 0) return database;
+
+  const assessments = { ...database.assessments };
+  database.groups.filter((group) => !groupId || group.id === groupId).forEach((group) => {
+    const affectedStudents = group.students.filter((student) => student.isAbsent);
+    const groupWorkspaces = workspaces.filter((workspace) => workspace.assignedGroupId === group.id);
+    affectedStudents.forEach((student) => {
+      groupWorkspaces.forEach((workspace) => {
+        const key = getAssessmentKey(workspace.id, student.id);
+        const current = getStudentAssessment({ ...database, assessments }, student.id, workspace.id);
+        assessments[key] = {
+          ...current,
+          workspaceId: workspace.id,
+          participationStatus: "absent",
+          encryptedParticipationStatus: current.encryptedParticipationStatus ?? null,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+    });
+  });
+
+  return {
+    ...database,
+    groups: database.groups.map((group) => !groupId || group.id === groupId
+      ? { ...group, students: group.students.map(({ isAbsent: _legacyIsAbsent, ...student }) => student) }
+      : group),
+    assessments,
+    updatedAt: new Date().toISOString(),
+  };
+};
 
 export const getStudentCorrectionStatus = (
   exam: Exam,
@@ -321,27 +401,6 @@ export const setStudentOrderInGroup = (
   };
 };
 
-export const updateStudentAbsentStatus = (
-  database: StudentDatabase,
-  groupId: string,
-  studentId: string,
-  isAbsent: boolean,
-): StudentDatabase => ({
-  ...database,
-  groups: database.groups.map((group) =>
-    group.id !== groupId
-      ? group
-      : {
-          ...group,
-          students: group.students.map((student) =>
-            student.id !== studentId ? student : { ...student, isAbsent }
-          ),
-          updatedAt: new Date().toISOString(),
-        },
-  ),
-  updatedAt: new Date().toISOString(),
-});
-
 export const removeStudentFromGroup = (
   database: StudentDatabase,
   groupId: string,
@@ -452,7 +511,7 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
     Object.entries(database.assessments).map(([assessmentKey, assessment]) => {
       const groupId = getStudentGroupIdByStudentId(database, assessment.studentId);
       if (!groupId || !targetIds.has(groupId)) return [assessmentKey, assessment];
-      if (Object.keys(assessment.taskScores).length === 0 && !assessment.teacherComment && !assessment.signatureDataUrl) {
+      if (Object.keys(assessment.taskScores).length === 0 && !assessment.teacherComment && !assessment.signatureDataUrl && (assessment.participationStatus ?? "present") === "present") {
         return [assessmentKey, assessment];
       }
 
@@ -464,6 +523,7 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
           teacherComment: "",
           taskScores: {},
           signatureDataUrl: null,
+          participationStatus: "present",
         },
       ];
     }),
@@ -499,6 +559,7 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
       const encryptedSignatureDataUrl = assessment.signatureDataUrl
         ? await encryptText(assessment.signatureDataUrl, password)
         : assessment.encryptedSignatureDataUrl ?? null;
+      const encryptedParticipationStatus = await encryptText(assessment.participationStatus ?? "present", password);
 
       if (
         !hasTaskScores &&
@@ -507,6 +568,7 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
         encryptedTaskScores === (assessment.encryptedTaskScores ?? null) &&
         encryptedTeacherComment === (assessment.encryptedTeacherComment ?? null) &&
         encryptedSignatureDataUrl === (assessment.encryptedSignatureDataUrl ?? null)
+        && encryptedParticipationStatus === (assessment.encryptedParticipationStatus ?? null)
       ) {
         return [assessmentKey, assessment] as const;
       }
@@ -522,6 +584,8 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
           signatureDataUrl: null,
           encryptedTeacherComment,
           encryptedSignatureDataUrl,
+          encryptedParticipationStatus,
+          participationStatus: "present",
         },
       ] as const;
     }),
@@ -550,6 +614,7 @@ export const hydrateSensitiveAssessmentsForGroup = async (
       let teacherComment = assessment.teacherComment;
       let signatureDataUrl = assessment.signatureDataUrl ?? null;
       let taskScores = assessment.taskScores;
+      let participationStatus = assessment.participationStatus ?? "present";
 
       if (Object.keys(taskScores).length === 0 && assessment.encryptedTaskScores) {
         const parsedTaskScores = JSON.parse(await decryptText(assessment.encryptedTaskScores, password)) as Record<string, number>;
@@ -567,6 +632,11 @@ export const hydrateSensitiveAssessmentsForGroup = async (
         didChange = true;
       }
 
+      if (assessment.encryptedParticipationStatus) {
+        participationStatus = await decryptText(assessment.encryptedParticipationStatus, password) as StudentParticipationStatus;
+        didChange = true;
+      }
+
       return [
         assessmentKey,
         {
@@ -574,6 +644,7 @@ export const hydrateSensitiveAssessmentsForGroup = async (
           taskScores,
           teacherComment,
           signatureDataUrl,
+          participationStatus,
         },
       ] as const;
     }),
@@ -606,7 +677,7 @@ export const serializeStudentDatabaseForStorage = async (
 
       const unlockedPassword = getUnlockedPassword(group.id);
       if (!unlockedPassword) {
-        if (!assessment.encryptedTaskScores && !assessment.encryptedTeacherComment && !assessment.encryptedSignatureDataUrl) {
+        if (!assessment.encryptedTaskScores && !assessment.encryptedTeacherComment && !assessment.encryptedSignatureDataUrl && !assessment.encryptedParticipationStatus) {
           return [assessmentKey, assessment] as const;
         }
 
@@ -617,6 +688,7 @@ export const serializeStudentDatabaseForStorage = async (
             taskScores: {},
             teacherComment: "",
             signatureDataUrl: null,
+            participationStatus: "present",
           },
         ] as const;
       }
@@ -630,6 +702,7 @@ export const serializeStudentDatabaseForStorage = async (
       const encryptedSignatureDataUrl = assessment.signatureDataUrl
         ? await encryptText(assessment.signatureDataUrl, unlockedPassword)
         : assessment.encryptedSignatureDataUrl ?? null;
+      const encryptedParticipationStatus = await encryptText(assessment.participationStatus ?? "present", unlockedPassword);
 
       return [
         assessmentKey,
@@ -641,6 +714,8 @@ export const serializeStudentDatabaseForStorage = async (
           signatureDataUrl: null,
           encryptedTeacherComment,
           encryptedSignatureDataUrl,
+          encryptedParticipationStatus,
+          participationStatus: "present",
         },
       ] as const;
     }),

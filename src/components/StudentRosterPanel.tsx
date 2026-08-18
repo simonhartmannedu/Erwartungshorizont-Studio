@@ -780,9 +780,7 @@ export const StudentRosterPanel = ({
                                         <td className="px-4 py-3 align-top">{isUnlocked ? parsedName.lastName || "—" : "—"}</td>
                                         <td className="px-4 py-3 align-top">{isUnlocked ? parsedName.firstName || "—" : "—"}</td>
                                         <td className="px-4 py-3 align-top">
-                                          {student.isAbsent ? (
-                                            <span className="badge-amber inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">abwesend</span>
-                                          ) : isSelected ? (
+                                          {isSelected ? (
                                             <span className="badge-emerald inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">ausgewählt</span>
                                           ) : (
                                             <span className="badge-slate inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-none">aktiv</span>

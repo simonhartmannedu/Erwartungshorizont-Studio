@@ -52,6 +52,8 @@ export const isStudentAssessment = (value: unknown): value is StudentAssessment 
   (value.signatureDataUrl == null || typeof value.signatureDataUrl === "string") &&
   (value.encryptedTeacherComment == null || isEncryptedText(value.encryptedTeacherComment)) &&
   (value.encryptedSignatureDataUrl == null || isEncryptedText(value.encryptedSignatureDataUrl)) &&
+  (value.participationStatus === undefined || (typeof value.participationStatus === "string" && ["present", "absent", "excused", "makeup"].includes(value.participationStatus))) &&
+  (value.encryptedParticipationStatus == null || isEncryptedText(value.encryptedParticipationStatus)) &&
   isIsoTimestamp(value.updatedAt) &&
   (value.printedAt === null || isIsoTimestamp(value.printedAt));
 

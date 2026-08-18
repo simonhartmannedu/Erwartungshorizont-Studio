@@ -15,6 +15,7 @@ Damit kannst du:
 - Erwartungshorizonte, Aufgaben, Punkte und Notenschlüssel erstellen und wiederverwenden;
 - Lerngruppen aus CSV-, XLSX- oder ODS-Dateien übernehmen;
 - Punkte, Kommentare und Unterschriften pro Schüler*in erfassen;
+- Teilnahme je Klassenarbeit als anwesend, abwesend, entschuldigt oder „schreibt nach“ dokumentieren;
 - Korrekturübersichten, Bewertungsbögen sowie CSV-, XLSX-, ODS- und DOCX-Dateien erzeugen;
 - abgeschlossene Arbeiten archivieren und für das nächste Schuljahr wiederverwenden;
 - verschlüsselte Sicherungen deines Arbeitsstands anlegen.
@@ -38,7 +39,7 @@ Langfristig entsteht so eine persönliche, gut wiederverwendbare Sammlung von Kr
 Die Anwendung ist **local-first**: Arbeitsstände und Schülerdaten liegen im Browser auf deinem Gerät. Es gibt kein verpflichtendes Konto, keine Telemetrie und keinen zentralen Synchronisationsserver.
 
 - Namen werden für geschützte Lerngruppen verschlüsselt gespeichert.
-- Punkte, Kommentare und Signaturen können mit dem Gruppenpasswort geschützt werden.
+- Punkte, Kommentare, Signaturen und Teilnahmestatus pro Klassenarbeit können mit dem Gruppenpasswort geschützt werden.
 - Backup-Dateien werden mit einem von dir gewählten Passwort verschlüsselt; dieses Passwort speichert die Anwendung nicht.
 - Eine PDF wird erst nach einer ausdrücklichen Einwilligung verarbeitet. Die Anwendung weist vor der Übernahme auf mögliche sensible Inhalte hin.
 - Bei mehreren geöffneten Tabs stoppt die Anwendung das Speichern, bevor ein neuerer Datenstand überschrieben werden könnte.

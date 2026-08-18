@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { DraftWorkspace, ExpectationArchiveEntry, StudentDatabase } from "../types";
 import { formatDateTime, formatNumber } from "../utils/format";
-import { getStudentAssessment } from "../utils/students";
+import { getStudentAssessment, isStudentParticipating } from "../utils/students";
 import { ArchiveIcon, CheckIcon, ChevronDownIcon, CloseIcon, DuplicateIcon, GroupIcon, OpenIcon, TrashIcon } from "./icons";
 import { Card, Field, IconButton } from "./ui";
 
@@ -151,7 +151,7 @@ export const ExpectationArchiveDashboard = ({
 
             linkedGroupLabels.push(`${group.subject} · ${group.className}`);
             const requiredTaskIds = workspace.exam.sections.flatMap((section) => section.tasks.map((task) => task.id));
-            const presentStudents = group.students.filter((student) => !student.isAbsent);
+            const presentStudents = group.students.filter((student) => isStudentParticipating(studentDatabase, student.id, workspace.id));
             studentCount += presentStudents.length;
             completedStudents += presentStudents.filter((student) => {
               const assessment = getStudentAssessment(studentDatabase, student.id, workspace.id);

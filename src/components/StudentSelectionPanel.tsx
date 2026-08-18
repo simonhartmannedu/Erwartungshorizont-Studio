@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { DraftWorkspace, Exam, StudentDatabase } from "../types";
-import { getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
+import { DraftWorkspace, Exam, StudentDatabase, StudentParticipationStatus } from "../types";
+import { getStudentAssessment, getStudentCorrectionStatus, getStudentParticipationStatus } from "../utils/students";
 import { ChevronDownIcon, ChevronRightIcon, LockIcon, UnlockIcon } from "./icons";
 import { Card, Field } from "./ui";
 
@@ -14,6 +14,7 @@ interface Props {
   onSelectGroup: (groupId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectStudent: (studentId: string) => void;
+  onChangeParticipationStatus: (status: StudentParticipationStatus) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   isSelectedGroupUnlocked: boolean;
   activeGroupIsProtected: boolean;
@@ -31,6 +32,7 @@ export const StudentSelectionPanel = ({
   onSelectGroup,
   onSelectWorkspace,
   onSelectStudent,
+  onChangeParticipationStatus,
   onRevealGroupStudentNames,
   isSelectedGroupUnlocked,
   activeGroupIsProtected,
@@ -78,6 +80,9 @@ export const StudentSelectionPanel = ({
   const selectedStudentAssessment = selectedStudentRecord
     ? getStudentAssessment(database, selectedStudentRecord.id, activeWorkspaceId)
     : null;
+  const selectedParticipationStatus = selectedStudentRecord
+    ? getStudentParticipationStatus(database, selectedStudentRecord.id, activeWorkspaceId)
+    : "present";
   const taskCount = activeExam.sections.reduce((count, section) => count + section.tasks.length, 0);
   const scoredTaskCount = activeExam.sections.reduce(
     (count, section) =>
@@ -100,6 +105,12 @@ export const StudentSelectionPanel = ({
     const fullName = resolvedNamesByStudentId[studentId]?.trim();
     return fullName ? `${fullName} · ${alias}` : alias;
   };
+  const getParticipationStatusLabel = (status: StudentParticipationStatus) => ({
+    present: "anwesend",
+    absent: "abwesend",
+    excused: "entschuldigt",
+    makeup: "schreibt nach",
+  })[status];
 
   const activeGroupLabel = activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : "Noch keine Lerngruppe gewählt";
   const renderGroupSecurityStatus = () => {
@@ -190,9 +201,25 @@ export const StudentSelectionPanel = ({
                 {activeGroup.students.map((student) => (
                   <option key={student.id} value={student.id}>
                     {getStudentDisplayLabel(student.id, student.alias)}
-                    {student.isAbsent ? " · abwesend" : ` · ${getCorrectionStatusLabel(studentCorrectionStatuses.get(student.id) ?? "uncorrected")}`}
+                    {` · ${getParticipationStatusLabel(getStudentParticipationStatus(database, student.id, activeWorkspaceId))}`}
+                    {getStudentParticipationStatus(database, student.id, activeWorkspaceId) === "present"
+                      ? ` · ${getCorrectionStatusLabel(studentCorrectionStatuses.get(student.id) ?? "uncorrected")}`
+                      : ""}
                   </option>
                 ))}
+              </select>
+            </Field>
+            <Field label="Teilnahme an dieser Klassenarbeit">
+              <select
+                className="field"
+                value={selectedParticipationStatus}
+                onChange={(event) => onChangeParticipationStatus(event.target.value as StudentParticipationStatus)}
+                disabled={activeGroupIsProtected && !isSelectedGroupUnlocked}
+              >
+                <option value="present">Anwesend</option>
+                <option value="absent">Abwesend</option>
+                <option value="excused">Entschuldigt</option>
+                <option value="makeup">Schreibt nach</option>
               </select>
             </Field>
             {selectedStudentRecord && taskCount > 0 ? (

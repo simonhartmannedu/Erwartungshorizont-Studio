@@ -96,6 +96,8 @@ export interface StudentRecord {
   createdAt: string;
 }
 
+export type StudentParticipationStatus = "present" | "absent" | "excused" | "makeup";
+
 export interface StudentGroup {
   id: string;
   subject: string;
@@ -116,6 +118,9 @@ export interface StudentAssessment {
   signatureDataUrl?: string | null;
   encryptedTeacherComment?: EncryptedText | null;
   encryptedSignatureDataUrl?: EncryptedText | null;
+  /** Participation applies to this student in this particular classwork. */
+  participationStatus?: StudentParticipationStatus;
+  encryptedParticipationStatus?: EncryptedText | null;
   updatedAt: string;
   printedAt: string | null;
 }

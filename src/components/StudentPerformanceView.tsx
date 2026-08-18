@@ -3,7 +3,7 @@ import { DraftWorkspace, StudentDatabase, StudentGroup, StudentRecord } from "..
 import { calculateExamSummary } from "../utils/calculations";
 import { resolveCommentTemplate } from "../utils/export";
 import { formatNumber } from "../utils/format";
-import { buildExamForStudent, getStudentAssessment, getStudentCorrectionStatus } from "../utils/students";
+import { buildExamForStudent, getStudentAssessment, getStudentCorrectionStatus, isStudentParticipating } from "../utils/students";
 import { FullscreenExitIcon, FullscreenIcon } from "./icons";
 import { Badge } from "./ui";
 
@@ -135,7 +135,7 @@ const getStudentAreaTotals = (
 
 const getGroupAverage = (workspace: DraftWorkspace, database: StudentDatabase, group: StudentGroup) => {
   const percentages = group.students
-    .filter((entry) => !entry.isAbsent)
+    .filter((entry) => isStudentParticipating(database, entry.id, workspace.id))
     .map((entry) => {
       const assessment = getStudentAssessment(database, entry.id, workspace.id);
       const hasScore = workspace.exam.sections.some((section) =>
@@ -166,7 +166,6 @@ const buildCompetenceEntries = (
   const areaDefinitions = getAreaDefinitions(workspaces, group.id);
   const studentTotals = getStudentAreaTotals(workspaces, database, group.id, student.id);
   const groupTotalsByStudent = group.students
-    .filter((entry) => !entry.isAbsent)
     .map((entry) => getStudentAreaTotals(workspaces, database, group.id, entry.id));
 
   return areaDefinitions.map((area) => {
@@ -200,6 +199,7 @@ const buildPerformanceEntries = (
 ): PerformanceEntry[] =>
   workspaces
     .filter((workspace) => workspace.assignedGroupId === group.id)
+    .filter((workspace) => isStudentParticipating(database, student.id, workspace.id))
     .map((workspace) => {
       const dateInfo = getWorkspaceDateInfo(workspace);
       const assessment = getStudentAssessment(database, student.id, workspace.id);

@@ -921,7 +921,7 @@ export const exportClassOverviewCsv = (
 export interface ScoringExportStudent {
   alias: string;
   fullName?: string | null;
-  isAbsent?: boolean;
+  participationStatus?: "present" | "absent" | "excused" | "makeup";
   scores?: Record<string, number>;
 }
 
@@ -941,14 +941,14 @@ const getTaskEntries = (exam: Exam) =>
     })),
   );
 
-const getScoringStudents = (students?: ScoringExportStudent[]) =>
+const getScoringStudents = (students?: ScoringExportStudent[]): ScoringExportStudent[] =>
   students && students.length > 0
     ? students
     : [
         {
           alias: "S01",
           fullName: "",
-          isAbsent: false,
+          participationStatus: "present",
           scores: {},
         },
       ];
@@ -1005,13 +1005,16 @@ const buildScoringRows = (
     return {
       Schuelercode: student.alias,
       Schuelername: student.fullName ?? "",
-      Anwesend: student.isAbsent ? "nein" : "ja",
+      Teilnahme: ({
+        present: "anwesend",
+        absent: "abwesend",
+        excused: "entschuldigt",
+        makeup: "schreibt nach",
+      } as const)[student.participationStatus ?? "present"],
       ...Object.fromEntries(
         tasks.map((entry) => [
           entry.header,
-          student.scores && Object.prototype.hasOwnProperty.call(student.scores, entry.task.id)
-            ? student.scores[entry.task.id]
-            : "",
+          student.scores?.[entry.task.id] ?? "",
         ]),
       ),
       Gesamtpunkte: `=SUM(${firstTaskCell}:${lastTaskCell})`,
