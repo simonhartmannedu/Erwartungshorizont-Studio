@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Erwartungshorizont Studio: Punktzahlen sicher berechnen, Korrekturen vereinfachen und Kompetenzen sichtbar machen – lokal und ohne Benutzerkonto."
+      content="Erwartungshorizont Studio ist ein kleines, local-first Werkzeug für Erwartungshorizonte, Korrekturen und Auswertungen im Schulalltag."
     />
-    <meta name="theme-color" content="#f5f7fb" />
-    <title>Erwartungshorizont Studio – Unterricht organisieren, Korrektur vereinfachen</title>
+    <meta name="theme-color" content="#faf9f6" />
+    <title>Erwartungshorizont Studio – ein Werkzeug für den Schulalltag</title>
     <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -21,145 +21,121 @@
         <span>Erwartungshorizont<br /><strong>Studio</strong></span>
       </a>
       <nav class="site-nav" aria-label="Seitennavigation">
-        <a href="#funktionen">Funktionen</a>
-        <a href="#so-gehts">So geht's</a>
-        <a href="#datenschutz">Datenschutz</a>
+        <a href="#funktionen">Das Studio</a>
+        <a href="#datenschutz">Daten</a>
       </nav>
-      <a class="header-link" href="./demo/">Demo ansehen <span aria-hidden="true">→</span></a>
+      <button class="theme-toggle" type="button" aria-label="Dunkles Farbschema aktivieren" title="Dunkles Farbschema aktivieren">
+        <!-- SunIcon and MoonIcon from Heroicons, MIT License: https://github.com/tailwindlabs/heroicons -->
+        <span class="theme-toggle-sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1.5m0 15V21m9-9h-1.5M4.5 12H3m15.364 6.364-1.06-1.06M6.697 6.697l-1.06-1.06m12.728 0-1.06 1.06M6.697 17.303l-1.06 1.06M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" /></svg></span>
+        <span class="theme-toggle-moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.598.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg></span>
+      </button>
+      <a class="header-link" href="https://erwartungshorizont.cc/demo/">Mit Demo-Daten ansehen <span aria-hidden="true">→</span></a>
     </header>
 
     <main id="inhalt">
       <section class="hero" id="start" aria-labelledby="hero-title">
-        <div class="hero-copy reveal">
-          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> Für den echten Schulalltag gemacht</p>
-          <h1 id="hero-title">Deine Korrektur.<br /><em>Endlich im Fluss.</em></h1>
-          <p class="hero-text">
-            Punkte sicher berechnen, Routinen abkürzen und Kompetenzen sichtbar machen – mit einem Werkzeug,
-            das auf deinem Gerät bleibt.
-          </p>
-          <div class="hero-actions">
-            <a class="button button-primary" href="./app/">Mit eigenen Daten starten <span aria-hidden="true">→</span></a>
-            <a class="button button-secondary" href="./demo/">Demo mit Beispieldaten ansehen <span aria-hidden="true">↗</span></a>
-          </div>
-          <p class="hero-note"><span aria-hidden="true">✓</span> Immer kostenlos · Open Source · Ohne Benutzerkonto · Daten bleiben lokal</p>
-        </div>
-
-        <div class="hero-visual reveal reveal-later">
-          <div class="hero-orbit orbit-one" aria-hidden="true"></div>
-          <div class="hero-orbit orbit-two" aria-hidden="true"></div>
-          <div class="app-window">
-            <div class="window-topbar" aria-hidden="true">
-              <span></span><span></span><span></span>
-              <i></i>
-              <b>Erwartungshorizont Studio</b>
+        <div class="hero-layout">
+          <div class="hero-copy">
+            <p class="kicker">Erwartungshorizont Studio</p>
+            <h1 id="hero-title">Erwartungshorizonte schnell erstellen, sauber auswerten &amp; drucken.</h1>
+            <p class="intro">
+              Für meinen Unterricht wollte ich Punkte, Notengrenzen und Auswertungen nicht jedes Mal wieder zusammensuchen. Deshalb ist dieses kleine Studio entstanden.
+            </p>
+            <p class="project-status"><span>v0.5</span><span>local-first</span><span>ohne Konto</span></p>
+            <div class="hero-actions">
+              <a class="button" href="https://erwartungshorizont.cc/app/">EWH-Studio starten <span aria-hidden="true">→</span></a>
+              <a class="plain-link" href="https://erwartungshorizont.cc/demo/">Mit Demo-Daten ansehen <span aria-hidden="true">→</span></a>
             </div>
-            <img src="./assets/ewh-overview.webp" alt="Übersicht einer Klassenarbeit im Erwartungshorizont Studio" />
           </div>
-          <aside class="floating-card progress-card">
-            <span class="mini-icon chart-icon" aria-hidden="true">↗</span>
-            <div><small>Korrekturstand</small><strong>24 <i>/ 24</i></strong></div>
-            <span class="success-check" aria-hidden="true">✓</span>
-          </aside>
-          <aside class="floating-card local-card">
-            <span class="mini-icon lock-icon" aria-hidden="true">⌁</span>
-            <div><strong>Lokal gespeichert</strong><small>Deine Daten bleiben bei dir.</small></div>
-          </aside>
+          <figure class="product-shot hero-shot">
+            <img src="./assets/ewh-overview.webp" alt="Übersicht einer Klassenarbeit mit Aufgaben, Punkten und Notenskala im Erwartungshorizont Studio" />
+          </figure>
         </div>
       </section>
 
-      <section class="proof-bar" aria-label="Die wichtigsten Eigenschaften">
-        <p>Weniger Korrekturaufwand. Mehr Klarheit für jede Klassenarbeit.</p>
-        <div><span>Punkte</span><i aria-hidden="true"></i><span>Routinen</span><i aria-hidden="true"></i><span>Kompetenzen</span></div>
-      </section>
-
-      <section class="section features" id="funktionen" aria-labelledby="features-title">
-        <div class="section-heading reveal">
-          <p class="eyebrow">Was dir wirklich Arbeit abnimmt</p>
-          <h2 id="features-title">Drei Dinge, die<br />Korrekturen leichter machen.</h2>
-          <p>Kein zusätzliches Verwaltungssystem. Sondern genau die Unterstützung, die zwischen Planung, Korrektur und Sprechtag zählt.</p>
-        </div>
-        <div class="feature-grid">
-          <article class="feature-card feature-card-blue reveal">
-            <span class="feature-icon" aria-hidden="true">÷</span>
-            <h3>Punkte sicher<br />in Noten übersetzen.</h3>
-            <p>Punktwerte, Prozentwerte und Notenschlüssel bleiben automatisch stimmig – auch wenn sich die Gesamtpunktzahl ändert.</p>
-            <span class="feature-number" aria-hidden="true">01</span>
-          </article>
-          <article class="feature-card reveal reveal-later">
-            <span class="feature-icon feature-icon-mint" aria-hidden="true">↻</span>
-            <h3>Einmal eintragen.<br />Immer weiterarbeiten.</h3>
-            <p>Namen, Lerngruppen und Rahmendaten sind angelegt, wenn du sie brauchst – statt bei jeder Arbeit von vorn zu beginnen.</p>
-            <span class="feature-number" aria-hidden="true">02</span>
-          </article>
-          <article class="feature-card reveal reveal-last">
-            <span class="feature-icon feature-icon-amber" aria-hidden="true">◔</span>
-            <h3>Kompetenzen<br />auf einen Blick.</h3>
-            <p>Sieh Stärken, Gruppenschnitt und Kompetenzprofile als klare Grafiken – auf Wunsch groß für Konferenzen und Sprechtage.</p>
-            <span class="feature-number" aria-hidden="true">03</span>
-          </article>
+      <section class="tool section" id="funktionen" aria-labelledby="tool-title">
+        <div class="tool-layout">
+          <div>
+            <p class="section-label">Ein Blick ins Studio <span class="label-pill">Open Source</span></p>
+            <h2 id="tool-title">Alles, was ich bei einer Klassenarbeit wirklich brauche.</h2>
+            <p class="tool-intro">Erwartungshorizont, Korrektur und Auswertung bleiben dabei nah beieinander.</p>
+            <ul class="info-cards tool-notes" id="so-gehts" aria-label="Wofür das Studio gedacht ist">
+              <li><strong>Erwartungshorizont mit Punkten aufbauen</strong><span>Kriterien und Gewichtungen direkt festlegen</span></li>
+              <li><strong>Punkte beim Korrigieren erfassen</strong><span>Erwartungshorizont und Bewertung nebeneinander</span></li>
+              <li><strong>Notengrenzen automatisch anpassen</strong><span>wenn sich die Gesamtpunktzahl ändert</span></li>
+              <li><strong>Ergebnisse auswerten und drucken</strong><span>für den Überblick nach der Klassenarbeit</span></li>
+              <li><strong>Klassenlisten per CSV übernehmen</strong><span>ohne Namen noch einmal einzutippen</span></li>
+              <li><strong>Mit Vorlagen beginnen</strong><span>für wiederkehrende Klassenarbeiten</span></li>
+            </ul>
+          </div>
+          <figure class="product-shot">
+            <img src="./assets/ewh-templates.webp" alt="Vorlagenauswahl im Erwartungshorizont Studio" loading="lazy" />
+            <figcaption>Vorlagen für wiederkehrende Ausgangspunkte.</figcaption>
+          </figure>
         </div>
       </section>
 
-      <section class="showcase section" id="so-gehts" aria-labelledby="showcase-title">
-        <div class="showcase-copy reveal">
-          <p class="eyebrow">Von der Idee bis zur Rückgabe</p>
-          <h2 id="showcase-title">Ein klarer Weg<br />durch jede Klassenarbeit.</h2>
-          <ol class="steps">
-            <li><span>1</span><div><strong>Erwartungshorizont erstellen</strong><p>Starte mit einer Vorlage oder lege Kriterien und Gewichtungen selbst fest.</p></div></li>
-            <li><span>2</span><div><strong>Lerngruppe verbinden</strong><p>Übernimm deine Liste und halte den Korrekturstand im Blick.</p></div></li>
-            <li><span>3</span><div><strong>Sauber auswerten &amp; exportieren</strong><p>Erstelle Übersichten, Bewertungsbögen und druckfertige Dateien direkt aus deinen Daten.</p></div></li>
-          </ol>
-          <a class="text-link" href="./demo/">Demo mit Beispieldaten öffnen <span aria-hidden="true">→</span></a>
-        </div>
-        <div class="showcase-images reveal reveal-later">
-          <div class="image-stack image-stack-back"><img src="./assets/ewh-search.webp" alt="Suche und Navigation im Erwartungshorizont Studio" loading="lazy" /></div>
-          <div class="image-stack image-stack-front"><img src="./assets/ewh-templates.webp" alt="Vorlagenauswahl im Erwartungshorizont Studio" loading="lazy" /></div>
-          <div class="image-label"><span aria-hidden="true">✦</span> Deine Arbeit. <strong>Dein System.</strong></div>
-        </div>
-      </section>
-
-      <section class="privacy section" id="datenschutz" aria-labelledby="privacy-title">
-        <div class="privacy-icon reveal" aria-hidden="true"><span>⌁</span></div>
-        <div class="privacy-copy reveal reveal-later">
-          <p class="eyebrow">Datenschutz als Ausgangspunkt</p>
-          <h2 id="privacy-title">Keine Cloud.<br />Kein Konto. Kein Umweg.</h2>
-          <p>Erwartungshorizont Studio ist local-first: Schülerdaten und Arbeitsstände liegen in deinem Browser auf deinem Gerät. Du entscheidest, wann du Sicherungen exportierst.</p>
-          <a class="text-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/docs/data-and-privacy.md">Mehr über Daten &amp; Privatsphäre <span aria-hidden="true">↗</span></a>
-        </div>
-      </section>
-
-      <section class="launch section" aria-labelledby="launch-title">
-        <div class="launch-content reveal">
-          <p class="eyebrow eyebrow-light">Dein nächster Schritt</p>
-          <h2 id="launch-title">Starte mit dem,<br />was zu dir passt.</h2>
-          <p>Lege deinen eigenen Arbeitsbereich an, wenn du direkt loslegen möchtest. Oder schau dir den Ablauf mit Beispieldaten an.</p>
-          <div class="launch-options">
-            <a href="./app/" class="launch-option">
-              <span class="launch-option-icon" aria-hidden="true">↗</span>
-              <span><strong>Mit eigenen Daten starten</strong><small>Deinen Arbeitsbereich anlegen</small></span>
-              <i aria-hidden="true">→</i>
-            </a>
-            <a href="./demo/" class="launch-option">
-              <span class="launch-option-icon launch-option-icon-mint" aria-hidden="true">✦</span>
-              <span><strong>Demo ansehen</strong><small>Mit Beispieldaten ausprobieren</small></span>
-              <i aria-hidden="true">→</i>
-            </a>
+      <section class="data section" id="datenschutz" aria-labelledby="data-title">
+        <div class="data-project">
+          <div>
+            <p class="section-label">Noch wichtig: die Daten</p>
+            <h2 id="data-title">Die Daten bleiben auf deinem Gerät.</h2>
+            <p>Klassenarbeiten, Lerngruppen und Schülerdaten liegen in der IndexedDB deines Browsers. Für einen Geräte- oder Browserwechsel kannst du alles als verschlüsseltes Vollbackup sichern und später wieder einspielen.</p>
+            <ul class="info-cards data-tools" aria-label="Sichern und exportieren">
+              <li><strong>Vollbackup</strong><span>verschlüsselt sichern &amp; wiederherstellen</span></li>
+              <li><strong>DOCX</strong><span>Bewertungsbögen und Übersichten nachträglich bearbeiten</span></li>
+              <li><strong>PDF</strong><span>direkt aus dem Druckdialog speichern</span></li>
+            </ul>
+            <a class="plain-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/docs/data-and-privacy.md">Mehr über Daten &amp; Privatsphäre <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="project-brief">
+            <p class="section-label">Ein unabhängiges Projekt</p>
+            <h3>Für meinen Unterricht gebaut. Offen für deinen.</h3>
+            <p>Der Quellcode ist offen; wenn du das Projekt verfolgen oder unterstützen möchtest, findest du es auf GitHub und Ko-fi.</p>
+            <p class="project-links">
+              <a href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio">GitHub <span aria-hidden="true">↗</span></a>
+              <a href="https://ko-fi.com/simonhartmann">Ko-fi <span aria-hidden="true">↗</span></a>
+              <a href="https://bsky.app/profile/mr-hartmann.bsky.social">Bluesky <span aria-hidden="true">↗</span></a>
+            </p>
           </div>
         </div>
-        <div class="launch-spark spark-one" aria-hidden="true">✦</div>
-        <div class="launch-spark spark-two" aria-hidden="true">✦</div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <a class="brand brand-footer" href="#start" aria-label="Zurück zum Seitenanfang"><span class="brand-mark" aria-hidden="true">E</span><span>Erwartungshorizont<br /><strong>Studio</strong></span></a>
-      <p>Ein Open-Source-Projekt für einen klareren Schulalltag.</p>
-      <div class="footer-links">
-        <a href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio" aria-label="Quellcode auf GitHub öffnen"><img src="./assets/github.svg" alt="" width="16" height="16" /> GitHub</a>
-        <a href="https://ko-fi.com/simonhartmann" aria-label="Erwartungshorizont Studio auf Ko-fi unterstützen"><img src="./assets/kofi.svg" alt="" width="16" height="16" /> Ko-fi</a>
-        <a href="https://bsky.app/profile/mr-hartmann.bsky.social" aria-label="Mr. Hartmann auf Bluesky folgen"><img src="./assets/bluesky.svg" alt="" width="16" height="16" /> Bluesky</a>
+      <div>
+        <a class="brand brand-footer" href="#start" aria-label="Zurück zum Seitenanfang"><span class="brand-mark" aria-hidden="true">E</span><span>Erwartungshorizont<br /><strong>Studio</strong></span></a>
+        <p>Ein kleines Werkzeug für meinen Schulalltag – vielleicht auch für deinen.</p>
       </div>
-      <div class="footer-legal"><a href="./impressum/">Impressum</a><a href="./datenschutz/">Datenschutzerklärung</a></div>
+      <div class="footer-links">
+        <a href="./datenschutz/">Datenschutz</a>
+        <a href="./impressum/">Impressum</a>
+        <a href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio"><img src="./assets/github.svg" alt="" width="16" height="16" /> GitHub</a>
+        <a href="https://ko-fi.com/simonhartmann"><img src="./assets/kofi.svg" alt="" width="16" height="16" /> Ko-fi</a>
+        <a href="https://bsky.app/profile/mr-hartmann.bsky.social"><img src="./assets/bluesky.svg" alt="" width="16" height="16" /> Bluesky</a>
+      </div>
     </footer>
+    <script>
+      (() => {
+        const storageKey = "ewh-landing-theme";
+        const toggle = document.querySelector(".theme-toggle");
+        const storedTheme = window.localStorage.getItem(storageKey);
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+        const setTheme = (theme) => {
+          document.body.dataset.theme = theme;
+          const label = theme === "dark" ? "Helles Farbschema aktivieren" : "Dunkles Farbschema aktivieren";
+          toggle.setAttribute("aria-label", label);
+          toggle.setAttribute("title", label);
+        };
+
+        setTheme(storedTheme || (prefersDark ? "dark" : "light"));
+        toggle.addEventListener("click", () => {
+          const nextTheme = document.body.dataset.theme === "dark" ? "light" : "dark";
+          window.localStorage.setItem(storageKey, nextTheme);
+          setTheme(nextTheme);
+        });
+      })();
+    </script>
   </body>
 </html>
