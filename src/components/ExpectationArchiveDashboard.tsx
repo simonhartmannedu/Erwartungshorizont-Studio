@@ -296,8 +296,14 @@ export const ExpectationArchiveDashboard = ({
           background: "var(--app-secondary-bg)",
         }}
       >
-        <div className="overflow-x-auto">
-        <table className="min-w-[980px] text-sm md:min-w-full">
+        <table className="archive-entry-table w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[17%]" />
+            <col className="w-[21%]" />
+            <col className="w-[25%]" />
+            <col className="w-[18%]" />
+            <col className="w-[19%]" />
+          </colgroup>
           <thead
             className="text-left text-xs uppercase tracking-[0.16em]"
             style={{
@@ -333,21 +339,21 @@ export const ExpectationArchiveDashboard = ({
               return (
                 <Fragment key={entry.id}>
                   <tr className="align-top" style={{ borderTop: "1px solid var(--app-border-default)" }}>
-                    <td className="px-4 py-3" style={{ color: "var(--app-text)" }}>
+                    <td className="break-words px-4 py-3" style={{ color: "var(--app-text)" }}>
                       <p className="font-semibold" style={{ color: "var(--app-text-strong)" }}>{entry.subject || "Ohne Fach"}</p>
                       <p>{entry.gradeLevel} · {entry.course}</p>
                       <p>{entry.schoolYear}</p>
                       <p>{entry.examDate}</p>
                     </td>
-                    <td className="px-4 py-3" style={{ color: "var(--app-text)" }}>
+                    <td className="break-words px-4 py-3" style={{ color: "var(--app-text)" }}>
                       <p className="font-semibold" style={{ color: "var(--app-text-strong)" }}>{entry.examTitle}</p>
                       <p>{entry.teacher}</p>
                       <p className="mt-2 text-xs" style={{ color: "var(--app-label)" }}>Gespeichert: {formatDateTime(entry.createdAt)}</p>
                     </td>
-                    <td className="px-4 py-3" style={{ color: "var(--app-text)" }}>
-                      <p className="max-w-2xl whitespace-pre-line leading-6">{entry.summaryText}</p>
+                    <td className="break-words px-4 py-3" style={{ color: "var(--app-text)" }}>
+                      <p className="whitespace-pre-line leading-6">{entry.summaryText}</p>
                     </td>
-                    <td className="px-4 py-3" style={{ color: "var(--app-text)" }}>
+                    <td className="break-words px-4 py-3" style={{ color: "var(--app-text)" }}>
                       <p className="font-semibold" style={{ color: "var(--app-text-strong)" }}>{formatNumber(entry.totalMaxPoints, 0)} Punkte</p>
                       <p>{entry.sectionCount} Abschnitte</p>
                       <p>{entry.expectationCount} Erwartungshorizonte</p>
@@ -367,7 +373,7 @@ export const ExpectationArchiveDashboard = ({
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="archive-entry-actions flex flex-wrap justify-end gap-2">
                         <IconButton
                           onClick={() => onOpen(entry)}
                           title="Im Builder öffnen"
@@ -377,10 +383,10 @@ export const ExpectationArchiveDashboard = ({
                         </IconButton>
                         {assigningEntryId === entry.id ? (
                           <>
-                            <label className="min-w-[240px]">
+                            <label className="min-w-0 flex-1 basis-full">
                               <span className="sr-only">Lerngruppe auswählen</span>
                               <select
-                                className="field"
+                                className="field w-full min-w-0"
                                 value={getSelectedGroupId(entry.id)}
                                 onChange={(event) =>
                                   setSelectedGroupByEntryId((current) => ({
@@ -486,7 +492,6 @@ export const ExpectationArchiveDashboard = ({
             )}
           </tbody>
         </table>
-        </div>
       </div>
     </Card>
   );

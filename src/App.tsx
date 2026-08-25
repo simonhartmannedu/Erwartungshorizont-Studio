@@ -155,6 +155,7 @@ import {
 import { EditorSectionTabs, getEditorSectionPanelId, type EditorSectionTabId } from "./components/EditorSectionTabs";
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
+import { EwhWizard } from "./components/EwhWizard";
 import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
 import { HomeDashboard } from "./components/HomeDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
@@ -171,6 +172,7 @@ import {
   ChevronRightIcon,
   LoadingIcon,
   PlusIcon,
+  TrashIcon,
 } from "./components/icons";
 import { Card, Field } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
@@ -889,6 +891,7 @@ function App() {
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
   const [guideStepIndex, setGuideStepIndex] = useState(0);
+  const [wizardStepIndex, setWizardStepIndex] = useState(0);
   const appShellRef = useRef<HTMLDivElement | null>(null);
   const guideDialogRef = useRef<HTMLDivElement | null>(null);
   const guideTitleRef = useRef<HTMLHeadingElement | null>(null);
@@ -923,6 +926,7 @@ function App() {
   const [pendingSchoolYearCreation, setPendingSchoolYearCreation] = useState<PendingSchoolYearCreation | null>(null);
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     home: null,
+    wizard: null,
     groups: null,
     guidedBuilder: null,
     builder: null,
@@ -1375,6 +1379,18 @@ function App() {
     setActiveTab(tabId);
     setGuideOpen(false);
     window.requestAnimationFrame(() => focusTabButton(tabId));
+  };
+
+  const openWizardTarget = (tabId: TabId, targetId?: string, editorSection?: EditorSectionTabId) => {
+    if (editorSection) setActiveEditorTab(editorSection);
+    setActiveTab(tabId);
+    window.requestAnimationFrame(() => {
+      if (targetId) {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        focusTabButton(tabId);
+      }
+    });
   };
 
   const handleGuideKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -3969,10 +3985,6 @@ function App() {
         : "Geschützte Lerngruppe entsperrt: Druck und CSV arbeiten mit lokal entschlüsselten Bewertungsdaten."
       : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und CSV-Exporte nutzen deshalb nur den Schülercode."
     : "PDF für Ausdrucke, CSV für Tabellenkalkulationen und JSON für Sicherungen.";
-  const currentSchoolYearPillLabel = activeSchoolYearFilter === "all"
-    ? getSchoolYearLabel(activeWorkspace ? getWorkspaceSchoolYear(activeWorkspace) : draftBundle.workspaces[0] ? getWorkspaceSchoolYear(draftBundle.workspaces[0]) : "")
-    : getSchoolYearLabel(activeSchoolYearFilter);
-
   const handlePrintSecurityTokens = () => {
     const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
     if (!opened) {
@@ -3998,6 +4010,9 @@ function App() {
   });
   const activeGuideStep = firstRunGuideSteps[guideStepIndex] ?? firstRunGuideSteps[0];
   const guideProgressLabel = `${guideStepIndex + 1} / ${firstRunGuideSteps.length}`;
+  const wizardHasProtectedGroup = studentDatabase.groups.some((group) => Boolean(group.passwordVerifier));
+  const wizardHasClassList = studentDatabase.groups.some((group) => group.students.length > 0);
+  const wizardHasPreparedWorkspace = Boolean(activeWorkspace?.setupCompletedAt || activeWorkspace?.exam.meta.title.trim() || activeWorkspace?.exam.sections.length);
   if (storageError) {
     return <StorageUnavailableScreen title={storageError.title} detail={storageError.detail} onReload={() => window.location.reload()} />;
   }
@@ -4025,7 +4040,6 @@ function App() {
       />
       <div className="mx-auto max-w-[1880px]">
         <AppHeader
-          currentSchoolYearPillLabel={currentSchoolYearPillLabel}
           visualTheme={visualTheme}
           onVisualThemeChange={setVisualTheme}
           theme={theme}
@@ -4130,19 +4144,17 @@ function App() {
               >
                 <PlusIcon />
               </button>
-              <details className="workspace-actions">
-                <summary title="Weitere Aktionen" aria-label="Weitere Aktionen">•••</summary>
-                <div className="workspace-actions-menu">
-                  <button
-                    type="button"
-                    onClick={() => activeWorkspace && setWorkspaceToDelete(activeWorkspace)}
-                    disabled={draftBundle.workspaces.length <= 1 || !activeWorkspace}
-                  >
-                    <ArchiveIcon />
-                    Aktive Arbeit löschen
-                  </button>
-                </div>
-              </details>
+              <button
+                type="button"
+                className="workspace-delete-button"
+                onClick={() => activeWorkspace && setWorkspaceToDelete(activeWorkspace)}
+                disabled={draftBundle.workspaces.length <= 1 || !activeWorkspace}
+                title={draftBundle.workspaces.length <= 1 ? "Mindestens eine Klassenarbeit bleibt erhalten" : "Aktive Klassenarbeit löschen"}
+              >
+                <TrashIcon />
+                <span className="hidden sm:inline">Klassenarbeit löschen</span>
+                <span className="sm:hidden">Löschen</span>
+              </button>
             </div>
             {hasNoAssignedWorkspaceForActiveGroup ? (
               <p className="workspace-inline-notice">Dieser Lerngruppe ist noch keine Klassenarbeit zugeordnet.</p>
@@ -4169,7 +4181,7 @@ function App() {
 
         <div
           className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 ${
-            activeTab === "guidedBuilder" || activeTab === "home"
+            activeTab === "guidedBuilder" || activeTab === "home" || activeTab === "wizard"
               ? "xl:grid-cols-[320px_minmax(0,1fr)]"
               : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
           }`}
@@ -4294,6 +4306,26 @@ function App() {
                 onApplyStudentOrder={handleApplyStudentOrder}
               />
             )}
+            </div>
+
+            <div
+              id={getTabPanelId("wizard")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("wizard")}
+              hidden={activeTab !== "wizard"}
+              tabIndex={0}
+            >
+              {activeTab === "wizard" ? (
+                <EwhWizard
+                  stepIndex={wizardStepIndex}
+                  protectedGroupAvailable={wizardHasProtectedGroup}
+                  classListAvailable={wizardHasClassList}
+                  workspaceAvailable={wizardHasPreparedWorkspace}
+                  archiveAvailable={archiveEntries.length > 0}
+                  onStepChange={setWizardStepIndex}
+                  onOpenTarget={openWizardTarget}
+                />
+              ) : null}
             </div>
 
             <div
@@ -4851,7 +4883,7 @@ function App() {
 
           </main>
 
-          {activeTab !== "guidedBuilder" && activeTab !== "home" ? (
+          {activeTab !== "guidedBuilder" && activeTab !== "home" && activeTab !== "wizard" ? (
             <aside className="space-y-6 xl:sticky xl:top-6 self-start">
               <SummaryPanel
                 summary={summary}

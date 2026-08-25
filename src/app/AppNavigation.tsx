@@ -1,11 +1,12 @@
 import { type KeyboardEvent, type MutableRefObject, useMemo, useState } from "react";
-import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon, SearchIcon } from "../components/icons";
+import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon, SearchIcon, WizardIcon } from "../components/icons";
 import type { GlobalSearchResult } from "./AppHeader";
 
-export type AppTabId = "home" | "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
+export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
 
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
+  { id: "wizard", label: "EWH-Wizard" },
   { id: "groups", label: "Lerngruppen" },
   { id: "guidedBuilder", label: "EWH erstellen" },
   { id: "builder", label: "EWH-Editor" },
@@ -20,6 +21,8 @@ export const TabIcon = ({ id }: { id: AppTabId }) => {
   switch (id) {
     case "home":
       return <HomeIcon />;
+    case "wizard":
+      return <WizardIcon />;
     case "guidedBuilder":
       return <PlusIcon />;
     case "builder":

@@ -462,7 +462,7 @@ export const StudentRosterPanel = ({
             </div>
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
-            <div className="group-action-card group-action-card-import rounded-2xl border p-5">
+            <div id="group-import" className="group-action-card group-action-card-import scroll-mt-24 rounded-2xl border p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><UploadIcon /></span>
                 <div>
@@ -550,7 +550,7 @@ export const StudentRosterPanel = ({
               </p>
             </div>
 
-            <section className="group-action-card group-action-card-manual space-y-4 rounded-2xl border p-5" aria-labelledby="manual-group-heading">
+            <section id="group-manual" className="group-action-card group-action-card-manual scroll-mt-24 space-y-4 rounded-2xl border p-5" aria-labelledby="manual-group-heading">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><GroupIcon /></span>
                 <div>
@@ -674,11 +674,11 @@ export const StudentRosterPanel = ({
                           onClick={() => onRemoveGroup(group.id, `${group.subject} · ${group.className}`, group.students.length)}
                           title="Lerngruppe entfernen"
                           variant="soft"
-                          className="px-3 py-2 text-xs"
+                          className="group-delete-button px-3 py-2 text-xs"
                           showTooltip={false}
                         >
                           <TrashIcon />
-                          Entfernen
+                          Lerngruppe löschen
                         </IconButton>
                       </div>
                     </div>

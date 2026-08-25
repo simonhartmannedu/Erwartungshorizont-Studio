@@ -21,7 +21,6 @@ export type GlobalSearchResult = {
 };
 
 type AppHeaderProps = {
-  currentSchoolYearPillLabel: string;
   visualTheme: VisualTheme;
   onVisualThemeChange: (theme: VisualTheme) => void;
   theme: ThemeMode;
@@ -36,7 +35,6 @@ type AppHeaderProps = {
 
 /** Presentational application header; state and persistence remain in App. */
 export const AppHeader = ({
-  currentSchoolYearPillLabel,
   visualTheme,
   onVisualThemeChange,
   theme,
@@ -53,10 +51,7 @@ export const AppHeader = ({
       <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
       <div className="brand-header-lockup">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display themed-strong text-4xl md:text-5xl">Erwartungshorizont Studio</h1>
-            <span className="school-year-pill">Schuljahr {currentSchoolYearPillLabel}</span>
-          </div>
+          <h1 className="font-display themed-strong text-4xl md:text-5xl">Erwartungshorizont Studio</h1>
           <p className="themed-muted mt-4 max-w-3xl text-base leading-7">
             Erwartungshorizonte, erstellen und verwalten
           </p>
@@ -112,7 +107,7 @@ export const AppHeader = ({
                 onChange={(event) => onShowSelectionReminderChange(event.target.checked)}
               />
               <span>
-                <strong className="themed-strong block">Auswahl-Hinweis zeigen</strong>
+                <strong className="themed-strong block">Tooltips anzeigen</strong>
                 <span className="themed-muted">Erinnert bei der Live-Auswertung an Klasse und Schüler*in.</span>
               </span>
             </label>

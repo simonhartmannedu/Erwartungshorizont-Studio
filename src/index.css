@@ -923,7 +923,6 @@
     color: var(--app-text-strong);
   }
 
-  :root[data-theme="pdf-report"] .school-year-pill,
   :root[data-theme="pdf-report"] .badge-slate,
   :root[data-theme="pdf-report"] .badge-amber,
   :root[data-theme="pdf-report"] .badge-rose,
@@ -943,7 +942,6 @@
   :root[data-theme="pdf-report"] .workspace-switcher-shell,
   :root[data-theme="pdf-report"] .themed-table-shell,
   :root[data-theme="pdf-report"] .callout,
-  :root[data-theme="pdf-report"] .school-year-pill,
   :root[data-theme="pdf-report"] .badge-slate,
   :root[data-theme="pdf-report"] .badge-amber,
   :root[data-theme="pdf-report"] .badge-rose,
@@ -1367,22 +1365,6 @@
     background: color-mix(in srgb, var(--app-secondary-hover) 82%, transparent);
     color: var(--app-label);
     box-shadow: var(--app-panel-shadow);
-  }
-
-  .school-year-pill {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2rem;
-    border: 1px solid var(--app-secondary-border);
-    border-radius: 0.7rem;
-    padding: 0.4rem 0.75rem;
-    background: var(--app-secondary-bg);
-    color: var(--app-text-strong);
-    font-size: 0.78rem;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--app-text-strong) 5%, transparent);
   }
 
   .card-title {
@@ -1908,6 +1890,24 @@
 
   .archive-info-step-icon svg { width: 1.1rem; height: 1.1rem; }
 
+  .archive-entry-table {
+    overflow-wrap: anywhere;
+  }
+
+  .archive-entry-table th {
+    overflow-wrap: normal;
+  }
+
+  .archive-entry-table th:first-child,
+  .archive-entry-table th:nth-child(2),
+  .archive-entry-table th:nth-child(4) {
+    white-space: normal;
+  }
+
+  .archive-entry-actions > .tooltip-anchor {
+    flex: 0 0 auto;
+  }
+
   .editor-toc {
     position: relative;
     max-height: min(34rem, calc(100vh - 14rem));
@@ -2378,6 +2378,36 @@
     background: var(--app-primary-bg);
     border-color: var(--app-primary-bg);
   }
+
+  .ewh-wizard { border-color: var(--app-border); background: var(--app-panel-bg); }
+  .ewh-wizard-hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--app-border); background: radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--app-field-focus) 24%, transparent), transparent 26rem), linear-gradient(120deg, color-mix(in srgb, var(--app-primary-bg) 8%, var(--app-panel-bg)), var(--app-panel-bg)); }
+  .ewh-wizard-count { display: inline-flex; align-items: center; min-height: 2.3rem; border: 1px solid color-mix(in srgb, var(--app-field-focus) 28%, var(--app-secondary-border)); border-radius: 999px; padding: 0.35rem 0.8rem; color: var(--app-text-strong); font-size: 0.8rem; font-weight: 800; }
+  .ewh-wizard-steps { display: grid; align-content: start; gap: 0.35rem; border-right: 1px solid var(--app-border); background: color-mix(in srgb, var(--app-secondary-hover) 42%, transparent); }
+  .ewh-wizard-step { display: grid; grid-template-columns: 2.45rem minmax(0, 1fr); align-items: center; gap: 0.85rem; width: 100%; border: 1px solid transparent; border-radius: 0.95rem; padding: 0.82rem; color: var(--app-text-muted); transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease; }
+  .ewh-wizard-step:hover { background: var(--app-secondary-hover); color: var(--app-text-strong); }
+  .ewh-wizard-step-active { border-color: color-mix(in srgb, var(--app-field-focus) 34%, var(--app-secondary-border)); background: var(--app-panel-bg); color: var(--app-text-strong); box-shadow: 0 0.6rem 1.5rem color-mix(in srgb, var(--app-text-strong) 7%, transparent); }
+  .ewh-wizard-step-number, .ewh-wizard-icon { display: inline-flex; align-items: center; justify-content: center; border-radius: 0.75rem; background: var(--app-secondary-bg); color: var(--app-text-muted); font-size: 0.85rem; font-weight: 800; }
+  .ewh-wizard-step-number { width: 2.45rem; height: 2.45rem; }
+  .ewh-wizard-step-number svg { width: 1.15rem; height: 1.15rem; }
+  .ewh-wizard-step-complete { background: color-mix(in srgb, var(--app-status-success) 16%, var(--app-secondary-bg)); color: var(--app-status-success); }
+  .ewh-wizard-step-copy { display: block; min-width: 0; text-align: left; }
+  .ewh-wizard-step-title { display: flex; align-items: center; gap: 0.55rem; }
+  .ewh-wizard-step-icon { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 1.55rem; height: 1.55rem; border-radius: 0.55rem; background: color-mix(in srgb, var(--app-field-focus) 12%, var(--app-secondary-bg)); color: var(--app-text-strong); }
+  .ewh-wizard-step-icon svg { width: 1.08rem; height: 1.08rem; }
+  .ewh-wizard-step small { display: block; margin-top: 0.3rem; padding-left: 2.1rem; color: var(--app-text-muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.01em; }
+  .ewh-wizard-step strong { font-size: 0.89rem; line-height: 1.25; }
+  .ewh-wizard-step:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
+  .ewh-wizard-content { min-width: 0; }
+  .ewh-wizard-card { animation: ewh-wizard-card-in 220ms ease-out both; }
+  .ewh-wizard-icon { width: 3.1rem; height: 3.1rem; background: var(--app-primary-bg); color: var(--app-primary-text); box-shadow: 0 0.85rem 1.8rem color-mix(in srgb, var(--app-primary-bg) 17%, transparent); }
+  .ewh-wizard-icon svg { width: 1.45rem; height: 1.45rem; }
+  .ewh-wizard-tip { display: flex; align-items: flex-start; gap: 0.7rem; max-width: 46rem; border: 1px solid color-mix(in srgb, var(--app-field-focus) 22%, var(--app-secondary-border)); border-radius: 0.9rem; padding: 0.85rem 1rem; background: color-mix(in srgb, var(--app-field-focus) 7%, transparent); color: var(--app-text-muted); font-size: 0.85rem; line-height: 1.45; }
+  .ewh-wizard-tip strong { color: var(--app-text-strong); }
+  @keyframes ewh-wizard-card-in { from { opacity: 0; transform: translateY(0.45rem); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 1023px) { .ewh-wizard-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--app-border); } .ewh-wizard-step { grid-template-columns: 2.1rem minmax(0, 1fr); gap: 0.55rem; padding: 0.6rem; } .ewh-wizard-step-number { width: 2.1rem; height: 2.1rem; } .ewh-wizard-step-title { gap: 0.35rem; } .ewh-wizard-step-icon { width: 1.35rem; height: 1.35rem; } .ewh-wizard-step-icon svg { width: 0.95rem; height: 0.95rem; } .ewh-wizard-step strong { font-size: 0.74rem; } .ewh-wizard-step small { padding-left: 1.7rem; font-size: 0.66rem; } }
+  @media (max-width: 640px) { .ewh-wizard-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ewh-wizard-step small { display: none; } }
+  .group-delete-button { border-color: color-mix(in srgb, var(--app-status-danger) 35%, var(--app-secondary-border)); color: var(--app-status-danger); }
+  .group-delete-button:hover { border-color: color-mix(in srgb, var(--app-status-danger) 58%, var(--app-secondary-border)); background: color-mix(in srgb, var(--app-status-danger) 10%, var(--app-secondary-bg)); }
 
   .signature-shell {
     border-color: var(--app-field-border);
@@ -5157,7 +5187,6 @@
     letter-spacing: 0.12em;
   }
 
-  .school-year-pill,
   .badge-slate,
   .badge-amber,
   .badge-rose,
@@ -5887,6 +5916,11 @@
 
   .workspace-icon-button { width: 2.3rem; padding: 0; }
   .workspace-icon-button svg { width: 1rem; height: 1rem; }
+  .workspace-delete-button { display: inline-flex; min-height: 2.3rem; align-items: center; justify-content: center; gap: 0.35rem; border: 1px solid color-mix(in srgb, var(--app-status-danger) 36%, var(--app-secondary-border)); border-radius: 0.65rem; padding: 0.4rem 0.62rem; background: color-mix(in srgb, var(--app-status-danger) 7%, var(--app-secondary-bg)); color: var(--app-status-danger); font-size: 0.75rem; font-weight: 750; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  .workspace-delete-button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--app-status-danger) 60%, var(--app-secondary-border)); background: color-mix(in srgb, var(--app-status-danger) 13%, var(--app-secondary-bg)); }
+  .workspace-delete-button:disabled { cursor: not-allowed; opacity: 0.48; }
+  .workspace-delete-button svg { width: 0.95rem; height: 0.95rem; }
+  .workspace-delete-button:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
   .workspace-actions { position: relative; display: flex; align-items: center; }
   .workspace-actions > summary { width: 2.3rem; min-height: 2.3rem; padding: 0; cursor: pointer; font-size: 0.72rem; letter-spacing: 0.05em; line-height: 1; list-style: none; }
   .workspace-actions > summary::-webkit-details-marker { display: none; }
