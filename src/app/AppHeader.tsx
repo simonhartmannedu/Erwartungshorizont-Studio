@@ -1,16 +1,20 @@
-import { FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SettingsIcon, SunIcon } from "../components/icons";
+import { useMemo, useState } from "react";
+import { ChevronDownIcon, FullscreenExitIcon, FullscreenIcon, InfoIcon, MoonIcon, PaletteIcon, SettingsIcon, StarIcon, SunIcon } from "../components/icons";
 import type { ThemeMode, VisualTheme } from "../types";
 
 export const visualThemeOptions: { value: VisualTheme; label: string }[] = [
-  { value: "pdf-report", label: "PDF-Report" },
-  { value: "earth-paper", label: "Bernsteinzimmer" },
-  { value: "nrw-trikolore", label: "NRW-Trikolore" },
-  { value: "waldmeister-schorle", label: "Waldmeister-Schorle" },
+  { value: "earth-paper", label: "Bernsteinzimmer im Lehrerzimmer" },
   { value: "blaubeer-pommesbude", label: "Blaubeer-Pommesbude" },
-  { value: "flieder-feierabend", label: "Flieder-Feierabend" },
-  { value: "beamtensalon", label: "Beamtensalon" },
-  { value: "barrierefrei", label: "Barrierefrei" },
-  { value: "video-tutorial", label: "Video-Tutorial" },
+  { value: "beamtensalon", label: "DIN A4, aber glamourös" },
+  { value: "video-tutorial", label: "Erklärvideo bei 1,25×" },
+  { value: "flieder-feierabend", label: "Flieder nach Dienstschluss" },
+  { value: "barrierefrei", label: "Kontrast auf Anschlag (barrierefrei)" },
+  { value: "kopierer-0758", label: "Kopierer, 07:58 Uhr" },
+  { value: "kreidestaub-kaffein", label: "Kreidestaub & Koffein" },
+  { value: "nrw-trikolore", label: "Landesdienst in Farbe" },
+  { value: "overheadprojektor-3000", label: "Overheadprojektor 3000" },
+  { value: "pdf-report", label: "PDF, aber schick" },
+  { value: "waldmeister-schorle", label: "Waldmeister-Schorle" },
 ];
 
 export type GlobalSearchResult = {
@@ -20,9 +24,86 @@ export type GlobalSearchResult = {
   detail: string;
 };
 
+const ThemePicker = ({
+  visualTheme,
+  favoriteVisualThemes,
+  onVisualThemeChange,
+  onFavoriteVisualThemesChange,
+}: Pick<AppHeaderProps, "visualTheme" | "favoriteVisualThemes" | "onVisualThemeChange" | "onFavoriteVisualThemesChange">) => {
+  const [open, setOpen] = useState(false);
+  const favoriteSet = useMemo(() => new Set(favoriteVisualThemes), [favoriteVisualThemes]);
+  const options = useMemo(
+    () =>
+      [...visualThemeOptions].sort((left, right) => {
+        const favoriteOrder = Number(favoriteSet.has(right.value)) - Number(favoriteSet.has(left.value));
+        return favoriteOrder || left.label.localeCompare(right.label, "de-DE", { numeric: true });
+      }),
+    [favoriteSet],
+  );
+  const activeLabel = visualThemeOptions.find((option) => option.value === visualTheme)?.label ?? "Darstellung wählen";
+
+  const toggleFavorite = (theme: VisualTheme) => {
+    onFavoriteVisualThemesChange(
+      favoriteSet.has(theme)
+        ? favoriteVisualThemes.filter((value) => value !== theme)
+        : [...favoriteVisualThemes, theme],
+    );
+  };
+
+  return (
+    <div className="theme-picker block w-full min-w-0 sm:min-w-[220px] sm:w-auto">
+      <span className="label inline-flex items-center gap-2"><PaletteIcon className="h-3.5 w-3.5" />Darstellung</span>
+      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+        <summary className="field header-control" aria-label={`Darstellung: ${activeLabel}`}>
+          <span>{activeLabel}</span>
+          <ChevronDownIcon className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        </summary>
+        <div className="theme-picker-menu" role="listbox" aria-label="Darstellung auswählen">
+          <p className="theme-picker-hint">Stern markieren, um Themes oben anzuheften.</p>
+          {options.map((option) => {
+            const isFavorite = favoriteSet.has(option.value);
+            return (
+              <div key={option.value} className={`theme-picker-option ${option.value === visualTheme ? "theme-picker-option-active" : ""}`}>
+                <button
+                  type="button"
+                  className="theme-picker-select"
+                  role="option"
+                  aria-selected={option.value === visualTheme}
+                  onClick={() => {
+                    onVisualThemeChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  {option.label}
+                </button>
+                <button
+                  type="button"
+                  className={`theme-picker-favorite ${isFavorite ? "theme-picker-favorite-active" : ""}`}
+                  aria-pressed={isFavorite}
+                  aria-label={`${option.label} ${isFavorite ? "nicht mehr" : "als"} favorisieren`}
+                  title={isFavorite ? "Favorit entfernen" : "Als Favorit markieren"}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleFavorite(option.value);
+                  }}
+                >
+                  <StarIcon filled={isFavorite} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </details>
+    </div>
+  );
+};
+
 type AppHeaderProps = {
   visualTheme: VisualTheme;
   onVisualThemeChange: (theme: VisualTheme) => void;
+  favoriteVisualThemes: VisualTheme[];
+  onFavoriteVisualThemesChange: (themes: VisualTheme[]) => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
   isAppFullscreen: boolean;
@@ -37,6 +118,8 @@ type AppHeaderProps = {
 export const AppHeader = ({
   visualTheme,
   onVisualThemeChange,
+  favoriteVisualThemes,
+  onFavoriteVisualThemesChange,
   theme,
   onToggleTheme,
   isAppFullscreen,
@@ -59,23 +142,12 @@ export const AppHeader = ({
       </div>
     </div>
     <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:justify-self-end">
-      <label className="block w-full min-w-0 sm:min-w-[170px] sm:w-auto">
-        <span className="label inline-flex items-center gap-2">
-          <PaletteIcon className="h-3.5 w-3.5" />
-          Darstellung
-        </span>
-        <select
-          className="field header-control"
-          value={visualTheme}
-          onChange={(event) => onVisualThemeChange(event.target.value as VisualTheme)}
-        >
-          {visualThemeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <ThemePicker
+        visualTheme={visualTheme}
+        favoriteVisualThemes={favoriteVisualThemes}
+        onVisualThemeChange={onVisualThemeChange}
+        onFavoriteVisualThemesChange={onFavoriteVisualThemesChange}
+      />
       <button type="button" className="button-secondary header-control w-full gap-2 sm:w-auto" onClick={onToggleTheme}>
         {theme === "light" ? <MoonIcon /> : <SunIcon />}
         {theme === "light" ? "Dunkel" : "Hell"}

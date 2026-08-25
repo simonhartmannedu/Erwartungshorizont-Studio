@@ -485,6 +485,7 @@ export const loadVisualTheme = (): VisualTheme => {
   const raw = window.localStorage.getItem(VISUAL_THEME_KEY);
   switch (raw) {
     case "pdf-report":
+    case "earth-paper":
     case "nrw-trikolore":
     case "waldmeister-schorle":
     case "blaubeer-pommesbude":
@@ -492,6 +493,9 @@ export const loadVisualTheme = (): VisualTheme => {
     case "beamtensalon":
     case "barrierefrei":
     case "video-tutorial":
+    case "kreidestaub-kaffein":
+    case "overheadprojektor-3000":
+    case "kopierer-0758":
       return raw;
     default:
       return "nrw-trikolore";

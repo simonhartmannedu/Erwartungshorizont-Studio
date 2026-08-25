@@ -109,6 +109,12 @@ export const WizardIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const StarIcon = ({ className = "h-4 w-4", filled = false }: IconProps & { filled?: boolean }) => (
+  <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="m12 3.8 2.52 5.1 5.63.82-4.08 3.98.96 5.61L12 16.66l-5.03 2.65.96-5.61-4.08-3.98 5.63-.82L12 3.8Z" strokeLinejoin="round" />
+  </svg>
+);
+
 export const MinusIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <path d="M5 12h14" strokeLinecap="round" />

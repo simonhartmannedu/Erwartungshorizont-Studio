@@ -14,7 +14,10 @@ export type VisualTheme =
   | "flieder-feierabend"
   | "beamtensalon"
   | "barrierefrei"
-  | "video-tutorial";
+  | "video-tutorial"
+  | "kreidestaub-kaffein"
+  | "overheadprojektor-3000"
+  | "kopierer-0758";
 
 export interface ExamMeta {
   schoolYear: string;

@@ -4042,6 +4042,10 @@ function App() {
         <AppHeader
           visualTheme={visualTheme}
           onVisualThemeChange={setVisualTheme}
+          favoriteVisualThemes={userPreferences.favoriteVisualThemes}
+          onFavoriteVisualThemesChange={(favoriteVisualThemes) =>
+            setUserPreferences((current) => ({ ...current, favoriteVisualThemes }))
+          }
           theme={theme}
           onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
           isAppFullscreen={isAppFullscreen}
