@@ -7,7 +7,7 @@ import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
 import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
 import { ExamHeaderForm } from "./ExamHeaderForm";
 import {
-  DashboardIcon,
+  ChevronRightIcon,
   InfoIcon,
   PencilIcon,
   PlusIcon,
@@ -808,6 +808,39 @@ export const GuidedExamBuilder = ({
     );
   };
 
+  const canSubmitCurrentMode =
+    canCreate &&
+    (mode === "templates"
+      ? Boolean(adjustedSelectedTemplate)
+      : mode === "manual"
+        ? difference === 0 && !hasEmptyTitles
+        : false);
+
+  const submitCurrentMode = () => {
+    if (mode === "templates" && adjustedSelectedTemplate) {
+      onSelectTemplate(
+        adjustedSelectedTemplate,
+        target,
+        gradeScale,
+        metaDraft,
+        target === "new" ? targetGroupId || null : null,
+        totalPoints,
+      );
+      return;
+    }
+
+    if (mode === "manual" && difference === 0 && !hasEmptyTitles) {
+      onApplyManualStructure({
+        totalPoints,
+        gradeScale,
+        sections: sectionDrafts,
+        target,
+        meta: metaDraft,
+        targetGroupId: target === "new" ? targetGroupId || null : null,
+      });
+    }
+  };
+
   const renderTargetControls = () => (
     <div className="space-y-4">
       {easyMode ? (
@@ -988,6 +1021,16 @@ export const GuidedExamBuilder = ({
         {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
         {renderModeButton("pdf", "PDF", "Aus Material starten")}
         {renderModeButton("manual", "Leere Struktur", "Kurz selbst aufbauen")}
+        <button
+          type="button"
+          className="template-create-button button-primary gap-2"
+          disabled={!canSubmitCurrentMode}
+          onClick={submitCurrentMode}
+          title={mode === "pdf" ? "Bitte erst einen PDF-Vorschlag auswerten und übernehmen." : undefined}
+        >
+          <span className="inline-flex items-center gap-2"><PlusIcon />EWH erstellen</span>
+          <ChevronRightIcon />
+        </button>
       </div>
 
       {mode === "templates" && (
@@ -1146,25 +1189,6 @@ export const GuidedExamBuilder = ({
                   {renderMetaSummary()}
                 </div>
 
-                <button
-                  type="button"
-                  className="button-primary w-full gap-2"
-                  disabled={!canCreate}
-                  onClick={() =>
-                    adjustedSelectedTemplate &&
-                    onSelectTemplate(
-                      adjustedSelectedTemplate,
-                      target,
-                      gradeScale,
-                      metaDraft,
-                      target === "new" ? targetGroupId || null : null,
-                      totalPoints,
-                    )
-                  }
-                >
-                  <DashboardIcon />
-                  Erstellen und im EWH-Editor öffnen
-                </button>
               </div>
             ) : (
               <div className="template-empty-state">
@@ -1322,24 +1346,6 @@ export const GuidedExamBuilder = ({
               ))}
             </div>
 
-            <button
-              type="button"
-              className="button-primary w-full gap-2"
-              disabled={!canCreate || difference !== 0 || hasEmptyTitles}
-              onClick={() =>
-                onApplyManualStructure({
-                  totalPoints,
-                  gradeScale,
-                  sections: sectionDrafts,
-                  target,
-                  meta: metaDraft,
-                  targetGroupId: target === "new" ? targetGroupId || null : null,
-                })
-              }
-            >
-              <DashboardIcon />
-              Struktur im EWH-Editor öffnen
-            </button>
           </section>
           {renderMetaEditor()}
         </div>

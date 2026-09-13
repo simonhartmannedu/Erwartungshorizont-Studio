@@ -2722,6 +2722,13 @@
     display: block;
   }
 
+  .template-create-button {
+    min-height: 5.25rem;
+    justify-content: space-between;
+    padding-inline: 1.1rem;
+    font-size: 1rem;
+  }
+
   .template-mode-button small {
     margin-top: 0.2rem;
     color: var(--app-text-muted);
@@ -3409,7 +3416,7 @@
     }
 
     .template-mode-tabs {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .template-search-box {
