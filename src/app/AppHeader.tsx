@@ -112,6 +112,8 @@ type AppHeaderProps = {
   onOpenUserGuide: () => void;
   showSelectionReminder: boolean;
   onShowSelectionReminderChange: (enabled: boolean) => void;
+  easyMode: boolean;
+  onEasyModeChange: (enabled: boolean) => void;
 };
 
 /** Presentational application header; state and persistence remain in App. */
@@ -128,6 +130,8 @@ export const AppHeader = ({
   onOpenUserGuide,
   showSelectionReminder,
   onShowSelectionReminderChange,
+  easyMode,
+  onEasyModeChange,
 }: AppHeaderProps) => (
   <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
     <div className="max-w-4xl">
@@ -170,26 +174,45 @@ export const AppHeader = ({
         </summary>
         <div className="header-settings-panel mt-2 space-y-4 p-4">
           <div>
-            <p className="label">Hilfen</p>
+            <p className="label">Arbeitsweise</p>
             <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-5">
               <input
                 type="checkbox"
                 className="mt-1"
-                checked={showSelectionReminder}
-                onChange={(event) => onShowSelectionReminderChange(event.target.checked)}
+                checked={easyMode}
+                onChange={(event) => onEasyModeChange(event.target.checked)}
               />
               <span>
-                <strong className="themed-strong block">Tooltips anzeigen</strong>
-                <span className="themed-muted">Erinnert bei der Live-Auswertung an Klasse und Schüler*in.</span>
+                <strong className="themed-strong block">Easy Mode</strong>
+                <span className="themed-muted">Zeigt nur EWH-Erstellung, Bearbeitung und Export. Lerngruppen, Archiv, Backup und weitere Menüs bleiben ausgeblendet.</span>
               </span>
             </label>
           </div>
-          <div className="border-t pt-3">
-            <button type="button" className="button-secondary w-full justify-center gap-2" onClick={onOpenUserGuide}>
-              <InfoIcon />
-              Einführung erneut öffnen
-            </button>
-          </div>
+          {!easyMode ? (
+            <>
+              <div>
+                <p className="label">Hilfen</p>
+                <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-5">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={showSelectionReminder}
+                    onChange={(event) => onShowSelectionReminderChange(event.target.checked)}
+                  />
+                  <span>
+                    <strong className="themed-strong block">Tooltips anzeigen</strong>
+                    <span className="themed-muted">Erinnert bei der Live-Auswertung an Klasse und Schüler*in.</span>
+                  </span>
+                </label>
+              </div>
+              <div className="border-t pt-3">
+                <button type="button" className="button-secondary w-full justify-center gap-2" onClick={onOpenUserGuide}>
+                  <InfoIcon />
+                  Einführung erneut öffnen
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       </details>
     </div>

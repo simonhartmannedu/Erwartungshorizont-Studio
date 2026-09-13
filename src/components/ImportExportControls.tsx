@@ -35,6 +35,7 @@ interface Props {
   exportScoringOdsLabel?: string;
   exportScoringXlsxLabel?: string;
   printHint?: string;
+  simpleEwhExport?: boolean;
 }
 
 export const ImportExportControls = ({
@@ -70,12 +71,15 @@ export const ImportExportControls = ({
   exportScoringOdsLabel,
   exportScoringXlsxLabel,
   printHint,
+  simpleEwhExport = false,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [selectedDocumentOutput, setSelectedDocumentOutput] = useState<string | null>(null);
   const [selectedTableOutputValue, setSelectedTableOutputValue] = useState<string | null>(null);
 
-  const pdfOutputs = [
+  const pdfOutputs = simpleEwhExport ? [
+    { value: "ewh", label: "Fertiger EWH", action: onPrintWithoutDetails, docxAction: onExportEmptyDocx },
+  ] : [
     { value: "current", label: printLabel || "Aktueller Bewertungsbogen", action: onPrint, docxAction: onExportDocx },
     ...(onPrintClass ? [{ value: "class", label: classPrintLabel || "Klassenbögen", action: onPrintClass, docxAction: onExportClassDocx }] : []),
     ...(onPrintClassOverview ? [{ value: "overview", label: classOverviewPrintLabel || "Klassenübersicht", action: onPrintClassOverview, docxAction: onExportClassOverviewDocx }] : []),
@@ -151,6 +155,7 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
+        {!simpleEwhExport ? (
         <div className="surface-muted rounded-2xl p-4">
           <p className="label">Tabellenexport</p>
           <p className="themed-muted mt-1 text-sm">Wähle zuerst den Tabelleninhalt. Danach erscheinen die passenden Formate.</p>
@@ -190,6 +195,7 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
+        ) : null}
         {showBackupControls ? (
           <div className="surface-elevated rounded-2xl border p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">

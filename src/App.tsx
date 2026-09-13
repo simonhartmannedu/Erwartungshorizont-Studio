@@ -1,5 +1,5 @@
 import { KeyboardEvent, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppNavigation, getTabButtonId, getTabPanelId, tabs, type AppTabId as TabId } from "./app/AppNavigation";
+import { AppNavigation, getTabButtonId, getTabPanelId, getVisibleTabs, type AppTabId as TabId } from "./app/AppNavigation";
 import { AppHeader, type GlobalSearchResult } from "./app/AppHeader";
 import { AppShell } from "./app/AppShell";
 import { AppStatusArea, type AppNotice, type AppNoticeTone } from "./app/AppStatusArea";
@@ -888,6 +888,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => loadUserPreferences());
+  const easyMode = userPreferences.easyMode;
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
   const [guideStepIndex, setGuideStepIndex] = useState(0);
@@ -921,7 +922,7 @@ function App() {
   const [localSaveState, setLocalSaveState] = useState<"saving" | "saved" | "failed">("saved");
   const pendingLocalSaveCountRef = useRef(0);
   const hasLocalSaveFailureRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [activeTab, setActiveTab] = useState<TabId>(() => (userPreferences.easyMode ? "guidedBuilder" : "home"));
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const [pendingSchoolYearCreation, setPendingSchoolYearCreation] = useState<PendingSchoolYearCreation | null>(null);
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -1335,6 +1336,12 @@ function App() {
   }, [userPreferences]);
 
   useEffect(() => {
+    if (easyMode && activeTab !== "guidedBuilder" && activeTab !== "builder") {
+      setActiveTab("guidedBuilder");
+    }
+  }, [activeTab, easyMode]);
+
+  useEffect(() => {
     if (!guideOpen) return;
     window.requestAnimationFrame(() => guideTitleRef.current?.focus());
   }, [guideOpen]);
@@ -1376,12 +1383,14 @@ function App() {
   };
 
   const activateGuideStepTarget = (tabId: TabId) => {
+    if (easyMode && tabId !== "guidedBuilder" && tabId !== "builder") return;
     setActiveTab(tabId);
     setGuideOpen(false);
     window.requestAnimationFrame(() => focusTabButton(tabId));
   };
 
   const openWizardTarget = (tabId: TabId, targetId?: string, editorSection?: EditorSectionTabId) => {
+    if (easyMode && tabId !== "guidedBuilder" && tabId !== "builder") return;
     if (editorSection) setActiveEditorTab(editorSection);
     setActiveTab(tabId);
     window.requestAnimationFrame(() => {
@@ -1437,26 +1446,28 @@ function App() {
   };
 
   const activateTab = (tabId: TabId) => {
+    if (easyMode && tabId !== "guidedBuilder" && tabId !== "builder") return;
     setActiveTab(tabId);
     window.requestAnimationFrame(() => focusTabButton(tabId));
   };
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentTabId: TabId) => {
-    const currentIndex = tabs.findIndex((tab) => tab.id === currentTabId);
+    const visibleTabs = getVisibleTabs(easyMode);
+    const currentIndex = visibleTabs.findIndex((tab) => tab.id === currentTabId);
     if (currentIndex === -1) return;
 
     const nextIndex = (() => {
       switch (event.key) {
         case "ArrowRight":
         case "ArrowDown":
-          return (currentIndex + 1) % tabs.length;
+          return (currentIndex + 1) % visibleTabs.length;
         case "ArrowLeft":
         case "ArrowUp":
-          return (currentIndex - 1 + tabs.length) % tabs.length;
+          return (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
         case "Home":
           return 0;
         case "End":
-          return tabs.length - 1;
+          return visibleTabs.length - 1;
         default:
           return null;
       }
@@ -1464,7 +1475,7 @@ function App() {
 
     if (nextIndex === null) return;
     event.preventDefault();
-    activateTab(tabs[nextIndex].id);
+    activateTab(visibleTabs[nextIndex].id);
   };
 
   useEffect(() => {
@@ -2111,10 +2122,7 @@ function App() {
     },
   ) => {
     const normalizedExam = normalizeExamStructure(nextExam);
-    const assignedGroupId =
-      config.target === "new"
-        ? config.targetGroupId || activeGroupId || null
-        : activeGroupId || null;
+    const assignedGroupId = config.target === "new" ? config.targetGroupId : activeGroupId || null;
 
     if (config.target === "current") {
       const activeWorkspaceId = activeWorkspace?.id;
@@ -4023,21 +4031,23 @@ function App() {
 
   return (
     <AppShell appShellRef={appShellRef}>
-      <FirstRunGuide
-        open={guideOpen}
-        dialogRef={guideDialogRef}
-        titleRef={guideTitleRef}
-        activeStep={activeGuideStep}
-        stepIndex={guideStepIndex}
-        progressLabel={guideProgressLabel}
-        onDialogKeyDown={handleGuideKeyDown}
-        onClose={() => closeUserGuide(false)}
-        onActivateStepTarget={activateGuideStepTarget}
-        onStepChange={setGuideStepIndex}
-        onPrevious={() => setGuideStepIndex((current) => Math.max(0, current - 1))}
-        onNext={() => setGuideStepIndex((current) => Math.min(firstRunGuideSteps.length - 1, current + 1))}
-        onDismiss={() => closeUserGuide(true)}
-      />
+      {!easyMode ? (
+        <FirstRunGuide
+          open={guideOpen}
+          dialogRef={guideDialogRef}
+          titleRef={guideTitleRef}
+          activeStep={activeGuideStep}
+          stepIndex={guideStepIndex}
+          progressLabel={guideProgressLabel}
+          onDialogKeyDown={handleGuideKeyDown}
+          onClose={() => closeUserGuide(false)}
+          onActivateStepTarget={activateGuideStepTarget}
+          onStepChange={setGuideStepIndex}
+          onPrevious={() => setGuideStepIndex((current) => Math.max(0, current - 1))}
+          onNext={() => setGuideStepIndex((current) => Math.min(firstRunGuideSteps.length - 1, current + 1))}
+          onDismiss={() => closeUserGuide(true)}
+        />
+      ) : null}
       <div className="mx-auto max-w-[1880px]">
         <AppHeader
           visualTheme={visualTheme}
@@ -4056,6 +4066,14 @@ function App() {
           onShowSelectionReminderChange={(showSelectionReminder) =>
             setUserPreferences((current) => ({ ...current, showSelectionReminder }))
           }
+          easyMode={easyMode}
+          onEasyModeChange={(enabled) => {
+            setUserPreferences((current) => ({ ...current, easyMode: enabled }));
+            if (enabled) {
+              setGuideOpen(false);
+              setActiveTab("guidedBuilder");
+            }
+          }}
         />
 
         <AppStatusArea
@@ -4074,8 +4092,10 @@ function App() {
           searchResults={globalSearchResults}
           sensitiveSearchSessionVersion={sensitiveSearchSessionVersion}
           onSearchResultSelect={openGlobalSearchResult}
+          easyMode={easyMode}
         />
 
+        {!easyMode ? (
         <section className="mb-5 no-print">
           <div className="workspace-bar">
             <div className="workspace-bar-primary">
@@ -4182,14 +4202,16 @@ function App() {
             />
           ) : null}
         </section>
+        ) : null}
 
         <div
-          className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 ${
+          className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 ${easyMode ? "" : (
             activeTab === "guidedBuilder" || activeTab === "home" || activeTab === "wizard"
               ? "xl:grid-cols-[320px_minmax(0,1fr)]"
               : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
-          }`}
+          )}`}
         >
+          {!easyMode ? (
           <aside
             className={`min-w-0 ${
               activeTab === "builder" ? "xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:self-start xl:overflow-y-auto xl:pr-1" : ""
@@ -4221,6 +4243,7 @@ function App() {
               ) : null}
             </div>
           </aside>
+          ) : null}
 
           <main className="min-w-0 space-y-6">
             <div
@@ -4397,30 +4420,36 @@ function App() {
               >
                 {loadedExamTemplates ? (
                   <GuidedExamBuilder
-                    groups={studentDatabase.groups.map((group) => ({
+                    groups={(easyMode ? [] : studentDatabase.groups).map((group) => ({
                       id: group.id,
                       subject: group.subject,
                       className: group.className,
                     }))}
-                    activeGroupId={activeGroupId}
+                    activeGroupId={easyMode ? "" : activeGroupId}
                     templates={loadedExamTemplates}
                     initialTotalPoints={summary.totalMaxPoints}
                     initialGradeScale={exam.gradeScale}
-                    initialSubject={activeGroup?.subject || ""}
-                    initialMeta={{
-                      ...exam.meta,
-                      schoolYear: pendingSchoolYearCreation?.schoolYear ?? exam.meta.schoolYear,
-                      course: pendingSchoolYearCreation?.course ?? exam.meta.course,
-                    }}
+                    initialSubject={easyMode ? "" : activeGroup?.subject || ""}
+                    initialMeta={
+                      easyMode
+                        ? createEmptyExamMeta()
+                        : {
+                            ...exam.meta,
+                            schoolYear: pendingSchoolYearCreation?.schoolYear ?? exam.meta.schoolYear,
+                            subject: activeGroup?.subject ?? exam.meta.subject,
+                            course: pendingSchoolYearCreation?.course ?? activeGroup?.className ?? exam.meta.course,
+                          }
+                    }
                     initialSections={exam.sections.map((section) => ({
                       id: section.id,
                       title: section.title,
                       points: summary.sectionResults.find((result) => result.sectionId === section.id)?.maxPoints ?? 0,
                       description: section.description,
                     }))}
-                    initialTarget={pendingSchoolYearCreation ? "new" : undefined}
-                    lockTargetToNew={Boolean(pendingSchoolYearCreation)}
-                    allowUnassignedWorkspace={Boolean(pendingSchoolYearCreation)}
+                    initialTarget={pendingSchoolYearCreation || easyMode ? "new" : undefined}
+                    lockTargetToNew={Boolean(pendingSchoolYearCreation) || easyMode}
+                    allowUnassignedWorkspace={Boolean(pendingSchoolYearCreation) || easyMode}
+                    easyMode={easyMode}
                     onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
                       applyTemplate(
                         template,
@@ -4776,6 +4805,7 @@ function App() {
                           }
                         />
                       </Card>
+                      {!easyMode ? (
                       <div className="mt-6 flex flex-col gap-3 rounded-2xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="label">Wiederverwenden</p>
@@ -4788,28 +4818,29 @@ function App() {
                           Vorlage im Archiv speichern
                         </button>
                       </div>
+                      ) : null}
                       <div className="mt-6 no-print">
                         <ImportExportControls
-                          onPrint={handlePrint}
-                          onExportDocx={handleExportDocx}
-                          onExportClassDocx={activeGroup ? handleExportClassDocx : undefined}
-                          onExportClassOverviewDocx={activeGroup && classOverview ? handleExportClassOverviewDocx : undefined}
+                          onPrint={easyMode ? handlePrintWithoutDetails : handlePrint}
+                          onExportDocx={easyMode ? handleExportEmptyDocx : handleExportDocx}
+                          onExportClassDocx={!easyMode && activeGroup ? handleExportClassDocx : undefined}
+                          onExportClassOverviewDocx={!easyMode && activeGroup && classOverview ? handleExportClassOverviewDocx : undefined}
                           onExportEmptyDocx={handleExportEmptyDocx}
-                          onExportGradeScaleDocx={handleExportGradeScaleDocx}
+                          onExportGradeScaleDocx={!easyMode ? handleExportGradeScaleDocx : undefined}
                           onPrintWithoutDetails={handlePrintWithoutDetails}
-                          onPrintGradeScale={handlePrintGradeScale}
-                          onPrintClass={activeGroup ? handlePrintClass : undefined}
-                          onPrintClassOverview={activeGroup && classOverview ? handlePrintClassOverview : undefined}
-                          onExportCsvStudent={handleExportStudentCsv}
-                          onExportCsvClass={activeGroup ? () => void handleExportClassCsv() : undefined}
-                          onExportCsvClassOverview={activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
-                          onExportCsvGradeScale={handleExportGradeScaleCsv}
-                          onExportScoringCsv={handleExportScoringCsv}
-                          onExportScoringOds={handleExportScoringOds}
-                          onExportScoringXlsx={handleExportScoringXlsx}
-                          printLabel={printLabel}
-                          printWithoutDetailsLabel={printWithoutDetailsLabel}
-                          printGradeScaleLabel={printGradeScaleLabel}
+                          onPrintGradeScale={!easyMode ? handlePrintGradeScale : undefined}
+                          onPrintClass={!easyMode && activeGroup ? handlePrintClass : undefined}
+                          onPrintClassOverview={!easyMode && activeGroup && classOverview ? handlePrintClassOverview : undefined}
+                          onExportCsvStudent={!easyMode ? handleExportStudentCsv : undefined}
+                          onExportCsvClass={!easyMode && activeGroup ? () => void handleExportClassCsv() : undefined}
+                          onExportCsvClassOverview={!easyMode && activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
+                          onExportCsvGradeScale={!easyMode ? handleExportGradeScaleCsv : undefined}
+                          onExportScoringCsv={!easyMode ? handleExportScoringCsv : undefined}
+                          onExportScoringOds={!easyMode ? handleExportScoringOds : undefined}
+                          onExportScoringXlsx={!easyMode ? handleExportScoringXlsx : undefined}
+                          printLabel={easyMode ? "EWH drucken" : printLabel}
+                          printWithoutDetailsLabel={easyMode ? "EWH drucken" : printWithoutDetailsLabel}
+                          printGradeScaleLabel={!easyMode ? printGradeScaleLabel : undefined}
                           classPrintLabel={classPrintLabel}
                           classOverviewPrintLabel={classOverviewPrintLabel}
                           exportCsvStudentLabel={exportCsvStudentLabel}
@@ -4819,7 +4850,8 @@ function App() {
                           exportScoringCsvLabel={exportScoringCsvLabel}
                           exportScoringOdsLabel={exportScoringOdsLabel}
                           exportScoringXlsxLabel={exportScoringXlsxLabel}
-                          printHint={printHint}
+                          printHint={easyMode ? "Exportiere den fertigen Erwartungshorizont als Druck-PDF oder Word-Datei." : printHint}
+                          simpleEwhExport={easyMode}
                         />
                       </div>
                     </div>
@@ -4887,7 +4919,7 @@ function App() {
 
           </main>
 
-          {activeTab !== "guidedBuilder" && activeTab !== "home" && activeTab !== "wizard" ? (
+          {!easyMode && activeTab !== "guidedBuilder" && activeTab !== "home" && activeTab !== "wizard" ? (
             <aside className="space-y-6 xl:sticky xl:top-6 self-start">
               <SummaryPanel
                 summary={summary}

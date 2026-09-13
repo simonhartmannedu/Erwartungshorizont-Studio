@@ -35,13 +35,13 @@ const createSection = (
 });
 
 const createBaseExam = ({
-  title,
-  unit,
-  notes,
-  gradeLevel,
-  course,
-  subject = "Englisch",
-  schoolYear = "2025/2026",
+  title: _title,
+  unit: _unit,
+  notes: _notes,
+  gradeLevel: _gradeLevel,
+  course: _course,
+  subject: _subject = "",
+  schoolYear: _schoolYear = "",
 }: {
   title: string;
   unit: string;
@@ -53,15 +53,15 @@ const createBaseExam = ({
 }): Omit<Exam, "sections"> => ({
   id: crypto.randomUUID(),
   meta: {
-    schoolYear,
-    subject,
-    gradeLevel,
-    course,
-    teacher: "M. Beispiel",
-    examDate: new Date().toISOString().slice(0, 10),
-    title,
-    unit,
-    notes,
+    schoolYear: "",
+    subject: "",
+    gradeLevel: "",
+    course: "",
+    teacher: "",
+    examDate: "",
+    title: "",
+    unit: "",
+    notes: "",
   },
   evaluationMode: "direct",
   gradeScale: createDefaultGradeScale(),
@@ -108,11 +108,13 @@ interface TemplateSectionSeed {
 }
 
 type TemplateFocus = "general" | "abitur";
+export type TemplateSchoolForm = "grundschule" | "realschule" | "sek1" | "sek2";
 
 interface TemplateBlueprint {
   id: string;
   subject: string;
   schoolStage: BuilderSchoolStage;
+  schoolForm?: TemplateSchoolForm;
   focus: TemplateFocus;
   title: string;
   shortLabel: string;
@@ -132,6 +134,7 @@ export interface ExamTemplateDefinition {
   id: string;
   subject: string;
   schoolStage: BuilderSchoolStage;
+  schoolForm: TemplateSchoolForm;
   focus: TemplateFocus;
   totalPoints: number;
   title: string;
@@ -170,6 +173,7 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
   id: blueprint.id,
   subject: blueprint.subject,
   schoolStage: blueprint.schoolStage,
+  schoolForm: blueprint.schoolForm ?? blueprint.schoolStage,
   focus: blueprint.focus,
   totalPoints: blueprint.totalPoints,
   title: blueprint.title,
@@ -189,6 +193,7 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
       notes: blueprint.notes,
       gradeLevel: blueprint.gradeLevel,
       course: blueprint.course,
+      subject: blueprint.subject,
     }),
     sections: blueprint.sections.map((section) => {
       const taskPoints = resolveTaskPoints(section);
@@ -683,6 +688,207 @@ const createScienceSekBlueprint = (subject: "Biologie" | "Physik", stage: Builde
     },
   ],
 });
+
+/** School-form-specific examples based on the current NRW curriculum structure. */
+const schoolFormBlueprints: TemplateBlueprint[] = [
+  {
+    id: "grundschule-deutsch-lesen-schreiben",
+    subject: "Deutsch",
+    schoolStage: "sek1",
+    schoolForm: "grundschule",
+    focus: "general",
+    title: "Grundschule · Deutsch Klasse 4 · Lesen und Schreiben",
+    shortLabel: "GS D 4",
+    description: "Kompetenzorientierte Lernzielkontrolle mit Leseverstehen, Schreiben und Sprachbewusstheit.",
+    pedagogicalHint: "Für Klasse 4: lebensnahe, überschaubare Aufgaben und klar beobachtbare Teilkompetenzen statt einer Sek-I-Klassenarbeitslogik.",
+    standardsNote: "Orientiert am Lehrplan Primarstufe NRW (Deutsch, 2025): Lesen, Schreiben und Sprache in kommunikativen Zusammenhängen. Als Bestandteil der Leistungsbewertung an Lernstand, Förderung und schulinterne Vereinbarungen anpassen.",
+    metaTitle: "",
+    unit: "",
+    notes: "",
+    gradeLevel: "",
+    course: "",
+    totalPoints: 30,
+    sections: [
+      {
+        title: "Lesen: Text verstehen",
+        points: 12,
+        description: "Einen altersgemäßen erzählenden oder sachlichen Text erschließen.",
+        note: "Kurze Texte, deutliche Aufgabenformate und bei Bedarf Lesestrategien oder Visualisierungen bereitstellen.",
+        tasks: [
+          { title: "Wichtige Informationen finden", description: "Informationen gezielt aus dem Text entnehmen.", expectation: "Zentrale Informationen werden sicher gefunden und passend wiedergegeben." },
+          { title: "Text verstehen und begründen", description: "Eine Aussage zum Text mit einer Textstelle begründen.", expectation: "Die Antwort zeigt Textverständnis und nutzt einen passenden Beleg." },
+        ],
+      },
+      {
+        title: "Schreiben: Für andere schreiben",
+        points: 12,
+        description: "Einen kurzen, adressatenbezogenen Text planen und verfassen.",
+        note: "Zum Beispiel Einladung, Bericht, Fortsetzung oder kurze Beschreibung; Textsorte transparent machen.",
+        tasks: [
+          { title: "Inhalt und Reihenfolge", description: "Alle wichtigen Informationen verständlich und sinnvoll geordnet darstellen.", expectation: "Der Text erfüllt die Aufgabe und ist für die Zielperson nachvollziehbar." },
+          { title: "Passende Sprache", description: "Wörter und Sätze passend zur Textsorte und Situation wählen.", expectation: "Die Formulierungen sind verständlich und adressatengerecht." },
+        ],
+      },
+      {
+        title: "Sprache: Wörter und Sätze untersuchen",
+        points: 6,
+        description: "Sprachliche Regelmäßigkeiten erkennen und für das eigene Schreiben nutzen.",
+        note: "Auf zuvor im Unterricht gesicherte Schwerpunkte wie Wortarten, Satzzeichen oder Rechtschreibstrategien begrenzen.",
+        tasks: [
+          { title: "Strategie anwenden", description: "Eine eingeübte Rechtschreib- oder Sprachstrategie anwenden und erklären.", expectation: "Die Strategie wird passend eingesetzt und das Ergebnis nachvollziehbar überprüft." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "grundschule-mathematik-alltag",
+    subject: "Mathematik",
+    schoolStage: "sek1",
+    schoolForm: "grundschule",
+    focus: "general",
+    title: "Grundschule · Mathematik Klasse 4 · Rechnen im Alltag",
+    shortLabel: "GS M 4",
+    description: "Kompetenzorientierte Lernzielkontrolle mit Zahlen und Operationen, Größen sowie Modellieren und Begründen.",
+    pedagogicalHint: "Verbindet mathematische Inhalte mit prozessbezogenen Kompetenzen und lässt Lösungswege sichtbar werden.",
+    standardsNote: "Orientiert am Lehrplan Primarstufe NRW (Mathematik, 2025): Problemlösen, Modellieren, Kommunizieren, Argumentieren und Darstellen werden mit Zahlen und Operationen sowie Größen und Messen verknüpft.",
+    metaTitle: "",
+    unit: "",
+    notes: "",
+    gradeLevel: "",
+    course: "",
+    totalPoints: 30,
+    sections: [
+      {
+        title: "Zahlen und Operationen",
+        points: 10,
+        description: "Sichere Rechenverfahren und Zahlvorstellungen anwenden.",
+        note: "Aufgabenformate an eingeführte Verfahren und den Lernstand der Lerngruppe anpassen.",
+        tasks: [
+          { title: "Rechenwege nutzen", description: "Aufgaben mit einem passenden Rechenweg lösen.", expectation: "Der Rechenweg ist nachvollziehbar und das Ergebnis stimmt." },
+          { title: "Ergebnisse prüfen", description: "Ein Ergebnis überschlagen oder mit einer Umkehraufgabe überprüfen.", expectation: "Die Kontrolle ist sinnvoll gewählt und verständlich erklärt." },
+        ],
+      },
+      {
+        title: "Größen und Messen",
+        points: 10,
+        description: "Größen aus der Lebenswelt schätzen, umrechnen und berechnen.",
+        note: "Zum Beispiel Geld, Zeit, Länge oder Masse in einem kindnahen Kontext einsetzen.",
+        tasks: [
+          { title: "Mit Größen rechnen", description: "Angaben passend umrechnen und für eine Rechnung verwenden.", expectation: "Einheiten und Rechenoperationen werden korrekt eingesetzt." },
+          { title: "Ergebnis einordnen", description: "Das Ergebnis mit Blick auf die Alltagssituation beurteilen.", expectation: "Die Antwort passt zur Situation und ist plausibel." },
+        ],
+      },
+      {
+        title: "Modellieren und begründen",
+        points: 10,
+        description: "Eine Sachsituation mathematisch darstellen, lösen und erklären.",
+        note: "Eine bildliche Darstellung, Tabelle oder Skizze kann als Unterstützung zugelassen oder erwartet werden.",
+        tasks: [
+          { title: "Situation darstellen", description: "Wichtige Angaben auswählen und mit Skizze, Tabelle oder Rechnung darstellen.", expectation: "Die Darstellung hilft erkennbar beim Lösen der Aufgabe." },
+          { title: "Lösungsweg erklären", description: "Den eigenen Rechenweg in verständlichen Worten erläutern.", expectation: "Die Erklärung macht die mathematische Überlegung deutlich." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "realschule-deutsch-textproduktion-6",
+    subject: "Deutsch",
+    schoolStage: "sek1",
+    schoolForm: "realschule",
+    focus: "general",
+    title: "Realschule · Deutsch 5/6 · Text verstehen und schreiben",
+    shortLabel: "RS D 5/6",
+    description: "Klassenarbeitsvorlage für die Erprobungsstufe mit Rezeption, Produktion sowie Reflektieren und Beurteilen.",
+    pedagogicalHint: "Folgt der KLP-Vernetzung von Lesen/Zuhören, Schreiben/Sprechen sowie Reflexion über Sprache, Texte, Kommunikation und Medien.",
+    standardsNote: "Orientiert am Kernlehrplan Realschule NRW Deutsch (2022), Kompetenzerwartungen für die Doppeljahrgangsstufe 5/6. Textsorte, Material und Bewertung an den schulinternen Lehrplan und die Fachkonferenz anpassen.",
+    metaTitle: "",
+    unit: "",
+    notes: "",
+    gradeLevel: "",
+    course: "",
+    totalPoints: 60,
+    sections: [
+      {
+        title: "Rezeption: Text erschließen",
+        points: 24,
+        description: "Zentrale Aussagen, Informationen und Gestaltung eines Textes erschließen.",
+        note: "Für literarische oder Sachtexte nutzbar; Lesestrategie und Operatoren in der Aufgabenstellung klar benennen.",
+        tasks: [
+          { title: "Informationen sichern", description: "Zentrale Aussagen und Details gezielt herausarbeiten.", expectation: "Die Antworten sind textnah, vollständig und fachlich korrekt." },
+          { title: "Textstellen deuten", description: "Eine Textstelle erklären und ihre Bedeutung für das Gesamtverständnis erläutern.", expectation: "Die Deutung ist nachvollziehbar und am Text belegt." },
+        ],
+      },
+      {
+        title: "Produktion: Text verfassen",
+        points: 24,
+        description: "Einen kohärenten und adressatenorientierten Text schreiben.",
+        note: "Zum Beispiel Bericht, Beschreibung, Brief oder begründete Stellungnahme; Textsortenmerkmale vorher sichern.",
+        tasks: [
+          { title: "Inhalt und Aufbau", description: "Die Schreibaufgabe vollständig, geordnet und adressatenbezogen umsetzen.", expectation: "Der Text erfüllt die Aufgabe und zeigt einen klaren Aufbau." },
+          { title: "Formulieren und überarbeiten", description: "Passende sprachliche Mittel einsetzen und den Text gezielt überarbeiten.", expectation: "Die Sprache ist verständlich, passend und erkennbar überarbeitet." },
+        ],
+      },
+      {
+        title: "Reflektieren und beurteilen",
+        points: 12,
+        description: "Sprache, Texte oder Medien mit fachlichen Kriterien untersuchen.",
+        note: "An den Unterrichtsschwerpunkt anbinden, etwa Wortarten, Satzbau, Rechtschreibstrategien oder Wirkung eines Mediums.",
+        tasks: [
+          { title: "Sprachliche Entscheidung begründen", description: "Eine sprachliche oder mediale Gestaltung mit Fachbegriffen erklären.", expectation: "Die Begründung ist fachlich stimmig und auf das Beispiel bezogen." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "realschule-englisch-communication-6",
+    subject: "Englisch",
+    schoolStage: "sek1",
+    schoolForm: "realschule",
+    focus: "general",
+    title: "Realschule · Englisch 5/6 · Reading und Writing",
+    shortLabel: "RS E 5/6",
+    description: "Klassenarbeitsvorlage mit funktionaler kommunikativer Kompetenz, Text- und Medienkompetenz sowie dienenden sprachlichen Mitteln.",
+    pedagogicalHint: "Die Sprache wird nicht isoliert, sondern als Mittel erfolgreicher Kommunikation bewertet; Reading und Writing können über eine vertraute Alltagssituation verbunden werden.",
+    standardsNote: "Orientiert am Kernlehrplan Realschule NRW Englisch (2021), Erprobungsstufe: funktionale kommunikative Kompetenz umfasst u. a. Leseverstehen und Schreiben; sprachliche Mittel dienen der Kommunikation. Aufgabenformat und Gewichtung schulisch abstimmen.",
+    metaTitle: "",
+    unit: "",
+    notes: "",
+    gradeLevel: "",
+    course: "",
+    totalPoints: 60,
+    sections: [
+      {
+        title: "Reading: Informationen verstehen",
+        points: 20,
+        description: "Einen altersangemessenen Text global und im Detail erschließen.",
+        note: "Mit vertrauten Themen und klarer, altersangemessener Standardsprache arbeiten.",
+        tasks: [
+          { title: "Global understanding", description: "Situation, Personen und Hauptaussage erfassen.", expectation: "Die Antworten zeigen sicheres Gesamtverständnis." },
+          { title: "Detailed information", description: "Relevante Einzelinformationen gezielt entnehmen.", expectation: "Details werden korrekt und passend zugeordnet." },
+        ],
+      },
+      {
+        title: "Writing: Kommunikation gestalten",
+        points: 25,
+        description: "Eine kurze Mitteilung für eine konkrete Kommunikationssituation verfassen.",
+        note: "Zum Beispiel email, message oder invitation; Aufgabe, Adressat und erwartete Textsorte eindeutig angeben.",
+        tasks: [
+          { title: "Content and task fulfilment", description: "Geforderte Informationen verständlich und vollständig mitteilen.", expectation: "Die Mitteilung erfüllt die kommunikative Aufgabe." },
+          { title: "Text and audience", description: "Den Text übersichtlich und adressatengerecht gestalten.", expectation: "Aufbau und Ton passen zur gewählten Kommunikationssituation." },
+        ],
+      },
+      {
+        title: "Language in context",
+        points: 15,
+        description: "Wortschatz, Grammatik und Orthografie funktional für die Kommunikationsaufgabe nutzen.",
+        note: "Sprachliche Mittel nicht losgelöst vom Schreibprodukt, sondern mit Bezug zur Verständlichkeit bewerten.",
+        tasks: [
+          { title: "Vocabulary and structures", description: "Passende Wörter und eingeübte Strukturen verständlich verwenden.", expectation: "Die Sprache unterstützt die Kommunikation und ist überwiegend korrekt." },
+        ],
+      },
+    ],
+  },
+];
 
 const sek1Blueprints: TemplateBlueprint[] = [
   {
@@ -2735,6 +2941,7 @@ export const createMediationExamTemplate = () => {
 
 export const examTemplates: ExamTemplateDefinition[] = [
   ...sek1Blueprints.map(createTemplateDefinition),
+  ...schoolFormBlueprints.map(createTemplateDefinition),
   ...sek2Blueprints.map(createTemplateDefinition),
   ...abiturBlueprints
     .filter((blueprint) => blueprint.title.includes("Vorabitur") || blueprint.title.includes("Abiturnah"))

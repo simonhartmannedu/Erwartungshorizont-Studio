@@ -65,7 +65,16 @@ export const PointScaleControl = ({ currentTotal, onApply, embedded = false }: P
                 </p>
               </div>
               <div className="point-factor-badge rounded-2xl px-4 py-3 text-right">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">Skalierungsfaktor</p>
+                <span
+                  className="tooltip-anchor inline-flex cursor-help"
+                  tabIndex={0}
+                  aria-label="Erklärung zum Skalierungsfaktor"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">Skalierungsfaktor</p>
+                  <span className="app-tooltip" aria-hidden="true">
+                    Zielsumme ÷ Ausgangssumme. Alle Maximalpunkte werden damit proportional umgerechnet; die Gewichtung der Bereiche bleibt gleich.
+                  </span>
+                </span>
                 <p className="mt-1 text-2xl font-semibold">{formatNumber(preview.factor, 3)}</p>
               </div>
             </div>

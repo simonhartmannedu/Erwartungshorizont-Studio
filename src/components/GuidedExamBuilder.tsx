@@ -1,5 +1,5 @@
 import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ExamTemplateDefinition } from "../data/templates";
+import { ExamTemplateDefinition, TemplateSchoolForm } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
 import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
 import { formatNumber } from "../utils/format";
@@ -31,6 +31,7 @@ export type GuidedBuilderTarget = "current" | "new";
 type DecisionMode = "templates" | "pdf" | "manual";
 type StageFilter = BuilderSchoolStage | "all";
 type FocusFilter = ExamTemplateDefinition["focus"] | "all";
+type SchoolFormFilter = TemplateSchoolForm | "all";
 type SubjectThemeKey =
   | "deutsch"
   | "englisch"
@@ -73,6 +74,7 @@ interface Props {
   initialTarget?: GuidedBuilderTarget;
   lockTargetToNew?: boolean;
   allowUnassignedWorkspace?: boolean;
+  easyMode?: boolean;
   onSelectTemplate: (
     template: ExamTemplateDefinition,
     target: GuidedBuilderTarget,
@@ -126,6 +128,19 @@ const stageLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sek I" : 
 const focusLabel = (focus: ExamTemplateDefinition["focus"]) => (focus === "abitur" ? "Vorabitur" : "Standard");
 
 const stageLongLabel = (stage: BuilderSchoolStage) => (stage === "sek1" ? "Sekundarstufe I" : "Sekundarstufe II");
+
+const schoolFormLabel = (schoolForm: TemplateSchoolForm) => {
+  switch (schoolForm) {
+    case "grundschule":
+      return "Grundschule";
+    case "realschule":
+      return "Realschule";
+    case "sek1":
+      return "Weitere Sek I";
+    case "sek2":
+      return "Sek II";
+  }
+};
 
 const SUBJECT_THEMES: Record<SubjectThemeKey, SubjectTheme> = {
   deutsch: {
@@ -525,6 +540,7 @@ const getTemplateSearchText = (template: ExamTemplateDefinition) =>
     template.title,
     template.shortLabel,
     template.subject,
+    schoolFormLabel(template.schoolForm),
     stageLabel(template.schoolStage),
     stageLongLabel(template.schoolStage),
     focusLabel(template.focus),
@@ -549,6 +565,7 @@ export const GuidedExamBuilder = ({
   initialTarget = "new",
   lockTargetToNew = false,
   allowUnassignedWorkspace = false,
+  easyMode = false,
   onSelectTemplate,
   onApplyManualStructure,
   onApplyPdfSuggestion,
@@ -565,6 +582,7 @@ export const GuidedExamBuilder = ({
   const [query, setQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [schoolFormFilter, setSchoolFormFilter] = useState<SchoolFormFilter>("all");
   const [focusFilter, setFocusFilter] = useState<FocusFilter>("all");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
@@ -606,7 +624,8 @@ export const GuidedExamBuilder = ({
           .toLowerCase();
         const queryMatches = queryTokens.every((token) => searchText.includes(token));
         const subjectMatches = subjectFilter === "all" || template.subject === subjectFilter;
-        const stageMatches = stageFilter === "all" || template.schoolStage === stageFilter;
+        const stageMatches = stageFilter === "all" || (template.schoolStage === stageFilter && template.schoolForm !== "grundschule");
+        const schoolFormMatches = schoolFormFilter === "all" || template.schoolForm === schoolFormFilter;
         const focusMatches = focusFilter === "all" || template.focus === focusFilter;
         const initialSubjectBonus = normalizeText(template.subject) === normalizeText(initialSubject) ? 8 : 0;
         const score =
@@ -623,14 +642,14 @@ export const GuidedExamBuilder = ({
         return {
           template,
           index,
-          visible: queryMatches && subjectMatches && stageMatches && focusMatches,
+          visible: queryMatches && subjectMatches && stageMatches && schoolFormMatches && focusMatches,
           score,
         };
       })
       .filter((entry) => entry.visible)
       .sort((a, b) => b.score - a.score || a.index - b.index)
       .map((entry) => entry.template);
-  }, [focusFilter, initialSubject, query, stageFilter, subjectFilter, templates]);
+  }, [focusFilter, initialSubject, query, schoolFormFilter, stageFilter, subjectFilter, templates]);
 
   const selectedTemplate = useMemo(
     () => scoredTemplates.find((template) => template.id === selectedTemplateId) ?? scoredTemplates[0] ?? null,
@@ -748,6 +767,7 @@ export const GuidedExamBuilder = ({
     setQuery("");
     setSubjectFilter("all");
     setStageFilter("all");
+    setSchoolFormFilter("all");
     setFocusFilter("all");
   };
 
@@ -790,6 +810,12 @@ export const GuidedExamBuilder = ({
 
   const renderTargetControls = () => (
     <div className="space-y-4">
+      {easyMode ? (
+        <DismissibleCallout tone="info" resetKey="template-decision-easy-mode">
+          Der EWH wird ohne Lerngruppe angelegt. Du kannst ihn anschließend direkt bearbeiten und exportieren.
+        </DismissibleCallout>
+      ) : (
+        <>
       <div className={`grid gap-3 ${lockTargetToNew ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
         <button
           type="button"
@@ -830,22 +856,40 @@ export const GuidedExamBuilder = ({
             Für neue Klassenarbeiten muss zuerst eine Lerngruppe angelegt werden.
           </DismissibleCallout>
         ))}
+        </>
+      )}
     </div>
   );
 
   const renderMetaSummary = () => (
     <div className="template-meta-summary">
       <div>
-        <span>Titel</span>
-        <strong>{metaDraft.title.trim() || "Ohne Titel"}</strong>
+        <span>Schuljahr</span>
+        <strong>{metaDraft.schoolYear.trim() || "Hier Schuljahr eintragen"}</strong>
       </div>
       <div>
-        <span>Kurs</span>
-        <strong>{metaDraft.course.trim() || "-"}</strong>
+        <span>Fach</span>
+        <strong>{metaDraft.subject.trim() || "Hier Fach eintragen"}</strong>
+      </div>
+      <div>
+        <span>Jahrgang</span>
+        <strong>{metaDraft.gradeLevel.trim() || "Hier Jahrgang eintragen"}</strong>
+      </div>
+      <div>
+        <span>Kurs / Klasse</span>
+        <strong>{metaDraft.course.trim() || "Hier Kurs oder Klasse eintragen"}</strong>
+      </div>
+      <div>
+        <span>Lehrkraft</span>
+        <strong>{metaDraft.teacher.trim() || "Hier Lehrkraft eintragen"}</strong>
+      </div>
+      <div>
+        <span>Titel</span>
+        <strong>{metaDraft.title.trim() || "Hier Titel eintragen"}</strong>
       </div>
       <div>
         <span>Datum</span>
-        <strong>{metaDraft.examDate || "-"}</strong>
+        <strong>{metaDraft.examDate || "Hier Datum eintragen"}</strong>
       </div>
       <button
         type="button"
@@ -858,7 +902,7 @@ export const GuidedExamBuilder = ({
           openMetaSettings();
         }}
       >
-        {showMetaSettings ? "Rahmendaten ausblenden" : "Rahmendaten bearbeiten"}
+        {showMetaSettings ? "Rahmendaten ausblenden" : "Allgemeine Rahmendaten bearbeiten"}
       </button>
     </div>
   );
@@ -868,10 +912,10 @@ export const GuidedExamBuilder = ({
       <section ref={metaEditorRef} className="template-meta-editor">
         <div className="template-meta-editor-header">
           <div>
-            <p className="label">Rahmendaten</p>
-            <h3 className="themed-strong text-lg font-semibold">Klassenarbeit vor dem Öffnen beschriften</h3>
+            <p className="label">Allgemeine Rahmendaten</p>
+            <h3 className="themed-strong text-lg font-semibold">EWH vor dem Öffnen beschriften</h3>
             <p className="themed-muted mt-1 text-sm leading-6">
-              Diese Angaben werden direkt in den neuen Erwartungshorizont übernommen.
+              Schuljahr, Fach, Jahrgang, Lerngruppe, Lehrkraft, Titel, Thema und Datum werden direkt in den neuen Erwartungshorizont übernommen.
             </p>
           </div>
           <button type="button" className="button-soft px-3 py-2 text-xs" onClick={() => setShowMetaSettings(false)}>
@@ -914,7 +958,7 @@ export const GuidedExamBuilder = ({
         </span>
         <span className="template-result-meta">
           <span>{template.subject}</span>
-          <span>{stageLabel(template.schoolStage)}</span>
+          <span>{schoolFormLabel(template.schoolForm)}</span>
           <span>{focusLabel(template.focus)}</span>
           <strong>{formatNumber(template.totalPoints)} P.</strong>
         </span>
@@ -957,7 +1001,7 @@ export const GuidedExamBuilder = ({
                 placeholder="Fach, Kompetenz, Punkte oder Format suchen..."
                 aria-label="Vorlagen durchsuchen"
               />
-              {(query || subjectFilter !== "all" || stageFilter !== "all" || focusFilter !== "all") && (
+              {(query || subjectFilter !== "all" || stageFilter !== "all" || schoolFormFilter !== "all" || focusFilter !== "all") && (
                 <button type="button" onClick={resetFilters}>
                   Zurücksetzen
                 </button>
@@ -980,6 +1024,23 @@ export const GuidedExamBuilder = ({
                   onClick={() => setSubjectFilter(subject)}
                 >
                   {subject}
+                </button>
+              ))}
+            </div>
+
+            <div className="template-filter-row" aria-label="Schulformfilter">
+              {[
+                ["all", "Alle Schulformen"],
+                ["grundschule", "Grundschule"],
+                ["realschule", "Realschule"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`template-filter-chip ${schoolFormFilter === value ? "template-filter-chip-active" : ""}`}
+                  onClick={() => setSchoolFormFilter(value as SchoolFormFilter)}
+                >
+                  {label}
                 </button>
               ))}
             </div>
@@ -1052,7 +1113,7 @@ export const GuidedExamBuilder = ({
                     <span className="template-badge template-badge-strong template-subject-badge">
                       {selectedTemplate.subject}
                     </span>
-                    <span className="template-badge">{stageLongLabel(selectedTemplate.schoolStage)}</span>
+                    <span className="template-badge">{schoolFormLabel(selectedTemplate.schoolForm)}</span>
                     <span className="template-badge">{focusLabel(selectedTemplate.focus)}</span>
                   </div>
                   <h3 className="themed-strong text-xl font-semibold">{selectedTemplate.title}</h3>

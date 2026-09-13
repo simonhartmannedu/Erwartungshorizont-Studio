@@ -4,6 +4,7 @@ import type { VisualTheme } from "../types";
 export type UserPreferences = {
   showSelectionReminder: boolean;
   favoriteVisualThemes: VisualTheme[];
+  easyMode: boolean;
 };
 
 const visualThemeValues: VisualTheme[] = [
@@ -16,6 +17,7 @@ const USER_PREFERENCES_KEY = scopedStorageKey("user-preferences");
 export const defaultUserPreferences: UserPreferences = {
   showSelectionReminder: true,
   favoriteVisualThemes: [],
+  easyMode: false,
 };
 
 export const loadUserPreferences = (): UserPreferences => {
@@ -32,6 +34,7 @@ export const loadUserPreferences = (): UserPreferences => {
       favoriteVisualThemes: Array.isArray(parsed.favoriteVisualThemes)
         ? [...new Set(parsed.favoriteVisualThemes.filter((theme): theme is VisualTheme => visualThemeValues.includes(theme as VisualTheme)))]
         : defaultUserPreferences.favoriteVisualThemes,
+      easyMode: typeof parsed.easyMode === "boolean" ? parsed.easyMode : defaultUserPreferences.easyMode,
     };
   } catch {
     return defaultUserPreferences;
