@@ -5,9 +5,10 @@ interface Props {
   meta: ExamMeta;
   onChange: <K extends keyof ExamMeta>(key: K, value: ExamMeta[K]) => void;
   disabled?: boolean;
+  showNotesListTransform?: boolean;
 }
 
-export const ExamHeaderForm = ({ meta, onChange, disabled = false }: Props) => (
+export const ExamHeaderForm = ({ meta, onChange, disabled = false, showNotesListTransform = true }: Props) => (
   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <Field label="Schuljahr">
       <input className="field" value={meta.schoolYear} placeholder="Hier Schuljahr eintragen" disabled={disabled} onChange={(e) => onChange("schoolYear", e.target.value)} />
@@ -39,7 +40,7 @@ export const ExamHeaderForm = ({ meta, onChange, disabled = false }: Props) => (
         value={meta.notes}
         placeholder="Hier Hinweise eintragen"
         disabled={disabled}
-        showListTransform
+        showListTransform={showNotesListTransform}
         onValueChange={(value) => onChange("notes", value)}
       />
     </Field>

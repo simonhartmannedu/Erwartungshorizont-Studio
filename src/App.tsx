@@ -177,7 +177,6 @@ import {
 import { Card, Field } from "./components/ui";
 import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
-import { ImportedExamSuggestion } from "./pdf/types";
 import { isDemoStorageScope, scopedStorageKey } from "./utils/storageScope";
 import { loadUserPreferences, saveUserPreferences, type UserPreferences } from "./utils/preferences";
 
@@ -374,19 +373,6 @@ const createTask = (): Task => ({
   expectation: "",
 });
 
-const createImportedTask = (
-  draft: ImportedExamSuggestion["sections"][number]["tasks"][number],
-  fallbackIndex: number,
-): Task => ({
-  id: crypto.randomUUID(),
-  title: draft.title.trim() || `Aufgabe ${fallbackIndex + 1}`,
-  description: draft.description.trim(),
-  category: "Inhalt",
-  maxPoints: Number.isFinite(draft.maxPoints) ? Math.max(0, draft.maxPoints) : 5,
-  achievedPoints: 0,
-  expectation: draft.expectation.trim(),
-});
-
 const createSection = (): Section => ({
   id: crypto.randomUUID(),
   title: "Neuer Abschnitt",
@@ -395,21 +381,6 @@ const createSection = (): Section => ({
   maxPointsOverride: null,
   note: "",
   tasks: [createTask()],
-});
-
-const createImportedSection = (
-  draft: ImportedExamSuggestion["sections"][number],
-  fallbackIndex: number,
-): Section => ({
-  id: crypto.randomUUID(),
-  title: draft.title.trim() || `Importierter Abschnitt ${fallbackIndex + 1}`,
-  description: draft.description.trim(),
-  linkedSectionId: null,
-  maxPointsOverride: null,
-  note: draft.note.trim(),
-  tasks: draft.tasks.length > 0
-    ? draft.tasks.map((task, index) => createImportedTask(task, index))
-    : [createTask()],
 });
 
 const createEmptyExam = (): Exam => ({
@@ -2192,47 +2163,6 @@ function App() {
     );
   };
 
-  const applyImportedExamSuggestion = (config: {
-    suggestion: ImportedExamSuggestion;
-    target: GuidedBuilderTarget;
-    gradeScale: Exam["gradeScale"];
-    meta: Exam["meta"];
-    targetGroupId: string | null;
-  }) => {
-    const { suggestion } = config;
-    const baseExam = createEmptyExam();
-    const nextExam = normalizeExamStructure({
-      ...baseExam,
-      meta: {
-        ...config.meta,
-        schoolYear: suggestion.meta.schoolYear.trim() || config.meta.schoolYear,
-        gradeLevel: suggestion.meta.gradeLevel.trim() || config.meta.gradeLevel,
-        course: suggestion.meta.course.trim() || config.meta.course,
-        teacher: config.meta.teacher,
-        examDate: suggestion.meta.examDate.trim() || config.meta.examDate,
-        title: suggestion.meta.title.trim() || config.meta.title,
-        unit: suggestion.meta.unit.trim() || config.meta.unit,
-        notes: [config.meta.notes.trim(), suggestion.meta.notes.trim()].filter(Boolean).join("\n\n"),
-      },
-      evaluationMode: "direct",
-      gradeScale: config.gradeScale,
-      printSettings: exam.printSettings,
-      sections:
-        suggestion.sections.length > 0
-          ? suggestion.sections.map((section, index) => createImportedSection(section, index))
-          : baseExam.sections,
-    });
-
-    commitBuiltExam(nextExam, {
-      target: config.target,
-      targetGroupId: config.targetGroupId,
-      currentTitle: "PDF-Vorschlag übernommen",
-      currentDetail: `${suggestion.sections.length} Abschnitt(e) und erkannte Metadaten wurden in den aktiven EWH übernommen.`,
-      newTitle: "PDF-Vorschlag als Klassenarbeit angelegt",
-      newDetail: "Der PDF-Vorschlag wurde als neue Klassenarbeit für {group} angelegt.",
-    });
-  };
-
   const updateSection = (sectionId: string, patch: Partial<Section>) => {
     setActiveWorkspaceExam((current) =>
       normalizeExamStructure({
@@ -2589,6 +2519,30 @@ function App() {
       currentDetail: "Die aktuelle Klassenarbeit wurde mit dem geführten Aufbau ersetzt.",
       newTitle: "Neue Klassenarbeit erstellt",
       newDetail: "Der geführte Aufbau wurde als neue Klassenarbeit für {group} angelegt.",
+    });
+  };
+
+  const applyComposedTemplate = (config: {
+    sections: Section[];
+    gradeScale: Exam["gradeScale"];
+    target: GuidedBuilderTarget;
+    meta: Exam["meta"];
+    targetGroupId: string | null;
+  }) => {
+    const nextExam = normalizeExamStructure({
+      ...exam,
+      meta: { ...config.meta },
+      evaluationMode: "direct",
+      gradeScale: config.gradeScale,
+      sections: config.sections,
+    });
+    commitBuiltExam(nextExam, {
+      target: config.target,
+      targetGroupId: config.targetGroupId,
+      currentTitle: "Klausur zusammengestellt",
+      currentDetail: "Die aktuelle Klassenarbeit wurde aus den ausgewählten Aufgabenelementen aufgebaut.",
+      newTitle: "Klassenarbeit erstellt",
+      newDetail: "Die zusammengestellte Klassenarbeit wurde als neue Klassenarbeit für {group} angelegt.",
     });
   };
 
@@ -4450,18 +4404,8 @@ function App() {
                     lockTargetToNew={Boolean(pendingSchoolYearCreation) || easyMode}
                     allowUnassignedWorkspace={Boolean(pendingSchoolYearCreation) || easyMode}
                     easyMode={easyMode}
-                    onSelectTemplate={(template, target, gradeScale, meta, targetGroupId, targetTotalPoints) => {
-                      applyTemplate(
-                        template,
-                        target,
-                        gradeScale,
-                        { ...meta },
-                        targetGroupId,
-                        targetTotalPoints,
-                      );
-                    }}
                     onApplyManualStructure={applyGuidedBuilderStructure}
-                    onApplyPdfSuggestion={applyImportedExamSuggestion}
+                    onApplyComposedTemplate={applyComposedTemplate}
                   />
                 ) : (
                   <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">

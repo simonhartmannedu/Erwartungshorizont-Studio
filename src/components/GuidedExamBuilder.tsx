@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type DragEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ExamTemplateDefinition, TemplateSchoolForm } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
 import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
@@ -8,15 +8,14 @@ import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
 import { ExamHeaderForm } from "./ExamHeaderForm";
 import {
   ChevronRightIcon,
+  DragIcon,
   InfoIcon,
   PencilIcon,
   PlusIcon,
   ReplaceIcon,
   TemplateIcon,
-  UploadIcon,
+  TrashIcon,
 } from "./icons";
-import { ImportedExamSuggestion } from "../pdf/types";
-import { PdfImportAssistant } from "./PdfImportAssistant";
 import { Card, DismissibleCallout, Field, NumberInput, TextAreaField } from "./ui";
 
 export interface GuidedSectionDraft {
@@ -28,7 +27,7 @@ export interface GuidedSectionDraft {
 
 export type GuidedBuilderTarget = "current" | "new";
 
-type DecisionMode = "templates" | "pdf" | "manual";
+type DecisionMode = "templates" | "manual";
 type StageFilter = BuilderSchoolStage | "all";
 type FocusFilter = ExamTemplateDefinition["focus"] | "all";
 type SchoolFormFilter = TemplateSchoolForm | "all";
@@ -75,14 +74,6 @@ interface Props {
   lockTargetToNew?: boolean;
   allowUnassignedWorkspace?: boolean;
   easyMode?: boolean;
-  onSelectTemplate: (
-    template: ExamTemplateDefinition,
-    target: GuidedBuilderTarget,
-    gradeScale: GradeScale,
-    meta: ExamMeta,
-    targetGroupId: string | null,
-    targetTotalPoints: number,
-  ) => void;
   onApplyManualStructure: (config: {
     totalPoints: number;
     gradeScale: GradeScale;
@@ -91,14 +82,24 @@ interface Props {
     meta: ExamMeta;
     targetGroupId: string | null;
   }) => void;
-  onApplyPdfSuggestion: (config: {
-    suggestion: ImportedExamSuggestion;
-    target: GuidedBuilderTarget;
+  onApplyComposedTemplate: (config: {
+    sections: Section[];
     gradeScale: GradeScale;
+    target: GuidedBuilderTarget;
     meta: ExamMeta;
     targetGroupId: string | null;
   }) => void;
 }
+
+type ComposerSection = Pick<Section, "id" | "title" | "description" | "note" | "tasks">;
+
+type ComposerLibraryItem = {
+  id: string;
+  subject: string;
+  templateTitle: string;
+  sectionTitle: string;
+  task: Task;
+};
 
 const getPartLabel = (index: number) => `Teil ${String.fromCharCode(65 + index)}`;
 
@@ -345,6 +346,21 @@ const createAdjustedTemplate = (template: ExamTemplateDefinition, sectionPoints:
   build: () => adjustExamToSectionPoints(template.build(), sectionPoints),
 });
 
+const buildComposerSections = (template: ExamTemplateDefinition, sectionPoints: number[]): ComposerSection[] =>
+  createAdjustedTemplate(template, sectionPoints)
+    .build()
+    .sections.map(({ id, title, description, note, tasks }) => ({ id, title, description, note, tasks }));
+
+const getComposerTotal = (sections: ComposerSection[]) =>
+  Math.round(sections.reduce((sum, section) => sum + section.tasks.reduce((taskSum, task) => taskSum + task.maxPoints, 0), 0) * 100) / 100;
+
+const cloneComposerTask = (task: Task, category: string): Task => ({
+  ...task,
+  id: crypto.randomUUID(),
+  category,
+  achievedPoints: 0,
+});
+
 const polarToCartesian = (cx: number, cy: number, radius: number, angleInDegrees: number) => {
   const radians = ((angleInDegrees - 90) * Math.PI) / 180;
   return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
@@ -566,9 +582,8 @@ export const GuidedExamBuilder = ({
   lockTargetToNew = false,
   allowUnassignedWorkspace = false,
   easyMode = false,
-  onSelectTemplate,
   onApplyManualStructure,
-  onApplyPdfSuggestion,
+  onApplyComposedTemplate,
 }: Props) => {
   const metaEditorRef = useRef<HTMLElement | null>(null);
   const detectedInitialSubject =
@@ -585,6 +600,13 @@ export const GuidedExamBuilder = ({
   const [schoolFormFilter, setSchoolFormFilter] = useState<SchoolFormFilter>("all");
   const [focusFilter, setFocusFilter] = useState<FocusFilter>("all");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
+  const [composerTemplateId, setComposerTemplateId] = useState<string | null>(null);
+  const [blankComposer, setBlankComposer] = useState(false);
+  const [composerSections, setComposerSections] = useState<ComposerSection[]>([]);
+  const [composerQuery, setComposerQuery] = useState("");
+  const [composerSubjectFilter, setComposerSubjectFilter] = useState<string>(initialSubject || "all");
+  const [activeComposerSectionId, setActiveComposerSectionId] = useState<string | null>(null);
+  const [composerDropTarget, setComposerDropTarget] = useState<string | null>(null);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
   const [activeTemplateSectionIndex, setActiveTemplateSectionIndex] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>(initialTarget);
@@ -662,10 +684,32 @@ export const GuidedExamBuilder = ({
     return getTemplateDefaultSectionPoints(selectedTemplate);
   }, [selectedTemplate, templatePointDrafts]);
   const selectedTemplateTotalPoints = selectedTemplate ? sumPoints(selectedTemplatePoints) : 0;
-  const adjustedSelectedTemplate = useMemo(
-    () => (selectedTemplate ? createAdjustedTemplate(selectedTemplate, selectedTemplatePoints) : null),
-    [selectedTemplate, selectedTemplatePoints],
+  const composerTemplate = useMemo(
+    () => templates.find((template) => template.id === composerTemplateId) ?? null,
+    [composerTemplateId, templates],
   );
+  const isComposerOpen = Boolean(composerTemplate || blankComposer);
+  const composerSubject = composerTemplate?.subject || metaDraft.subject.trim() || initialSubject.trim() || "Alle Fächer";
+  const composerStage = composerTemplate?.schoolStage ?? manualStage;
+  const composerTotalPoints = useMemo(() => getComposerTotal(composerSections), [composerSections]);
+  const composerLibrary = useMemo<ComposerLibraryItem[]>(() => {
+    const normalizedQuery = normalizeText(composerQuery);
+    return templates.flatMap((template) =>
+      template.build().sections.flatMap((section) =>
+        section.tasks.map((task, taskIndex) => ({
+          id: `${template.id}:${section.id}:${taskIndex}`,
+          subject: template.subject,
+          templateTitle: template.shortLabel,
+          sectionTitle: section.title,
+          task,
+        })),
+      ),
+    ).filter((item) => {
+      const subjectMatches = composerSubjectFilter === "all" || item.subject === composerSubjectFilter;
+      const text = `${item.subject} ${item.templateTitle} ${item.sectionTitle} ${item.task.title} ${item.task.description} ${item.task.expectation}`.toLowerCase();
+      return subjectMatches && (!normalizedQuery || text.includes(normalizedQuery));
+    });
+  }, [composerQuery, composerSubjectFilter, templates]);
 
   const manualResolvedSubject = manualSubject === "__custom__" ? manualCustomSubject.trim() : manualSubject;
   const manualGuidance = useMemo(
@@ -709,10 +753,17 @@ export const GuidedExamBuilder = ({
   }, [scoredTemplates, selectedTemplateId]);
 
   useEffect(() => {
-    if (mode !== "templates" || !selectedTemplate) return;
+    if (mode !== "templates" || !selectedTemplate || isComposerOpen) return;
     setTotalPoints(selectedTemplateTotalPoints);
     setGradeScale((current) => gradeScaleFor(current, selectedTemplateTotalPoints, selectedTemplate.schoolStage));
-  }, [mode, selectedTemplate?.id, selectedTemplateTotalPoints]);
+  }, [isComposerOpen, mode, selectedTemplate?.id, selectedTemplateTotalPoints]);
+
+  useEffect(() => {
+    if (!isComposerOpen) return;
+    const nextTotal = getComposerTotal(composerSections);
+    setTotalPoints(nextTotal);
+    setGradeScale((current) => gradeScaleFor(current, nextTotal, composerStage));
+  }, [composerSections, composerStage, isComposerOpen]);
 
   useEffect(() => {
     if (!selectedTemplate || activeTemplateSectionIndex < selectedTemplate.previewSections.length) return;
@@ -720,11 +771,11 @@ export const GuidedExamBuilder = ({
   }, [activeTemplateSectionIndex, selectedTemplate]);
 
   useEffect(() => {
-    if (mode !== "manual") return;
+    if (mode !== "manual" || isComposerOpen) return;
     setTotalPoints(manualGuidance.preset.totalPoints);
     setSectionDrafts(buildSectionDrafts(manualGuidance.preset.sections, manualGuidance.preset.totalPoints));
     setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
-  }, [manualGuidance, manualStage, mode]);
+  }, [isComposerOpen, manualGuidance, manualStage, mode]);
 
   const updateTotalPoints = (value: number) => {
     const nextTotal = Math.max(1, Math.round(value * 2) / 2);
@@ -737,13 +788,6 @@ export const GuidedExamBuilder = ({
     }
     setTotalPoints(nextTotal);
     setGradeScale((current) => gradeScaleFor(current, nextTotal, activeScaleStage));
-  };
-
-  const selectTemplate = (template: ExamTemplateDefinition) => {
-    const nextPoints = templatePointDrafts[template.id] ?? getTemplateDefaultSectionPoints(template);
-    setSelectedTemplateId(template.id);
-    setTotalPoints(sumPoints(nextPoints));
-    setGradeScale((current) => gradeScaleFor(current, sumPoints(nextPoints), template.schoolStage));
   };
 
   const updateTemplateSectionPoint = (sectionIndex: number, value: number) => {
@@ -761,6 +805,106 @@ export const GuidedExamBuilder = ({
     }));
     setTotalPoints(nextTotal);
     setGradeScale((current) => gradeScaleFor(current, nextTotal, selectedTemplate.schoolStage));
+  };
+
+  const openComposer = (template: ExamTemplateDefinition) => {
+    const sectionPoints = templatePointDrafts[template.id] ?? getTemplateDefaultSectionPoints(template);
+    const sections = buildComposerSections(template, sectionPoints);
+    setSelectedTemplateId(template.id);
+    setComposerTemplateId(template.id);
+    setBlankComposer(false);
+    setComposerSections(sections);
+    setComposerSubjectFilter(template.subject);
+    setComposerQuery("");
+    setActiveComposerSectionId(sections[0]?.id ?? null);
+    const nextTotal = getComposerTotal(sections);
+    setTotalPoints(nextTotal);
+    setGradeScale((current) => gradeScaleFor(current, nextTotal, template.schoolStage));
+  };
+
+  const openBlankComposer = () => {
+    const sections: ComposerSection[] = [{
+      id: crypto.randomUUID(),
+      title: "Teil A",
+      description: "",
+      note: "",
+      tasks: [],
+    }];
+    setMode("manual");
+    setComposerTemplateId(null);
+    setBlankComposer(true);
+    setComposerSections(sections);
+    setComposerSubjectFilter("all");
+    setComposerQuery("");
+    setActiveComposerSectionId(sections[0].id);
+    setTotalPoints(0);
+    setGradeScale((current) => gradeScaleFor(current, 1, manualStage));
+  };
+
+  const updateComposerSections = (updater: (current: ComposerSection[]) => ComposerSection[]) => {
+    setComposerSections(updater);
+  };
+
+  const appendLibraryItem = (item: ComposerLibraryItem, sectionId = activeComposerSectionId) => {
+    const destinationId = sectionId ?? composerSections[0]?.id;
+    if (!destinationId) return;
+    updateComposerSections((current) => current.map((section) => (
+      section.id === destinationId
+        ? { ...section, tasks: [...section.tasks, cloneComposerTask(item.task, section.title)] }
+        : section
+    )));
+  };
+
+  const moveComposerTask = (sourceSectionId: string, taskId: string, targetSectionId: string, insertionIndex: number) => {
+    updateComposerSections((current) => {
+      const sourceSection = current.find((section) => section.id === sourceSectionId);
+      const task = sourceSection?.tasks.find((entry) => entry.id === taskId);
+      if (!task) return current;
+      const sourceIndex = sourceSection?.tasks.findIndex((entry) => entry.id === taskId) ?? -1;
+      const withoutTask = current.map((section) => section.id === sourceSectionId
+        ? { ...section, tasks: section.tasks.filter((entry) => entry.id !== taskId) }
+        : section);
+      return withoutTask.map((section) => {
+        if (section.id !== targetSectionId) return section;
+        const adjustedIndex = sourceSectionId === targetSectionId && sourceIndex < insertionIndex
+          ? insertionIndex - 1
+          : insertionIndex;
+        const tasks = [...section.tasks];
+        tasks.splice(Math.max(0, Math.min(adjustedIndex, tasks.length)), 0, { ...task, category: section.title });
+        return { ...section, tasks };
+      });
+    });
+  };
+
+  const handleComposerDrop = (event: DragEvent<HTMLElement>, targetSectionId: string, insertionIndex: number) => {
+    event.preventDefault();
+    setComposerDropTarget(null);
+    const libraryId = event.dataTransfer.getData("application/x-ewh-library-task");
+    if (libraryId) {
+      const item = composerLibrary.find((entry) => entry.id === libraryId);
+      if (!item) return;
+      const destination = composerSections.find((section) => section.id === targetSectionId);
+      if (!destination) return;
+      updateComposerSections((current) => current.map((section) => section.id === targetSectionId
+        ? {
+            ...section,
+            tasks: [
+              ...section.tasks.slice(0, insertionIndex),
+              cloneComposerTask(item.task, section.title),
+              ...section.tasks.slice(insertionIndex),
+            ],
+          }
+        : section));
+      return;
+    }
+    const rawTask = event.dataTransfer.getData("application/x-ewh-composer-task");
+    if (!rawTask) return;
+    try {
+      const { sourceSectionId, taskId } = JSON.parse(rawTask) as { sourceSectionId: string; taskId: string };
+      moveComposerTask(sourceSectionId, taskId, targetSectionId, insertionIndex);
+    } catch {
+      // Ignore data not created by this composer.
+    }
   };
 
   const resetFilters = () => {
@@ -791,12 +935,20 @@ export const GuidedExamBuilder = ({
 
   const renderModeButton = (nextMode: DecisionMode, label: string, description: string) => {
     const active = mode === nextMode;
-    const Icon = nextMode === "templates" ? TemplateIcon : nextMode === "pdf" ? UploadIcon : PencilIcon;
+    const Icon = nextMode === "templates" ? TemplateIcon : PencilIcon;
     return (
       <button
         type="button"
         className={`template-mode-button ${active ? "template-mode-button-active" : ""}`}
-        onClick={() => setMode(nextMode)}
+        onClick={() => {
+          if (nextMode === "manual") {
+            openBlankComposer();
+            return;
+          }
+          setMode(nextMode);
+          setComposerTemplateId(null);
+          setBlankComposer(false);
+        }}
         aria-pressed={active}
       >
         <Icon className="h-5 w-5" />
@@ -810,22 +962,25 @@ export const GuidedExamBuilder = ({
 
   const canSubmitCurrentMode =
     canCreate &&
-    (mode === "templates"
-      ? Boolean(adjustedSelectedTemplate)
-      : mode === "manual"
-        ? difference === 0 && !hasEmptyTitles
-        : false);
+    Boolean(isComposerOpen && composerSections.some((section) => section.tasks.length > 0));
 
   const submitCurrentMode = () => {
-    if (mode === "templates" && adjustedSelectedTemplate) {
-      onSelectTemplate(
-        adjustedSelectedTemplate,
-        target,
+    if (isComposerOpen && composerSections.some((section) => section.tasks.length > 0)) {
+      onApplyComposedTemplate({
+        sections: composerSections.map((section) => ({
+          ...section,
+          title: section.title.trim() || "Aufgabenteil",
+          description: section.description.trim(),
+          note: section.note.trim(),
+          linkedSectionId: null,
+          maxPointsOverride: null,
+          tasks: section.tasks.map((task) => ({ ...task, category: section.title.trim() || "Aufgabenteil" })),
+        })),
         gradeScale,
-        metaDraft,
-        target === "new" ? targetGroupId || null : null,
-        totalPoints,
-      );
+        target,
+        meta: metaDraft,
+        targetGroupId: target === "new" ? targetGroupId || null : null,
+      });
       return;
     }
 
@@ -967,6 +1122,23 @@ export const GuidedExamBuilder = ({
       </section>
     ) : null;
 
+  const renderComposerMetaEditor = () => (
+    <div className="template-composer-meta">
+      <div>
+        <p className="label">Rahmendaten</p>
+        <h4 className="themed-strong mt-1 text-lg font-semibold">Direkt bearbeiten</h4>
+        <p className="themed-muted mt-1 text-sm leading-6">Diese Angaben werden direkt in den neuen EWH übernommen.</p>
+      </div>
+      <ExamHeaderForm
+        meta={metaDraft}
+        showNotesListTransform={false}
+        onChange={(key, value) => {
+          setMetaDraft((current) => ({ ...current, [key]: value }));
+        }}
+      />
+    </div>
+  );
+
   const renderTemplateCard = (template: ExamTemplateDefinition, index: number) => {
     const selected = selectedTemplate?.id === template.id;
     const subjectTheme = getSubjectTheme(template.subject);
@@ -976,7 +1148,7 @@ export const GuidedExamBuilder = ({
         type="button"
         className={`template-result-card ${selected ? "template-result-card-selected" : ""}`}
         style={getSubjectThemeStyle(subjectTheme)}
-        onClick={() => selectTemplate(template)}
+        onClick={() => openComposer(template)}
         aria-pressed={selected}
       >
         <span className="template-subject-mark" aria-hidden="true">
@@ -996,6 +1168,105 @@ export const GuidedExamBuilder = ({
           <strong>{formatNumber(template.totalPoints)} P.</strong>
         </span>
       </button>
+    );
+  };
+
+  const renderComposer = () => {
+    const composerSubjects = availableSubjects.filter((subject) => templates.some((template) => template.subject === subject));
+    return (
+      <div className="template-composer" aria-label="Klausur zusammenstellen">
+        <div className="template-composer-header" style={getSubjectThemeStyle(getSubjectTheme(composerSubject))}>
+          <div>
+            <p className="label">Zusammenstellung</p>
+            <h3 className="themed-strong mt-1 text-xl font-semibold">{composerTemplate?.title ?? "Leere Klausur zusammenstellen"}</h3>
+            <p className="themed-muted mt-1 text-sm leading-6">Ziehe Aufgaben zwischen den Teilen um oder ergänze passende Elemente aus der Bibliothek. Die Punktzahl und der Notenschlüssel werden sofort aus der Auswahl berechnet.</p>
+          </div>
+          <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={() => { setComposerTemplateId(null); setBlankComposer(false); setMode("templates"); }}>Vorlage wechseln</button>
+        </div>
+
+        <div className="template-composer-layout">
+          <aside className="template-composer-library">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="themed-strong font-semibold">Aufgaben-Bibliothek</h4>
+                <p className="themed-muted mt-1 text-xs leading-5">{composerTemplate ? `Zunächst ${composerSubject}; andere Fächer lassen sich bewusst dazunehmen.` : "Wähle passende Aufgaben aus der Bibliothek und stelle deine Klausur frei zusammen."}</p>
+              </div>
+              <span className="template-badge">{composerLibrary.length}</span>
+            </div>
+            <input className="field mt-3" value={composerQuery} onChange={(event) => setComposerQuery(event.target.value)} placeholder="Aufgabe suchen …" aria-label="Aufgaben durchsuchen" />
+            <div className="template-filter-row" aria-label="Fachfilter für Aufgaben">
+              {composerTemplate ? <button type="button" className={`template-filter-chip ${composerSubjectFilter === composerSubject ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter(composerSubject)}>{composerSubject}</button> : null}
+              <button type="button" className={`template-filter-chip ${composerSubjectFilter === "all" ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter("all")}>Alle Fächer</button>
+              {composerSubjects.filter((subject) => subject !== composerSubject).map((subject) => (
+                <button key={subject} type="button" className={`template-filter-chip ${composerSubjectFilter === subject ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter(subject)}>{subject}</button>
+              ))}
+            </div>
+            <div className="template-composer-library-list">
+              {composerLibrary.map((item) => (
+                <article
+                  key={item.id}
+                  className="template-library-task"
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "copy";
+                    event.dataTransfer.setData("application/x-ewh-library-task", item.id);
+                  }}
+                >
+                  <div className="template-library-task-title"><DragIcon /><strong>{item.task.title}</strong></div>
+                  <p>{item.task.description}</p>
+                  <div><span>{item.subject} · {item.sectionTitle}</span><strong>{formatNumber(item.task.maxPoints)} P.</strong></div>
+                  <button type="button" className="button-secondary px-2 py-1 text-xs" onClick={() => appendLibraryItem(item)}>Zu aktivem Teil</button>
+                </article>
+              ))}
+              {composerLibrary.length === 0 && <p className="themed-muted text-sm">Keine passenden Elemente gefunden.</p>}
+            </div>
+          </aside>
+
+          <section className="template-composer-workspace">
+            <div className="template-composer-summary">
+              <div><span>Ausgewählt</span><strong>{formatNumber(composerTotalPoints)} Punkte</strong></div>
+              <div><span>Aufgaben</span><strong>{composerSections.reduce((sum, section) => sum + section.tasks.length, 0)}</strong></div>
+              <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={() => {
+                const section: ComposerSection = { id: crypto.randomUUID(), title: `Teil ${String.fromCharCode(65 + composerSections.length)}`, description: "", note: "", tasks: [] };
+                updateComposerSections((current) => [...current, section]);
+                setActiveComposerSectionId(section.id);
+              }}><PlusIcon />Teil ergänzen</button>
+            </div>
+            {composerSections.map((section) => (
+              <section key={section.id} className={`template-composer-section ${activeComposerSectionId === section.id ? "template-composer-section-active" : ""}`} onClick={() => setActiveComposerSectionId(section.id)}>
+                <div className="template-composer-section-header">
+                  <input className="field" value={section.title} aria-label="Titel des Aufgabenteils" onChange={(event) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, title: event.target.value } : entry))} />
+                  <strong>{formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</strong>
+                </div>
+                <div
+                  className={`template-composer-dropzone ${composerDropTarget === `${section.id}:0` ? "template-composer-dropzone-active" : ""}`}
+                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setComposerDropTarget(`${section.id}:0`); }}
+                  onDragLeave={() => setComposerDropTarget(null)}
+                  onDrop={(event) => handleComposerDrop(event, section.id, 0)}
+                >Aufgabe hier ablegen</div>
+                {section.tasks.map((task, index) => (
+                  <div key={task.id}>
+                    <article className="template-composer-task" draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-ewh-composer-task", JSON.stringify({ sourceSectionId: section.id, taskId: task.id })); }}>
+                      <DragIcon />
+                      <div><strong>{task.title}</strong><p>{task.description || task.expectation || "Ohne Beschreibung"}</p></div>
+                      <NumberInput className="field" value={task.maxPoints} min={0} step={0.5} onCommit={(value) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.map((candidate) => candidate.id === task.id ? { ...candidate, maxPoints: value, achievedPoints: Math.min(candidate.achievedPoints, value) } : candidate) } : entry))} />
+                      <button type="button" className="icon-button" title="Aufgabe entfernen" onClick={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.filter((candidate) => candidate.id !== task.id) } : entry))}><TrashIcon /></button>
+                    </article>
+                    <div className={`template-composer-dropzone template-composer-dropzone-between ${composerDropTarget === `${section.id}:${index + 1}` ? "template-composer-dropzone-active" : ""}`} onDragOver={(event) => { event.preventDefault(); setComposerDropTarget(`${section.id}:${index + 1}`); }} onDragLeave={() => setComposerDropTarget(null)} onDrop={(event) => handleComposerDrop(event, section.id, index + 1)}>Hier ablegen</div>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </section>
+
+          <aside className="template-composer-settings template-preview-panel">
+            <h4 className="themed-strong text-lg font-semibold">Übernehmen</h4>
+            <p className="themed-muted mt-1 text-sm leading-6">Die Auswahl wird als bearbeitbarer EWH angelegt. Punkte, Erwartungen und Aufgabentexte bleiben erhalten.</p>
+            {renderTargetControls()}
+            {renderComposerMetaEditor()}
+          </aside>
+        </div>
+      </div>
     );
   };
 
@@ -1019,21 +1290,22 @@ export const GuidedExamBuilder = ({
 
       <div className="template-mode-tabs">
         {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
-        {renderModeButton("pdf", "PDF", "Aus Material starten")}
-        {renderModeButton("manual", "Leere Struktur", "Kurz selbst aufbauen")}
+        {renderModeButton("manual", "Leere Struktur", "Frei zusammenstellen")}
         <button
           type="button"
           className="template-create-button button-primary gap-2"
           disabled={!canSubmitCurrentMode}
           onClick={submitCurrentMode}
-          title={mode === "pdf" ? "Bitte erst einen PDF-Vorschlag auswerten und übernehmen." : undefined}
+          title={mode === "templates" && !isComposerOpen ? "Wähle zuerst eine Vorlage für die Zusammenstellung." : undefined}
         >
-          <span className="inline-flex items-center gap-2"><PlusIcon />EWH erstellen</span>
+          <span className="inline-flex items-center gap-2"><PlusIcon />{mode === "templates" && !composerTemplate ? "Vorlage wählen" : "EWH erstellen"}</span>
           <ChevronRightIcon />
         </button>
       </div>
 
-      {mode === "templates" && (
+      {isComposerOpen ? renderComposer() : null}
+
+      {mode === "templates" && !isComposerOpen && (
         <div className="template-decision-layout">
           <section className="template-search-panel">
             <div className="template-search-box">
@@ -1187,6 +1459,7 @@ export const GuidedExamBuilder = ({
                   </Field>
                   {renderTargetControls()}
                   {renderMetaSummary()}
+                  <button type="button" className="button-primary gap-2" onClick={() => openComposer(selectedTemplate)}><DragIcon />Klausur zusammenstellen</button>
                 </div>
 
               </div>
@@ -1201,38 +1474,7 @@ export const GuidedExamBuilder = ({
         </div>
       )}
 
-      {mode === "pdf" && (
-        <div className="template-secondary-layout">
-          <section className="template-preview-panel">
-            <h3 className="themed-strong text-xl font-semibold">Aus PDF starten</h3>
-            <p className="themed-muted mt-2 text-sm leading-6">
-              Nutze ein Aufgabenblatt oder einen vorhandenen Erwartungshorizont als Ausgangspunkt.
-            </p>
-            <Field label="Zielpunktzahl">
-              <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
-            </Field>
-            {renderTargetControls()}
-            {renderMetaSummary()}
-          </section>
-          <PdfImportAssistant
-            embedded
-            disabled={!canCreate}
-            applyLabel="Mit PDF-Vorschlag in EWH-Editor"
-            onApplySuggestion={(suggestion) =>
-              onApplyPdfSuggestion({
-                suggestion,
-                target,
-                gradeScale,
-                meta: metaDraft,
-                targetGroupId: target === "new" ? targetGroupId || null : null,
-              })
-            }
-          />
-          {renderMetaEditor()}
-        </div>
-      )}
-
-      {mode === "manual" && (
+      {mode === "manual" && !isComposerOpen && (
         <div className="template-secondary-layout">
           <section className="template-preview-panel">
             <h3 className="themed-strong text-xl font-semibold">Leere Struktur vorbereiten</h3>

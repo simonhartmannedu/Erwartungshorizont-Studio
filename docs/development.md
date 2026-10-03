@@ -20,7 +20,6 @@ Vor einem Release führst du zusätzlich `npm run test:regression` und `npm run 
 - Oberfläche und Abläufe: `src/components/`, `src/app/` und `src/features/`
 - Fachlogik: `src/utils/` und `src/domain/`
 - Persistente Datentypen: `src/types.ts`, `src/utils/storage.ts`, `src/infrastructure/`
-- PDF-Import: `src/components/PdfImportAssistant.tsx`, `src/pdf/`, `server/` und `vite.config.ts`
 - Export und Druck: `src/utils/export.ts`
 
 `App.tsx` verbindet die Abläufe. Neue Fachlogik sollte nach Möglichkeit nicht dort, sondern in einer kleinen testbaren Funktion oder einem Controller landen.
