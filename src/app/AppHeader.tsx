@@ -138,7 +138,7 @@ export const AppHeader = ({
       <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
       <div className="brand-header-lockup">
         <div className="min-w-0">
-          <h1 className="font-display themed-strong text-4xl md:text-5xl">Erwartungshorizont Studio</h1>
+          <h1 className="font-display font-medium themed-strong text-4xl md:text-5xl">Erwartungshorizont Studio</h1>
           <p className="themed-muted mt-4 max-w-3xl text-base leading-7">
             Erwartungshorizonte, erstellen und verwalten
           </p>

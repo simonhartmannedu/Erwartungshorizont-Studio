@@ -1,6 +1,9 @@
 @font-face { font-family: "Manrope"; font-style: normal; font-weight: 400; font-display: swap; src: url("./assets/manrope-400.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 500; font-display: swap; src: url("./assets/manrope-500.woff2") format("woff2"); }
 @font-face { font-family: "Manrope"; font-style: normal; font-weight: 600; font-display: swap; src: url("./assets/manrope-600.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 700; font-display: swap; src: url("./assets/manrope-700.woff2") format("woff2"); }
 @font-face { font-family: "Fraunces"; font-style: normal; font-weight: 500; font-display: swap; src: url("./assets/fraunces-500.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 600; font-display: swap; src: url("./assets/fraunces-600.woff2") format("woff2"); }
 
 :root { color: #10213c; background: #f5f7fb; font-family: "Manrope", Arial, sans-serif; }
 * { box-sizing: border-box; }
