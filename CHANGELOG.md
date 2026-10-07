@@ -2,7 +2,7 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
-## 0.6.1 – 07.10.2026
+## 0.7.0 – 07.10.2026
 
 - Arbeitsbereiche, Klassenarbeitskontext und Korrekturansicht klarer gegliedert.
 - Teilnahmeschalter bündelt Korrektur, Klassendurchschnitt und Klassendruck; nicht teilnehmende Schüler:innen werden in diesen Abläufen ausgelassen.

@@ -6,7 +6,7 @@ test("rejects malformed and unsupported backup files without opening a restore d
   await page.getByRole("tab", { name: "Backup" }).click();
 
   const backupPanel = page.getByRole("tabpanel", { name: "Backup" });
-  await backupPanel.getByRole("button", { name: "Backup wiederherstellen" }).click();
+  await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
   const restoreDialog = page.locator(".dialog-panel");
   const backupFileInput = restoreDialog.locator('input[type="file"]');
   await restoreDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
@@ -20,7 +20,7 @@ test("rejects malformed and unsupported backup files without opening a restore d
   await expect(page.getByText("BACKUP_UNEXPECTED")).toBeVisible();
   await expect(page.locator(".dialog-panel")).toHaveCount(0);
 
-  await backupPanel.getByRole("button", { name: "Backup wiederherstellen" }).click();
+  await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
   const secondRestoreDialog = page.locator(".dialog-panel");
   await secondRestoreDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
   await backupFileInput.setInputFiles({

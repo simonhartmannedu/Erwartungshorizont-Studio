@@ -21,13 +21,13 @@
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
         <p class="intro">Wähle den Umfang, der zu deiner Aufgabe passt. Du kannst ihn später jederzeit in den Einstellungen ändern.</p>
 
-        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.6.1">
+        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.7.0">
           <div class="terminal-bar">
             <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
             <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-            <span class="terminal-version">v0.6.1</span>
+            <span class="terminal-version">v0.7.0</span>
           </div>
-          <pre aria-label="Aktuelle Änderungen in Version 0.6.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+          <pre aria-label="Aktuelle Änderungen in Version 0.7.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
         </section>
 
         <div class="mode-grid">
@@ -68,11 +68,11 @@
         const output = document.getElementById("release-terminal-output");
         if (!output) return;
         const lines = [
-          "$ release v0.6.1",
-          "✓ Klassenarbeiten klarer gegliedert",
-          "✓ Korrektur: Teilnahme, Druck & Durchschnitt verbunden",
-          "✓ Sperrstatus und Backups vereinfacht",
-          "✓ EWH-Versionen werden automatisch angelegt"
+          "$ release v0.7.0",
+          "✓ Arbeitsbereiche und Korrektur klarer gegliedert",
+          "✓ Teilnahme verbindet Korrektur, Druck & Durchschnitt",
+          "✓ Backups: lokal verschlüsselt, optional via Nextcloud-Ordner",
+          "✓ Sperrstatus und EWH-Versionen übersichtlich gehalten"
         ];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const writeImmediately = () => { output.textContent = lines.join("\n"); };

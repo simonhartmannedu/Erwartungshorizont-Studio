@@ -5,7 +5,7 @@ const openBogencheck = async (page: import("@playwright/test").Page) => {
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await page.getByRole("button", { name: "Klasse entsperren", exact: true }).click();
   await page.locator("#header-unlock-password").fill("demo");
-  await page.getByRole("button", { name: "Lerngruppe entschlüsseln" }).click();
+  await page.getByRole("button", { name: "Entsperren", exact: true }).click();
   await page.getByRole("tab", { name: "Bogencheck" }).click();
 };
 
