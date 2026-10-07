@@ -3,8 +3,8 @@ import { KeyboardEvent, useRef } from "react";
 export type EditorSectionTabId = "setup" | "tasks" | "result";
 
 const editorSectionTabs: { id: EditorSectionTabId; label: string; description: string }[] = [
-  { id: "setup", label: "Rahmendaten", description: "Metadaten, Punkte und Noten" },
-  { id: "tasks", label: "Bewertung", description: "Abschnitte und Unteraufgaben" },
+  { id: "setup", label: "Vorbereiten", description: "Rahmendaten, Rubrik und Notenschlüssel" },
+  { id: "tasks", label: "Korrigieren", description: "Punkte für die ausgewählte Schüler:in eingeben" },
   { id: "result", label: "Ergebnis & Druck", description: "Note, Kommentar und Unterschrift" },
 ];
 

@@ -3,7 +3,7 @@ import { Section, Task } from "../types";
 import { calculateSectionResult } from "../utils/calculations";
 import { formatNumber } from "../utils/format";
 import { getWritingLanguageMetrics } from "../utils/writing";
-import { ChevronDownIcon, ChevronRightIcon, DragIcon, DuplicateIcon, LinkIcon, TrashIcon, UnlinkIcon } from "./icons";
+import { DragIcon, DuplicateIcon, LinkIcon, TrashIcon, UnlinkIcon } from "./icons";
 import { Badge, Card, Field, IconButton, NumberInput, TextAreaField } from "./ui";
 import { getEditorTaskAnchorId } from "./EditorToc";
 import { TaskTable } from "./TaskTable";
@@ -137,11 +137,11 @@ export const SectionEditor = ({
       <Card
         title={`${index + 1}. ${section.title || "Neuer Aufgabenteil"}`}
         subtitle={section.description}
+        collapsible
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
         actions={
           <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1 shadow-sm sm:flex-nowrap">
-            <IconButton onClick={onToggleCollapse} title={collapsed ? "Aufklappen" : "Zuklappen"} className="px-2.5 py-2 text-xs">
-              {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-            </IconButton>
             <IconButton onClick={() => onMove("up")} title="Aufgabenteil nach oben" className="px-2.5 py-2 text-xs">
               ↑
             </IconButton>

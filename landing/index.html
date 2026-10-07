@@ -18,23 +18,38 @@
 
       <section class="start" id="start" aria-labelledby="start-title">
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
-        <h1 id="start-title">Wie möchtest du<br /><em>heute arbeiten?</em></h1>
+        <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
         <p class="intro">Wähle den Umfang, der zu deiner Aufgabe passt. Du kannst ihn später jederzeit in den Einstellungen ändern.</p>
+
+        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.6.1">
+          <div class="terminal-bar">
+            <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+            <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
+            <span class="terminal-version">v0.6.1</span>
+          </div>
+          <pre aria-label="Aktuelle Änderungen in Version 0.6.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+        </section>
 
         <div class="mode-grid">
           <a class="mode-card mode-card-primary" href="./app/?mode=easy">
-            <span class="mode-symbol" aria-hidden="true">↗</span>
+            <span class="mode-symbol" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l3 3V20.5H7z"/><path d="M14 3.5v3h3M10 12l1.5 1.5L14.5 10.5"/></svg>
+            </span>
             <span class="mode-copy">
+              <small class="mode-label">01 / Schnellstart</small>
               <strong>Mit Easy-Mode starten</strong>
-              <small>Nur EWH erstellen und drucken</small>
+              <small class="mode-description">Nur EWH erstellen und drucken</small>
             </span>
             <span class="mode-arrow" aria-hidden="true">→</span>
           </a>
           <a class="mode-card" href="./app/?mode=expert">
-            <span class="mode-symbol mode-symbol-mint" aria-hidden="true">✦</span>
+            <span class="mode-symbol mode-symbol-mint" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m7.5 10 2.5 2-2.5 2M13 15h3.5"/></svg>
+            </span>
             <span class="mode-copy">
+              <small class="mode-label">02 / Arbeitsbereich</small>
               <strong>Expert-Mode öffnen</strong>
-              <small>Klassenimport, Auswertung und Druck</small>
+              <small class="mode-description">Klassenimport, Auswertung und Druck</small>
             </span>
             <span class="mode-arrow" aria-hidden="true">→</span>
           </a>
@@ -48,5 +63,46 @@
       <span>Deine Daten bleiben auf deinem Gerät.</span>
       <span><a href="./impressum/">Impressum</a><a href="./datenschutz/">Datenschutz</a><a href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio">GitHub</a></span>
     </footer>
+    <script>
+      (() => {
+        const output = document.getElementById("release-terminal-output");
+        if (!output) return;
+        const lines = [
+          "$ release v0.6.1",
+          "✓ Klassenarbeiten klarer gegliedert",
+          "✓ Korrektur: Teilnahme, Druck & Durchschnitt verbunden",
+          "✓ Sperrstatus und Backups vereinfacht",
+          "✓ EWH-Versionen werden automatisch angelegt"
+        ];
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const writeImmediately = () => { output.textContent = lines.join("\n"); };
+        if (reduceMotion) { writeImmediately(); return; }
+
+        let line = 0;
+        let character = 0;
+        const type = () => {
+          output.textContent += lines[line][character] ?? "";
+          character += 1;
+          if (character < lines[line].length) {
+            window.setTimeout(type, 18);
+            return;
+          }
+          if (line < lines.length - 1) {
+            output.textContent += "\n";
+            line += 1;
+            character = 0;
+            window.setTimeout(type, 210);
+            return;
+          }
+          window.setTimeout(() => {
+            output.textContent = "";
+            line = 0;
+            character = 0;
+            type();
+          }, 4200);
+        };
+        type();
+      })();
+    </script>
   </body>
 </html>

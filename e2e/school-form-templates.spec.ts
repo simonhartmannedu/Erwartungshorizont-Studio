@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("filters the NRW-oriented example templates by school form", async ({ page }) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
-  await page.getByRole("tab", { name: "EWH erstellen" }).click();
+  await page.getByRole("button", { name: "EWH erstellen" }).first().click();
 
   await expect(page.getByLabel("Vorlagen durchsuchen")).toBeVisible();
   const results = page.locator(".template-result-grid");

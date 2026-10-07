@@ -9,6 +9,7 @@ EWH-Studio verarbeitet Arbeitsstände und Schülerdaten grundsätzlich lokal im 
 | Klassenarbeiten, Archive und Schülerdaten | sql.js-Datenbank in IndexedDB des Browsers |
 | Darstellung und Backup-Status | `localStorage` des Browsers |
 | Sicherungen | von dir heruntergeladene, verschlüsselte Datei |
+| Optionale Nextcloud-Ablage | ausschließlich eine neu erzeugte, verschlüsselte Backup-Datei im lokal synchronisierten und schulisch freigegebenen Nextcloud-Ordner |
 
 Löscht du Browserdaten, verwendest ein privates Fenster oder wechselst das Gerät, können lokale Daten verloren gehen. Deshalb sind regelmäßige verschlüsselte Backups wichtig.
 
@@ -35,3 +36,13 @@ Im lokalen Entwicklungsbetrieb erfolgt die Verarbeitung im lokalen Dienst. Stati
 Vollbackups enthalten Arbeitsstände, Archive und – falls vorhanden – Schülerdaten. Du verschlüsselst sie mit einem selbst gewählten Passwort. Die Anwendung zeigt den Import vor dem Ersetzen an, verlangt eine Bestätigung und bietet eine Vorab-Sicherung an.
 
 Ein Backup-Passwort kann nicht wiederhergestellt werden. Teste eine wichtige Sicherung gelegentlich in einem getrennten Browserprofil.
+
+### Nextcloud-Ordner für freigegebene Speicherorte
+
+Die optionale Nextcloud-Funktion verbindet einen lokalen Ordner, der bereits durch den Nextcloud-Desktop-Client synchronisiert wird. EWH-Studio legt dort nur neu erzeugte, lokal verschlüsselte Vollbackups ab. Der Desktop-Client der Schule übernimmt die Übertragung. EWH-Studio erhält und speichert weder WebDAV-Adresse noch Nextcloud-Benutzernamen oder -Passwörter; im Browser liegt nur die Ordnerfreigabe.
+
+Die Ordnerverbindung benötigt einen Browser mit Dateisystemzugriff (derzeit insbesondere Chromium-basierte Browser wie Edge oder Chrome). In anderen Browsern bleibt das verschlüsselte Download-Backup verfügbar. Auf einem weiteren Gerät muss der Nextcloud-Desktop-Client den Ordner zuerst lokal synchronisieren; anschließend wählst du ihn dort ebenfalls ausdrücklich aus.
+
+Du bzw. deine Schule verantwortet die Freigabe des gewählten Cloud-Speichers, dessen Serverstandort, Zugriffsrechte, Auftragsverarbeitung, Verzeichnis der Verarbeitungstätigkeiten und die Datenschutzprüfung. Vor der Nutzung mit Schülerdaten muss der Speicher durch Schule oder Schulträger freigegeben sein. EWH-Studio übernimmt keine Gewähr für Verfügbarkeit oder Sicherheitskonfiguration fremder Cloud-Speicher.
+
+Office 365, OneDrive und iCloud werden nicht angebunden.

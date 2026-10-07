@@ -2,6 +2,14 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## 0.6.1 – 07.10.2026
+
+- Arbeitsbereiche, Klassenarbeitskontext und Korrekturansicht klarer gegliedert.
+- Teilnahmeschalter bündelt Korrektur, Klassendurchschnitt und Klassendruck; nicht teilnehmende Schüler:innen werden in diesen Abläufen ausgelassen.
+- Sperrstatus und Backup-Bereich vereinfacht; Schuljahr-Aktionen sind nicht mehr als eigene Einstiegspunkte sichtbar.
+- Erwartungshorizonte erhalten bei strukturellen Änderungen weiterhin automatisch eine lokale Version.
+- Optionale Nextcloud-Ablage nutzt nun einen lokal synchronisierten, schulisch freigegebenen Ordner statt Browser-WebDAV: keine CORS-Konfiguration und keine Speicherung von Nextcloud-Zugangsdaten in EWH-Studio.
+
 ## 0.6.0 – 18.08.2026
 
 - Abschnittsgewichtungen entfernt: Gesamtnoten werden wieder ausschließlich aus den erreichten Rohpunkten gebildet.

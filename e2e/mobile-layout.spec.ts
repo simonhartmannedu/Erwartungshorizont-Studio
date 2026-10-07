@@ -5,6 +5,8 @@ test.use({ viewport: { width: 390, height: 844 } });
 test("nutzt auf kleinen Displays die verfügbare Breite ohne horizontalen Seitenüberlauf", async ({ page }) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeiten" }).click();
+  await page.getByRole("tab", { name: "Korrigieren" }).click();
 
   await expect(page.locator(".local-save-status")).toContainText(/Speichert lokal|Lokal gespeichert/);
   await expect(page.getByRole("button", { name: /Arbeitskontext/ })).toBeVisible();
@@ -30,7 +32,8 @@ test("richtet die Auswahl ab Tabletbreite bündig zum Inhaltsbereich aus", async
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
-  await page.getByRole("tab", { name: "Lerngruppen" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeiten" }).click();
+  await page.getByRole("tab", { name: "Korrigieren" }).click();
 
   const positions = await page.evaluate(() => {
     const selectionCard = Array.from(document.querySelectorAll("h2"))

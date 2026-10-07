@@ -12,7 +12,6 @@ export const SummaryPanel = ({
   locked = false,
   hasSelectedGroup = false,
   hasSelectedStudent = false,
-  showSelectionReminder = true,
 }: {
   summary: ExamSummary;
   studentLabel?: string | null;
@@ -27,7 +26,6 @@ export const SummaryPanel = ({
   locked?: boolean;
   hasSelectedGroup?: boolean;
   hasSelectedStudent?: boolean;
-  showSelectionReminder?: boolean;
 }) => {
   const [issuesCollapsed, setIssuesCollapsed] = useState(summary.issues.length > 0);
 
@@ -37,8 +35,8 @@ export const SummaryPanel = ({
 
   return (
     <Card
-      title="Live-Auswertung"
-      subtitle="Alle Summen, Prozentwerte und Noten aktualisieren sich automatisch."
+      title={hasSelectedStudent ? "Individuelle Auswertung" : "Bewertungsübersicht"}
+      subtitle={hasSelectedStudent ? "Punkte, Prozentwert und Note der ausgewählten Person." : "Rubrik und Notenschlüssel der aktiven Klassenarbeit."}
     >
       <div className="grid gap-4">
       {studentLabel && (
@@ -62,16 +60,17 @@ export const SummaryPanel = ({
       ) : null}
       {!locked ? (
         <>
-      {showSelectionReminder && !hasSelectedStudent ? (
-        <DismissibleCallout tone="warning" resetKey={`selection-reminder-${hasSelectedGroup}`}>
-          <p className="font-semibold">Noch keine individuelle Auswertung</p>
+      {!hasSelectedStudent ? (
+        <DismissibleCallout tone="info" resetKey={`selection-reminder-${hasSelectedGroup}`}>
+          <p className="font-semibold">Noch keine individuelle Korrektur ausgewählt</p>
           <p>
             {hasSelectedGroup
-              ? "Wähle in der Auswahl eine bereits angelegte Schüler*in aus. Erst dann werden ihre Punkte, Prozentwerte und Note angezeigt."
-              : "Wähle in der Auswahl zuerst eine Lerngruppe und anschließend eine bereits angelegte Schüler*in aus. Erst dann werden individuelle Punkte, Prozentwerte und Noten angezeigt."}
+              ? "Wähle zum Korrigieren eine Schüler:in. Bis dahin zeigen wir nur Daten der Rubrik, keine Note."
+              : "Wähle zum Korrigieren zuerst eine Lerngruppe und anschließend eine Schüler:in. Bis dahin zeigen wir nur Daten der Rubrik, keine Note."}
           </p>
         </DismissibleCallout>
       ) : null}
+      {hasSelectedStudent ? <>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="metric-primary rounded-2xl p-4">
           <p className="label !text-current opacity-80">Gesamtpunkte</p>
@@ -132,6 +131,19 @@ export const SummaryPanel = ({
           </div>
         </div>
       </div>
+      </> : (
+        <div className="surface-muted grid gap-3 rounded-2xl p-4 sm:grid-cols-2">
+          <div>
+            <p className="label">Maximalpunkte der Rubrik</p>
+            <p className="themed-strong text-2xl font-semibold">{formatNumber(summary.totalMaxPoints)}</p>
+          </div>
+          <div>
+            <p className="label">Notenschlüssel</p>
+            <p className="themed-strong text-sm font-semibold">Bereit für die Korrektur</p>
+            <p className="themed-muted mt-1 text-sm">Individuelle Ergebnisse erscheinen erst nach Auswahl einer Schüler:in.</p>
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         {summary.issues.length === 0 ? (
           <Badge tone="emerald">Keine Validierungshinweise</Badge>

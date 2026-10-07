@@ -9,7 +9,7 @@ interface Props {
 }
 
 export const ExamHeaderForm = ({ meta, onChange, disabled = false, showNotesListTransform = true }: Props) => (
-  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
     <Field label="Schuljahr">
       <input className="field" value={meta.schoolYear} placeholder="Hier Schuljahr eintragen" disabled={disabled} onChange={(e) => onChange("schoolYear", e.target.value)} />
     </Field>

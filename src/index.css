@@ -1806,6 +1806,65 @@
     box-shadow: 0 0.65rem 1.4rem color-mix(in srgb, var(--app-primary-bg) 20%, transparent);
   }
 
+  .backup-action-kicker {
+    margin: 0 0 0.15rem;
+    color: var(--app-field-focus);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .backup-sync-card {
+    border-color: color-mix(in srgb, var(--app-status-success) 36%, var(--app-border));
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--app-status-success) 10%, transparent), transparent 54%),
+      var(--app-secondary-bg);
+  }
+
+  .backup-sync-icon {
+    display: inline-flex;
+    width: 3.25rem;
+    height: 3.25rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--app-status-success) 35%, var(--app-secondary-border));
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--app-status-success) 14%, var(--app-secondary-bg));
+    color: var(--app-status-success);
+  }
+
+  .backup-sync-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .backup-sync-card .backup-action-kicker {
+    color: var(--app-status-success);
+  }
+
+  .backup-remote-note {
+    border-top: 1px solid color-mix(in srgb, var(--app-status-success) 24%, var(--app-secondary-border));
+    padding-top: 0.25rem;
+    color: var(--app-soft-text);
+  }
+
+  .backup-connected-folder {
+    overflow: hidden;
+    margin: 0;
+    color: var(--app-status-success);
+    font-size: 0.75rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .backup-browser-note {
+    margin: 0;
+    color: var(--app-soft-text);
+  }
+
   .backup-choice-button {
     min-height: 3.1rem;
     gap: 0.5rem;
@@ -5063,15 +5122,14 @@
 }
 
 .group-security-status {
-  display: grid;
+  display: flex;
   width: 100%;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   border: 1px solid var(--app-secondary-border);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--app-panel-bg) 94%, var(--app-secondary-bg));
-  padding: 0.7rem 0.75rem;
+  padding: 0.55rem 0.7rem;
   color: var(--app-text);
   text-align: left;
   transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
@@ -5099,13 +5157,13 @@
 }
 
 .group-security-status.is-locked {
-  border-color: color-mix(in srgb, #d97706 34%, var(--app-secondary-border));
-  background: color-mix(in srgb, #f59e0b 7%, var(--app-panel-bg));
+  border-color: color-mix(in srgb, #dc2626 42%, var(--app-secondary-border));
+  background: color-mix(in srgb, #ef4444 9%, var(--app-panel-bg));
 }
 
 .group-security-status.is-locked .group-security-status-icon {
-  background: color-mix(in srgb, #f59e0b 18%, var(--app-panel-bg));
-  color: #a16207;
+  background: color-mix(in srgb, #ef4444 20%, var(--app-panel-bg));
+  color: #b91c1c;
 }
 
 .group-security-status.is-unlocked .group-security-status-icon {
@@ -5114,9 +5172,7 @@
 }
 
 .group-security-status-copy {
-  display: grid;
   min-width: 0;
-  gap: 0.15rem;
 }
 
 .group-security-status-copy strong {
@@ -5125,23 +5181,11 @@
   line-height: 1.2;
 }
 
-.group-security-status-copy small {
-  color: var(--app-text-muted);
-  font-size: 0.73rem;
-  line-height: 1.35;
+.group-security-status.is-locked .group-security-status-copy strong {
+  color: #b91c1c;
 }
 
-.group-security-status-action {
-  color: var(--app-field-focus);
-  font-size: 0.78rem;
-  font-weight: 750;
-}
-
-.group-security-status.is-locked .group-security-status-action {
-  color: #a16207;
-}
-
-.group-security-status.is-unlocked .group-security-status-action {
+.group-security-status.is-unlocked .group-security-status-copy strong {
   color: #047857;
 }
 
@@ -5499,6 +5543,27 @@
 
 /* Institutional application redesign: calm, dense, and document-led. */
 @media screen {
+  .app-header {
+    border-bottom: 1px solid var(--app-border-default);
+    padding-bottom: 0.8rem;
+  }
+
+  .app-navigation-row {
+    border-bottom: 1px solid var(--app-border-default);
+    padding-bottom: 0.65rem;
+  }
+
+  .app-navigation-tabs {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  @media (min-width: 1024px) {
+    .app-navigation-tabs {
+      overflow: visible;
+    }
+  }
+
   body,
   .app-shell,
   .app-shell:fullscreen {
@@ -5932,6 +5997,18 @@
     border-radius: 0.25rem;
     background: color-mix(in srgb, var(--section-accent) 12%, var(--app-secondary-bg));
     color: var(--app-text-strong);
+  }
+
+  .section-editor .card-title-toggle {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .section-editor .card-title-toggle:hover,
+  .section-editor .card-title-toggle:focus-visible {
+    color: var(--section-accent, var(--app-field-focus));
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
   }
 
   .score-input {

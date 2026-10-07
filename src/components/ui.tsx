@@ -41,7 +41,20 @@ export const Card = ({
         }`}
       >
         <div>
-          {title && <h2 className="card-title text-lg font-semibold">{title}</h2>}
+          {title ? (
+            <h2 className="card-title text-lg font-semibold">
+              {collapsible ? (
+                <button
+                  type="button"
+                  className="card-title-toggle text-left"
+                  onClick={() => onToggleCollapse?.()}
+                  aria-expanded={!collapsed}
+                >
+                  {title}
+                </button>
+              ) : title}
+            </h2>
+          ) : null}
           {subtitle && <p className="card-subtitle mt-1 text-sm">{subtitle}</p>}
         </div>
         {collapsible ? (

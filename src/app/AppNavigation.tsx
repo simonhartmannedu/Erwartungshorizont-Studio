@@ -5,19 +5,26 @@ import type { GlobalSearchResult } from "./AppHeader";
 export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "bogencheck" | "archive" | "backup";
 
 /** Bogencheck remains implemented, but is not released in the primary navigation yet. */
+/**
+ * These are the durable destinations of the workspace. Creation and the
+ * wizard remain available as contextual actions; making them top-level tabs
+ * made the same job appear in three different places.
+ */
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
-  { id: "wizard", label: "EWH-Wizard" },
+  { id: "builder", label: "Klassenarbeiten" },
   { id: "groups", label: "Lerngruppen" },
-  { id: "guidedBuilder", label: "EWH erstellen" },
-  { id: "builder", label: "EWH-Editor" },
-  { id: "archive", label: "EWH-Archiv" },
+  { id: "archive", label: "Archiv" },
   { id: "backup", label: "Backup" },
 ];
 
 /** The compact workflow deliberately exposes only creating and finishing an EWH. */
-export const easyModeTabs = tabs.filter((tab) => tab.id === "guidedBuilder" || tab.id === "builder");
+export const easyModeTabs = tabs.filter((tab) => tab.id === "builder");
 export const getVisibleTabs = (easyMode: boolean) => (easyMode ? easyModeTabs : tabs);
+
+/** Contextual views keep their old state IDs for compatibility with existing calls. */
+export const getNavigationTabId = (tabId: AppTabId): AppTabId =>
+  tabId === "guidedBuilder" || tabId === "wizard" ? "builder" : tabId;
 
 export const getTabButtonId = (tabId: AppTabId) => `app-tab-${tabId}`;
 export const getTabPanelId = (tabId: AppTabId) => `app-tabpanel-${tabId}`;
@@ -135,10 +142,13 @@ export const AppNavigation = ({
   sensitiveSearchSessionVersion,
   onSearchResultSelect,
   easyMode,
-}: AppNavigationProps) => (
+}: AppNavigationProps) => {
+  const navigationTab = getNavigationTabId(activeTab);
+
+  return (
   <div className="mb-6 no-print">
-    <div className="flex min-w-0 flex-col gap-2 py-1 sm:flex-row sm:items-center sm:gap-3">
-      <div role="tablist" aria-label="Hauptbereiche" className="flex min-w-0 gap-3 overflow-x-auto">
+    <div className="app-navigation-row flex min-w-0 flex-col gap-2 py-1 lg:flex-row lg:items-center lg:gap-3">
+      <div role="tablist" aria-label="Hauptbereiche" className="app-navigation-tabs flex w-full min-w-0 gap-2 lg:w-auto">
         {getVisibleTabs(easyMode).map((tab) => (
           <button
             key={tab.id}
@@ -147,13 +157,13 @@ export const AppNavigation = ({
               tabButtonRefs.current[tab.id] = element;
             }}
             role="tab"
-            aria-selected={activeTab === tab.id}
+            aria-selected={navigationTab === tab.id}
             aria-controls={getTabPanelId(tab.id)}
-            tabIndex={activeTab === tab.id ? 0 : -1}
+            tabIndex={navigationTab === tab.id ? 0 : -1}
             type="button"
             onClick={() => onSelectTab(tab.id)}
             onKeyDown={(event) => onTabKeyDown(event, tab.id)}
-            className={`${activeTab === tab.id ? "button-primary" : "button-secondary"} app-navigation-tab shrink-0 gap-2 whitespace-nowrap`}
+            className={`${navigationTab === tab.id ? "button-primary" : "button-secondary"} app-navigation-tab shrink-0 gap-2 whitespace-nowrap`}
           >
             <TabIcon id={tab.id} />
             {tab.label}
@@ -184,4 +194,5 @@ export const AppNavigation = ({
       </div>
     </div>
   </div>
-);
+  );
+};

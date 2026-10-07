@@ -87,6 +87,13 @@ export const UploadIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const CloudUploadIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M7.5 18.5H6.8a4.3 4.3 0 1 1 .9-8.5A5.4 5.4 0 0 1 18 11.8a3.4 3.4 0 0 1-.8 6.7h-.7" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 20v-7m-2.7 2.7L12 13l2.7 2.7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const DuplicateIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
     <rect x="9" y="9" width="10" height="10" rx="1.5" />

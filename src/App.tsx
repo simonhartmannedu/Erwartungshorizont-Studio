@@ -53,6 +53,7 @@ import {
 } from "./utils/storage";
 import {
   buildAppBackupFilenameForClass,
+  buildAppBackupFilename,
   BackupValidationError,
   BackupFailureMetadata,
   buildSchoolYearArchiveFilename,
@@ -161,7 +162,7 @@ import { EditorSectionTabs, getEditorSectionPanelId, type EditorSectionTabId } f
 import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { EwhWizard } from "./components/EwhWizard";
-import { BackupPanel, SchoolYearBackupOption } from "./components/BackupPanel";
+import { BackupPanel } from "./components/BackupPanel";
 import { HomeDashboard } from "./components/HomeDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
@@ -186,6 +187,13 @@ import { SECTION_CHART_PALETTE } from "./utils/sectionChart";
 import { cloneExam, createEmptyExamMeta, withExamMeta } from "./utils/exam";
 import { isDemoStorageScope, scopedStorageKey } from "./utils/storageScope";
 import { loadUserPreferences, saveUserPreferences, type UserPreferences } from "./utils/preferences";
+import {
+  connectNextcloudFolder,
+  getConnectedNextcloudFolderName,
+  getLatestNextcloudFolderBackup,
+  saveEncryptedBackupToNextcloudFolder,
+  supportsNextcloudFolderConnection,
+} from "./utils/nextcloudFolder";
 
 const GuidedExamBuilder = lazy(async () => {
   const module = await import("./components/GuidedExamBuilder");
@@ -937,6 +945,7 @@ function App() {
   const unlockActivityAtRef = useRef<number>(Date.now());
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(() => loadLastBackupAt());
   const [lastBackupFailure, setLastBackupFailure] = useState(() => loadLastBackupFailure());
+  const [nextcloudFolderName, setNextcloudFolderName] = useState<string | null>(null);
   const [restoreCheckpoint, setRestoreCheckpoint] = useState<RestoreCheckpoint | null>(null);
   const [pendingImportPreview, setPendingImportPreview] = useState<PendingImportPreview | null>(null);
   const [restoreOverwriteConfirmed, setRestoreOverwriteConfirmed] = useState(false);
@@ -1005,7 +1014,7 @@ function App() {
   const [showGradeScaleEditor, setShowGradeScaleEditor] = useState(false);
   const [activeEditorTab, setActiveEditorTab] = useState<EditorSectionTabId>("setup");
   const [metadataSectionCollapsed, setMetadataSectionCollapsed] = useState(false);
-  const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(false);
+  const [pointsAndGradeSectionCollapsed, setPointsAndGradeSectionCollapsed] = useState(true);
   const [resultSectionCollapsed, setResultSectionCollapsed] = useState(false);
   const [versionListCollapsed, setVersionListCollapsed] = useState(true);
   const [loadedExamTemplates, setLoadedExamTemplates] = useState<ExamTemplateDefinition[] | null>(null);
@@ -1016,7 +1025,7 @@ function App() {
     setCollapsedSectionIds([]);
     setActiveEditorTab("setup");
     setMetadataSectionCollapsed(false);
-    setPointsAndGradeSectionCollapsed(false);
+    setPointsAndGradeSectionCollapsed(true);
     setResultSectionCollapsed(false);
   }, []);
   const navigateEditorToc = useCallback((anchorId: string) => {
@@ -1120,6 +1129,21 @@ function App() {
     setUnlockedGroupIds([]);
     lockUnlockedGroupsWithSnapshot(lockedPasswords, notice);
   };
+
+  useEffect(() => {
+    if (!supportsNextcloudFolderConnection()) return;
+    let cancelled = false;
+    void getConnectedNextcloudFolderName()
+      .then((folderName) => {
+        if (!cancelled) setNextcloudFolderName(folderName);
+      })
+      .catch(() => {
+        // A folder handle is convenience metadata only. A local backup remains available.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (activeTab !== "guidedBuilder" || loadedExamTemplates) return;
@@ -1613,36 +1637,6 @@ function App() {
     () => describeBackupStatus(studentDatabase, lastBackupAt, lastBackupFailure),
     [studentDatabase, lastBackupAt, lastBackupFailure],
   );
-  const schoolYearBackupOptions = useMemo<SchoolYearBackupOption[]>(() => {
-    const workspaceIdsWithAssessments = new Map<string, number>();
-    Object.values(studentDatabase.assessments).forEach((assessment) => {
-      const workspaceId = getAssessmentWorkspaceId(assessment);
-      if (!workspaceId) return;
-      workspaceIdsWithAssessments.set(workspaceId, (workspaceIdsWithAssessments.get(workspaceId) ?? 0) + 1);
-    });
-
-    const optionBySchoolYear = new Map<string, SchoolYearBackupOption>();
-    draftBundle.workspaces.forEach((workspace) => {
-      const schoolYear = getWorkspaceSchoolYear(workspace);
-      const current = optionBySchoolYear.get(schoolYear) ?? {
-        value: schoolYear,
-        label: getSchoolYearLabel(schoolYear),
-        workspaceCount: 0,
-        snapshotCount: 0,
-        assessmentCount: 0,
-      };
-      optionBySchoolYear.set(schoolYear, {
-        ...current,
-        workspaceCount: current.workspaceCount + 1,
-        snapshotCount: current.snapshotCount + workspace.versions.length,
-        assessmentCount: current.assessmentCount + (workspaceIdsWithAssessments.get(workspace.id) ?? 0),
-      });
-    });
-
-    return Array.from(optionBySchoolYear.values()).sort((left, right) =>
-      left.label.localeCompare(right.label, "de-DE", { numeric: true }),
-    );
-  }, [draftBundle.workspaces, studentDatabase.assessments]);
   const captureRestoreCheckpoint = (): RestoreCheckpoint => ({
     draftBundle,
     archiveEntries,
@@ -3085,6 +3079,64 @@ function App() {
     }
   };
 
+  const handleConnectNextcloudFolder = async () => {
+    try {
+      const folderName = await connectNextcloudFolder();
+      setNextcloudFolderName(folderName);
+      pushNotice("success", "Nextcloud-Ordner verbunden", `EWH sichert künftig verschlüsselte Backups in „${folderName}“. Der Nextcloud-Desktop-Client übernimmt die Synchronisation.`);
+      return folderName;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return null;
+      const code = error instanceof Error ? error.message : "NEXTCLOUD_FOLDER_CONNECT_FAILED";
+      pushNotice("danger", "Nextcloud-Ordner konnte nicht verbunden werden", `Der Ordnerzugriff wurde nicht eingerichtet. Fehlercode: ${code}.`);
+      return null;
+    }
+  };
+
+  const handleSyncNextcloudFolder = async (passphrase: string) => {
+    if (!passphrase.trim()) {
+      pushNotice("warning", "Backup-Passwort fehlt", "Bitte vergib ein Passwort für das verschlüsselte Backup.");
+      return false;
+    }
+
+    const exportedAt = new Date().toISOString();
+    try {
+      const filename = buildAppBackupFilename(exportedAt);
+      const backup = await createEncryptedAppBackup({
+        draftBundle,
+        studentDatabase,
+        archiveEntries,
+      }, passphrase.trim(), exportedAt);
+      await saveEncryptedBackupToNextcloudFolder(filename, JSON.stringify(backup, null, 2));
+      markBackupComplete(backup.exportedAt);
+      setLastBackupAt(backup.exportedAt);
+      setLastBackupFailure(null);
+      pushNotice("success", "Nextcloud-Backup gespeichert", "Die verschlüsselte Sicherung liegt im lokalen Nextcloud-Ordner. Der Nextcloud-Desktop-Client übernimmt die Synchronisation.");
+      return true;
+    } catch (error) {
+      const failure = { occurredAt: exportedAt, code: "NEXTCLOUD_FOLDER_BACKUP_FAILED" };
+      markBackupFailed(failure.code, failure.occurredAt);
+      setLastBackupFailure(failure);
+      const code = error instanceof Error ? error.message : "NEXTCLOUD_FOLDER_BACKUP_FAILED";
+      pushNotice("danger", "Nextcloud-Backup fehlgeschlagen", `Die Sicherung wurde nicht hochgeladen. Fehlercode: ${code}.`);
+      return false;
+    }
+  };
+
+  const handleLoadLatestNextcloudBackup = async () => {
+    try {
+      const backup = await getLatestNextcloudFolderBackup();
+      if (!backup) {
+        pushNotice("warning", "Kein Nextcloud-Backup gefunden", "Im verbundenen lokalen Nextcloud-Ordner wurde keine EWH-Backup-Datei gefunden.");
+      }
+      return backup;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "NEXTCLOUD_FOLDER_READ_FAILED";
+      pushNotice("danger", "Nextcloud-Backup konnte nicht gelesen werden", `Prüfe Ordnerberechtigung und den Nextcloud-Desktop-Client. Fehlercode: ${code}.`);
+      return null;
+    }
+  };
+
   const openQuickBackupDialog = () => {
     setQuickBackupPassphrase("");
     setQuickBackupError("");
@@ -3232,6 +3284,9 @@ function App() {
         : `${normalizedSchoolYear} ist aktiv. Schülerlisten und Bewertungen wurden entfernt; wähle jetzt eine Vorlage für die erste Klassenarbeit.`,
     );
   };
+  // Kept private so existing persisted school-year archives remain readable; no UI invokes these legacy actions.
+  void handleArchiveSchoolYear;
+  void handleStartSchoolYear;
 
   const handleRemoveWorkspace = (workspaceId: string) => {
     const deletesLastVisibleWorkspace =
@@ -3631,8 +3686,11 @@ function App() {
       return false;
     }
 
-    if (activeGroup.students.length === 0) {
-      pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
+    const participatingStudents = activeGroup.students.filter((student) =>
+      isStudentParticipating(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null),
+    );
+    if (participatingStudents.length === 0) {
+      pushNotice("warning", "Keine teilnehmenden Schüler", "Für diese Klassenarbeit ist keine teilnehmende Schüler:in ausgewählt.");
       return false;
     }
 
@@ -3660,7 +3718,7 @@ function App() {
     }
 
     const reports = [];
-    for (const student of activeGroup.students) {
+    for (const student of participatingStudents) {
       const studentExam = buildExamForStudent(exam, studentDatabase, {
         groupId: activeGroup.id,
         studentId: student.id,
@@ -4330,12 +4388,12 @@ function App() {
 
         <div
           className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 ${easyMode ? "" : (
-            activeTab === "guidedBuilder" || activeTab === "home" || activeTab === "wizard"
-              ? "xl:grid-cols-[320px_minmax(0,1fr)]"
-              : "xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+            activeTab === "builder" && activeEditorTab !== "setup"
+              ? "xl:grid-cols-[300px_minmax(0,1fr)_340px]"
+              : ""
           )}`}
         >
-          {!easyMode ? (
+          {!easyMode && activeTab === "builder" && activeEditorTab !== "setup" ? (
           <aside
             className={`min-w-0 ${
               activeTab === "builder" ? "xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:self-start xl:overflow-y-auto xl:pr-1" : ""
@@ -4344,18 +4402,12 @@ function App() {
             <div className={activeTab === "builder" ? "space-y-6" : ""}>
               <StudentSelectionPanel
                 database={studentDatabase}
-                workspaces={visibleWorkspaces}
                 activeExam={exam}
                 activeWorkspaceId={draftBundle.activeWorkspaceId}
                 activeGroupId={activeGroupId}
                 activeStudentId={activeStudentId}
                 onSelectGroup={(groupId) => setActiveGroupId(groupId)}
-                onSelectWorkspace={(workspaceId) => {
-                  setActiveWorkspaceId(workspaceId);
-                  setActiveTab("builder");
-                }}
                 onSelectStudent={(studentId) => openStudentInBuilder(studentId)}
-                onChangeParticipationStatus={handleChangeParticipationStatus}
                 onRevealGroupStudentNames={handleRevealGroupStudentNames}
                 isSelectedGroupUnlocked={Boolean(activeGroupPassword)}
                 activeGroupIsProtected={activeGroupIsProtected}
@@ -4534,7 +4586,13 @@ function App() {
             >
             {activeTab === "builder" && (
               <>
-                <EditorSectionTabs activeTab={activeEditorTab} onSelectTab={setActiveEditorTab} />
+                <EditorSectionTabs
+                  activeTab={activeEditorTab}
+                  onSelectTab={(tabId) => {
+                    if (tabId === "tasks") setCollapsedSectionIds(displayExam.sections.map((section) => section.id));
+                    setActiveEditorTab(tabId);
+                  }}
+                />
                 <div hidden={activeEditorTab !== "setup"}>
                   <div id={EDITOR_METADATA_ANCHOR_ID} className="scroll-mt-24">
                     <Card
@@ -4551,6 +4609,15 @@ function App() {
                           setActiveWorkspaceExam((current) => ({ ...current, meta: { ...current.meta, [key]: value } }))
                         }
                       />
+                      {activeWorkspace ? (
+                        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 surface-muted">
+                          <div>
+                            <p className="label">Bewertungsraster</p>
+                            <p className="themed-muted text-sm">Kriterien und Maximalpunkte bearbeitest du im nächsten Schritt. Änderungen gelten für die ganze Klassenarbeit.</p>
+                          </div>
+                          <button type="button" className="button-secondary" onClick={() => setActiveEditorTab("tasks")}>Rubrik öffnen</button>
+                        </div>
+                      ) : null}
                       {!activeWorkspace ? (
                         <div className="surface-muted mt-4 rounded-2xl p-4">
                           <p className="label">Noch kein EWH zugeordnet</p>
@@ -4775,12 +4842,33 @@ function App() {
                   hidden={activeEditorTab !== "tasks"}
                   className="space-y-6"
                 >
+                {activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
+                  <Card title="Korrektur starten" subtitle="Die Rubrik bleibt unverändert; Punkte gehören immer zu einer ausgewählten Schüler:in.">
+                    <div className="surface-muted rounded-2xl p-5">
+                      <p className="themed-strong font-semibold">{selectedStudent ? "Schüler:in nimmt nicht teil" : "Noch keine Schüler:in ausgewählt"}</p>
+                      <p className="themed-muted mt-2 text-sm leading-6">
+                        {selectedStudent
+                          ? "Aktiviere links „Nimmt an dieser Klassenarbeit teil“, um Punkte einzugeben und ein individuelles Ergebnis zu erhalten."
+                          : "Wähle links zuerst die Lerngruppe und dann einen Schülercode. Erst danach werden Eingabefelder, individuelles Ergebnis und Korrekturfortschritt angezeigt."}
+                      </p>
+                      {selectedStudent ? (
+                        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm leading-5">
+                          <input type="checkbox" className="mt-0.5" checked={false} disabled={assessmentLocked} onChange={(event) => {
+                            if (event.target.checked) handleChangeParticipationStatus("present");
+                          }} />
+                          <span><strong className="themed-strong block">Nimmt an dieser Klassenarbeit teil</strong><span className="themed-muted">Aktivieren, um diese Korrektur wieder aufzunehmen.</span></span>
+                        </label>
+                      ) : null}
+                    </div>
+                  </Card>
+                ) : (
+                  <>
                 {activeWorkspace ? (
                   <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 surface-muted">
                     <div>
-                      <p className="label">Abschnitte</p>
+                      <p className="label">Individuelle Korrektur</p>
                       <p className="themed-muted text-sm">
-                        {displayExam.sections.length} Bereiche · {displayExam.sections.reduce((sum, section) => sum + section.tasks.length, 0)} Unteraufgaben
+                        {activeStudentLiveLabel ?? "Schülercode"} · {displayExam.sections.reduce((sum, section) => sum + section.tasks.length, 0)} Punkteingaben
                       </p>
                     </div>
                     <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1">
@@ -4801,6 +4889,33 @@ function App() {
                         Alle aufklappen
                       </button>
                     </div>
+                  </div>
+                ) : null}
+
+                {activeWorkspace && selectedStudent ? (
+                  <section className="rounded-xl border p-4 surface-muted" aria-label="Teilnahme an dieser Klassenarbeit">
+                    <label className="flex cursor-pointer items-start gap-3 text-sm leading-5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked
+                        disabled={assessmentLocked}
+                        onChange={(event) => {
+                          if (!event.target.checked) handleChangeParticipationStatus("absent");
+                        }}
+                      />
+                      <span>
+                        <strong className="themed-strong block">Nimmt an dieser Klassenarbeit teil</strong>
+                        <span className="themed-muted">Teilnehmende Schüler:innen werden korrigiert, gedruckt und im Klassendurchschnitt berücksichtigt.</span>
+                      </span>
+                    </label>
+                  </section>
+                ) : null}
+
+                {activeWorkspace ? (
+                  <div className="rounded-xl border p-4 surface-muted">
+                    <p className="themed-strong text-sm font-semibold">Geteilte Rubrik, individuelle Punkte</p>
+                    <p className="themed-muted mt-1 text-sm leading-6">Aufgabentitel, erwartete Antworten und Maximalpunkte gehören zur gemeinsamen Rubrik. Nur die Spalte „Erreicht“ wird für {activeStudentLiveLabel ?? "die ausgewählte Schüler:in"} gespeichert. Änderungen an der Rubrik wirken sich auf alle Korrekturen aus.</p>
                   </div>
                 ) : null}
 
@@ -4929,6 +5044,8 @@ function App() {
                       </button>
                     </div>
                 ) : null}
+                  </>
+                )}
                 </div>
 
                 <div
@@ -5065,20 +5182,22 @@ function App() {
               <BackupPanel
                 backupStatus={backupStatus}
                 lastBackupAt={lastBackupAt}
-                schoolYearOptions={schoolYearBackupOptions}
                 canRollbackImport={Boolean(restoreCheckpoint)}
                 onExportFullBackup={handleExportDatabase}
                 onImportBackup={handleImportDatabase}
                 onRollbackImport={rollbackLastImport}
-                onArchiveSchoolYear={handleArchiveSchoolYear}
-                onStartSchoolYear={handleStartSchoolYear}
+                nextcloudFolderName={nextcloudFolderName}
+                nextcloudFolderSupported={supportsNextcloudFolderConnection()}
+                onConnectNextcloudFolder={handleConnectNextcloudFolder}
+                onSyncNextcloud={handleSyncNextcloudFolder}
+                onLoadLatestNextcloudBackup={handleLoadLatestNextcloudBackup}
               />
             )}
             </div>
 
           </main>
 
-          {!easyMode && activeTab !== "guidedBuilder" && activeTab !== "home" && activeTab !== "wizard" ? (
+          {!easyMode && activeTab === "builder" && activeEditorTab !== "setup" ? (
             <aside className="space-y-6 xl:sticky xl:top-6 self-start">
               <SummaryPanel
                 summary={summary}
@@ -5087,7 +5206,6 @@ function App() {
                 locked={assessmentLocked}
                 hasSelectedGroup={Boolean(activeGroupId)}
                 hasSelectedStudent={Boolean(selectedStudent)}
-                showSelectionReminder={userPreferences.showSelectionReminder}
                 correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
               />
               {activeTab === "builder" && activeWorkspace ? (
@@ -5246,12 +5364,8 @@ function App() {
 
       <ConfirmDialog
         open={headerUnlockDialogOpen}
-        title={headerUnlockPurpose === "scores" ? "Punkteingabe entsperren" : "Klassenpasswort eingeben"}
-        description={
-          headerUnlockPurpose === "scores"
-            ? "Die Punkte dieser Lerngruppe sind geschützt. Gib das Klassenpasswort ein, um die Leistungsdaten nur lokal für diese Sitzung zu bearbeiten."
-            : "Nach erfolgreicher Prüfung werden Bewertungsdaten, Kommentare, Signaturen und Klarnamen dieser Lerngruppe nur lokal für die aktuelle Sitzung geladen."
-        }
+        title="Lerngruppe entsperren"
+        description="Das Passwort bleibt nur für diese lokale Sitzung verfügbar."
         onCancel={() => {
           if (headerUnlockLoading) return;
           setHeaderUnlockDialogOpen(false);
@@ -5291,16 +5405,12 @@ function App() {
             setHeaderUnlockLoading(false);
           }
         }}
-        confirmLabel={headerUnlockLoading ? "Wird geladen..." : "Lerngruppe entschlüsseln"}
+        confirmLabel={headerUnlockLoading ? "Wird geladen..." : "Entsperren"}
         cancelDisabled={headerUnlockLoading}
         confirmDisabled={headerUnlockLoading}
       >
-        <div className="dialog-preview rounded-2xl p-4">
-          <Field
-            as="div"
-            label={`Passwort für ${activeGroup?.subject ?? "Klasse"} · ${activeGroup?.className ?? ""}`}
-            inputId="header-unlock-password"
-          >
+        <div className="space-y-3">
+          <Field as="div" label={`Passwort · ${activeGroup?.subject ?? "Klasse"} ${activeGroup?.className ?? ""}`} inputId="header-unlock-password">
             <input
               id="header-unlock-password"
               className="field"

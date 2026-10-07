@@ -9,7 +9,7 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.evaluate(() => window.history.replaceState({}, "", "/?demo=1"));
 
-  await page.getByRole("tab", { name: "EWH-Editor" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeiten" }).click();
   await page.getByRole("tab", { name: "Ergebnis & Druck", exact: true }).click();
   await page.getByRole("button", { name: "Vorlage im Archiv speichern" }).click();
   await expect(page.getByRole("heading", { name: "Erwartungshorizont-Archiv" })).toBeVisible();
@@ -23,14 +23,14 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await manualGroupForm.getByRole("button", { name: "Lerngruppe anlegen" }).click();
   await expect(page.getByRole("button", { name: groupLabel, exact: true })).toBeVisible();
 
-  await page.getByRole("tab", { name: "EWH-Archiv" }).click();
+  await page.getByRole("tab", { name: "Archiv" }).click();
   await page.getByTitle("Lerngruppe zuordnen").click();
   await page.getByLabel("Lerngruppe auswählen").selectOption({ label: groupLabel });
   await page.getByTitle("Ausgewählter Lerngruppe zuordnen").click();
-  await expect(page.getByRole("tab", { name: "EWH-Editor", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Klassenarbeiten", selected: true })).toBeVisible();
   await expect(page.locator(".local-save-status")).toHaveClass(/local-save-status-saved/);
 
   await page.reload();
-  await page.getByRole("tab", { name: "EWH-Archiv" }).click();
+  await page.getByRole("tab", { name: "Archiv" }).click();
   await expect(page.getByText(new RegExp(`Zugeordnet: .*${groupLabel}`))).toBeVisible();
 });

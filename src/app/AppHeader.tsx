@@ -133,25 +133,18 @@ export const AppHeader = ({
   easyMode,
   onEasyModeChange,
 }: AppHeaderProps) => (
-  <header className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-    <div className="max-w-4xl">
-      <p className="hero-kicker mb-3">Erwartungshorizont-Studio | NRW Edition</p>
+  <header className="app-header mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-w-0">
       <div className="brand-header-lockup">
         <div className="min-w-0">
-          <h1 className="font-display font-medium themed-strong text-4xl md:text-5xl">Erwartungshorizont Studio</h1>
-          <p className="themed-muted mt-4 max-w-3xl text-base leading-7">
-            Erwartungshorizonte, erstellen und verwalten
+          <h1 className="font-display font-medium themed-strong text-2xl md:text-3xl">Erwartungshorizont Studio</h1>
+          <p className="themed-muted mt-1 text-sm leading-6">
+            Klassenarbeiten vorbereiten, korrigieren und sichern
           </p>
         </div>
       </div>
     </div>
-    <div className="header-actions flex w-full flex-col gap-3 no-print sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:justify-self-end">
-      <ThemePicker
-        visualTheme={visualTheme}
-        favoriteVisualThemes={favoriteVisualThemes}
-        onVisualThemeChange={onVisualThemeChange}
-        onFavoriteVisualThemesChange={onFavoriteVisualThemesChange}
-      />
+    <div className="header-actions flex w-full flex-wrap gap-2 no-print sm:w-auto sm:items-end sm:justify-end">
       <button type="button" className="button-secondary header-control w-full gap-2 sm:w-auto" onClick={onToggleTheme}>
         {theme === "light" ? <MoonIcon /> : <SunIcon />}
         {theme === "light" ? "Dunkel" : "Hell"}
@@ -173,6 +166,12 @@ export const AppHeader = ({
           Einstellungen
         </summary>
         <div className="header-settings-panel mt-2 space-y-4 p-4">
+          <ThemePicker
+            visualTheme={visualTheme}
+            favoriteVisualThemes={favoriteVisualThemes}
+            onVisualThemeChange={onVisualThemeChange}
+            onFavoriteVisualThemesChange={onFavoriteVisualThemesChange}
+          />
           <div>
             <p className="label">Arbeitsweise</p>
             <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-5">
