@@ -85,6 +85,92 @@ export interface PrintSettings {
   showWeightedOverview: boolean;
 }
 
+/** A compact, machine-readable answer key. The question text stays on the actual exam paper. */
+export interface MultipleChoiceAnswerBlock {
+  id: string;
+  type: "multipleChoice";
+  title: string;
+  taskId: string | null;
+  /** When true, title and maximum points are maintained by this Bogencheck block. */
+  managedTask?: boolean;
+  optionLabels: string[];
+  correctAnswers: string[];
+  /** One editable point value per answer line. */
+  answerPoints: number[];
+  /** Legacy value, only used when reading older local drafts. */
+  pointsPerAnswer?: number;
+}
+
+/** A matching task uses the same fixed answer grid: item number to selected letter. */
+export interface MatchingAnswerBlock {
+  id: string;
+  type: "matching";
+  title: string;
+  taskId: string | null;
+  /** When true, title and maximum points are maintained by this Bogencheck block. */
+  managedTask?: boolean;
+  optionLabels: string[];
+  correctAnswers: string[];
+  /** One editable point value per matching line. */
+  answerPoints: number[];
+  /** Legacy value, only used when reading older local drafts. */
+  pointsPerAnswer?: number;
+}
+
+/** Binary statements are stored separately so they remain recognisable in the editor and on printouts. */
+export interface TrueFalseAnswerBlock {
+  id: string;
+  type: "trueFalse";
+  title: string;
+  taskId: string | null;
+  managedTask?: boolean;
+  optionLabels: string[];
+  correctAnswers: string[];
+  answerPoints: number[];
+  pointsPerAnswer?: number;
+}
+
+/** A row can contain several correct choices; it receives points only when the full set is selected. */
+export interface MultipleResponseAnswerBlock {
+  id: string;
+  type: "multipleResponse";
+  title: string;
+  taskId: string | null;
+  managedTask?: boolean;
+  optionLabels: string[];
+  correctAnswers: string[][];
+  answerPoints: number[];
+  pointsPerAnswer?: number;
+}
+
+/** Each row is assigned a position (normally 1, 2, 3, …) in a fixed answer grid. */
+export interface OrderingAnswerBlock {
+  id: string;
+  type: "ordering";
+  title: string;
+  taskId: string | null;
+  managedTask?: boolean;
+  optionLabels: string[];
+  correctAnswers: string[];
+  answerPoints: number[];
+  pointsPerAnswer?: number;
+}
+
+/** Kept only so existing local drafts can be opened; it is removed during normalization. */
+export interface LegacyNumberedGapAnswerBlock {
+  id: string;
+  type: "numberedGaps";
+  title: string;
+  taskId: string | null;
+  gapCount: number;
+}
+
+export type AnswerSheetBlock = MultipleChoiceAnswerBlock | MatchingAnswerBlock | TrueFalseAnswerBlock | MultipleResponseAnswerBlock | OrderingAnswerBlock | LegacyNumberedGapAnswerBlock;
+
+export interface AnswerSheetSettings {
+  blocks: AnswerSheetBlock[];
+}
+
 export interface EncryptedText {
   ciphertext: string;
   iv: string;
@@ -124,6 +210,9 @@ export interface StudentAssessment {
   /** Participation applies to this student in this particular classwork. */
   participationStatus?: StudentParticipationStatus;
   encryptedParticipationStatus?: EncryptedText | null;
+  /** Opaque, random work code printed on a Bogencheck answer sheet. */
+  answerSheetCode?: string;
+  encryptedAnswerSheetCode?: EncryptedText | null;
   updatedAt: string;
   printedAt: string | null;
 }
@@ -142,6 +231,7 @@ export interface Exam {
   gradeScale: GradeScale;
   sections: Section[];
   printSettings: PrintSettings;
+  answerSheetSettings?: AnswerSheetSettings;
 }
 
 export interface DraftWorkspace {

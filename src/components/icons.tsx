@@ -23,6 +23,20 @@ export const DashboardIcon = ({ className = "h-4 w-4" }: IconProps) => (
   </svg>
 );
 
+export const CameraIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M4.5 7.5h3l1.4-2h6.2l1.4 2h3A1.5 1.5 0 0 1 21 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5V9a1.5 1.5 0 0 1 1.5-1.5Z" strokeLinejoin="round" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+);
+
+export const ScanIcon = ({ className = "h-4 w-4" }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+    <path d="M8 4.5H5.5v3M16 4.5h2.5v3M8 19.5H5.5v-3M16 19.5h2.5v-3M8 9h8v6H8z" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M10 12h4" strokeLinecap="round" />
+  </svg>
+);
+
 export const DragIcon = ({ className = "h-4 w-4" }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
     <circle cx="8" cy="7" r="1.4" />

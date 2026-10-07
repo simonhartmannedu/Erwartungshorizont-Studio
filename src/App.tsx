@@ -26,6 +26,8 @@ import {
   GroupAccessMode,
   ThemeMode,
   VisualTheme,
+  AnswerSheetSettings,
+  AnswerSheetBlock,
 } from "./types";
 import type { ExamTemplateDefinition } from "./data/templates";
 import { sampleExam } from "./data/sampleExam";
@@ -105,15 +107,18 @@ import {
   migrateLegacyStudentAbsences,
   removeStudentGroup,
   removeStudentFromGroup,
+  renameStudentGroup,
   scrubSensitiveAssessmentsForGroups,
   scaleTaskScoresForStudents,
   setStudentOrderInGroup,
   updateGroupDefaultSignature,
   updateStudentScore,
   updateStudentParticipationStatus,
+  updateStudentAnswerSheetCode,
   updateStudentSignature,
   updateTeacherComment,
 } from "./utils/students";
+import { createAnswerSheetCode } from "./utils/answerSheets";
 import {
   downloadCsvFile,
   exportEditableExamDocx,
@@ -162,6 +167,8 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter } from "./components/AppFooter";
 import { PointScaleControl } from "./components/PointScaleControl";
 import { GradeScaleRangeSection } from "./components/GradeScaleRangeSection";
+import { BogencheckPanel } from "./components/BogencheckPanel";
+import { BogencheckScanner } from "./components/BogencheckScanner";
 import { StudentRosterPanel } from "./components/StudentRosterPanel";
 import { StudentSelectionPanel } from "./components/StudentSelectionPanel";
 import { SectionAllocationOverview } from "./components/SectionAllocationOverview";
@@ -395,6 +402,7 @@ const createEmptyExam = (): Exam => ({
     compactRows: false,
     showWeightedOverview: false,
   },
+  answerSheetSettings: { blocks: [] },
 });
 
 const createDraftWorkspace = (
@@ -668,6 +676,50 @@ function App() {
             ...defaultPrintSettings,
             ...(nextExam.printSettings ?? {}),
           },
+          answerSheetSettings: {
+            blocks: (nextExam.answerSheetSettings?.blocks ?? []).flatMap<AnswerSheetBlock>((block) => {
+              if (block?.type === "multipleChoice" || block?.type === "matching" || block?.type === "trueFalse" || block?.type === "ordering") {
+                const optionLabels = Array.from(new Set((block.optionLabels ?? []).map((label) => String(label).trim()).filter(Boolean)));
+                return optionLabels.length >= 2 && Array.isArray(block.correctAnswers)
+                  ? (() => {
+                      const correctAnswers = block.correctAnswers.map((answer) => optionLabels.includes(answer) ? answer : optionLabels[0]);
+                      const legacyPoints = Math.max(0, toFiniteNumber(block.pointsPerAnswer, 1));
+                      const answerPoints = correctAnswers.map((_, index) => Math.max(0, toFiniteNumber(block.answerPoints?.[index], legacyPoints)));
+                      return [{
+                        id: block.id || crypto.randomUUID(),
+                        type: block.type,
+                        title: block.title ?? ({ multipleChoice: "Multiple Choice", matching: "Zuordnung", trueFalse: "Richtig / Falsch", ordering: "Reihenfolge" })[block.type],
+                        taskId: block.taskId ?? null,
+                        managedTask: Boolean(block.managedTask),
+                        optionLabels,
+                        correctAnswers,
+                        answerPoints,
+                      }];
+                    })()
+                  : [];
+              }
+              if (block?.type === "multipleResponse") {
+                const optionLabels = Array.from(new Set((block.optionLabels ?? []).map((label) => String(label).trim()).filter(Boolean)));
+                return optionLabels.length >= 2 && Array.isArray(block.correctAnswers)
+                  ? (() => {
+                      const correctAnswers = block.correctAnswers
+                        .filter(Array.isArray)
+                        .map((answers) => Array.from(new Set(answers.map((answer) => String(answer).trim()).filter((answer) => optionLabels.includes(answer)))))
+                        .filter((answers) => answers.length > 0);
+                      const legacyPoints = Math.max(0, toFiniteNumber(block.pointsPerAnswer, 1));
+                      const answerPoints = correctAnswers.map((_, index) => Math.max(0, toFiniteNumber(block.answerPoints?.[index], legacyPoints)));
+                      return correctAnswers.length ? [{
+                        id: block.id || crypto.randomUUID(), type: block.type, title: block.title ?? "Mehrfachauswahl", taskId: block.taskId ?? null,
+                        managedTask: Boolean(block.managedTask), optionLabels, correctAnswers, answerPoints,
+                      }] : [];
+                    })()
+                  : [];
+              }
+              // Legacy numbered gaps were only a correction aid. They deliberately do not
+              // appear on the QR answer sheet: handwritten gap texts stay on the original exam.
+              return [];
+            }),
+          },
         }),
     );
   };
@@ -858,7 +910,12 @@ function App() {
   const skipInitialStudentDatabasePersistenceRef = useRef(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => loadVisualTheme());
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => loadUserPreferences());
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>(() => {
+    const storedPreferences = loadUserPreferences();
+    const requestedMode = runtimeQuery.get("mode");
+    if (requestedMode !== "easy" && requestedMode !== "expert") return storedPreferences;
+    return { ...storedPreferences, easyMode: requestedMode === "easy" };
+  });
   const easyMode = userPreferences.easyMode;
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
@@ -900,6 +957,7 @@ function App() {
     home: null,
     wizard: null,
     groups: null,
+    bogencheck: null,
     guidedBuilder: null,
     builder: null,
     archive: null,
@@ -2074,6 +2132,55 @@ function App() {
     }));
   };
 
+  const createBogencheckTask = (type: Extract<AnswerSheetBlock, { type: "multipleChoice" | "matching" | "trueFalse" | "multipleResponse" | "ordering" }>["type"], title: string, maxPoints: number) => {
+    const taskId = crypto.randomUUID();
+    setActiveWorkspaceExam((current) => {
+      const task: Task = {
+        id: taskId,
+        title,
+        description: ({ multipleChoice: "Multiple-Choice-Aufgabe", multipleResponse: "Mehrfachauswahl-Aufgabe", trueFalse: "Richtig-/Falsch-Aufgabe", matching: "Zuordnungsaufgabe", ordering: "Reihenfolge-Aufgabe" })[type] + " auf dem Bogencheck-Beiblatt.",
+        category: ({ multipleChoice: "Multiple Choice", multipleResponse: "Mehrfachauswahl", trueFalse: "Richtig / Falsch", matching: "Zuordnung", ordering: "Reihenfolge" })[type],
+        maxPoints,
+        achievedPoints: 0,
+        expectation: "Siehe Lösungsschlüssel im Bogencheck.",
+      };
+      const sections = current.sections.length > 0
+        ? current.sections.map((section, index) => index === current.sections.length - 1 ? { ...section, tasks: [...section.tasks, task] } : section)
+        : [{ ...createSection(), tasks: [task] }];
+      return normalizeExamStructure({ ...current, sections });
+    });
+    return taskId;
+  };
+
+  const syncBogencheckSettings = (answerSheetSettings: AnswerSheetSettings) => {
+    const pointsByTaskId = new Map<string, number>();
+    const managedTitles = new Map<string, string>();
+    answerSheetSettings.blocks.forEach((block) => {
+      if (block.type === "numberedGaps" || !block.taskId) return;
+      const blockPoints = block.correctAnswers.reduce((total, _, index) => total + (block.answerPoints[index] ?? block.pointsPerAnswer ?? 0), 0);
+      pointsByTaskId.set(block.taskId, (pointsByTaskId.get(block.taskId) ?? 0) + blockPoints);
+      if (block.managedTask) managedTitles.set(block.taskId, block.title.trim() || ({ multipleChoice: "Multiple Choice", multipleResponse: "Mehrfachauswahl", trueFalse: "Richtig / Falsch", matching: "Zuordnung", ordering: "Reihenfolge" })[block.type]);
+    });
+
+    setActiveWorkspaceExam((current) => normalizeExamStructure({
+      ...current,
+      answerSheetSettings,
+      sections: current.sections.map((section) => ({
+        ...section,
+        tasks: section.tasks.map((task) => {
+          const maxPoints = pointsByTaskId.get(task.id);
+          if (maxPoints === undefined) return task;
+          return {
+            ...task,
+            title: managedTitles.get(task.id) ?? task.title,
+            maxPoints,
+            achievedPoints: Math.min(task.achievedPoints, maxPoints),
+          };
+        }),
+      })),
+    }));
+  };
+
   const triggerExamCelebration = () => {
     pushNotice("success", "Korrektur abgeschlossen", "Alle ausgewählten Bewertungsbögen sind als korrigiert markiert.");
   };
@@ -2188,6 +2295,15 @@ function App() {
     const templatePatch = { ...patch };
     delete templatePatch.achievedPoints;
     if (Object.keys(templatePatch).length === 0) return;
+
+    const isBogencheckTask = (exam.answerSheetSettings?.blocks ?? []).some(
+      (block) => block.type !== "numberedGaps" && block.taskId === taskId,
+    );
+    if (templatePatch.maxPoints !== undefined && isBogencheckTask) {
+      delete templatePatch.maxPoints;
+      pushNotice("info", "Punkte werden im Bogencheck gepflegt", "Die maximale Punktzahl dieser Aufgabe ergibt sich automatisch aus Lösungsschlüssel und Punkten je Antwort.");
+      if (Object.keys(templatePatch).length === 0) return;
+    }
 
     if (templatePatch.maxPoints !== undefined) {
       const section = exam.sections.find((entry) => entry.id === sectionId) ?? null;
@@ -2773,6 +2889,32 @@ function App() {
     setStudentDatabase((current) => setStudentOrderInGroup(current, groupId, orderedStudentIds));
   };
 
+  const handleRenameGroup = (groupId: string, nextClassName: string) => {
+    const group = getStudentGroup(studentDatabase, groupId);
+    const className = nextClassName.trim();
+    if (!group || !className || className === group.className) return false;
+
+    const duplicate = studentDatabase.groups.some(
+      (entry) => entry.id !== groupId && entry.className.trim().toLocaleLowerCase("de-DE") === className.toLocaleLowerCase("de-DE"),
+    );
+    if (duplicate) {
+      pushNotice("warning", "Klassenbezeichnung bereits vorhanden", `Eine Lerngruppe mit der Bezeichnung ${className} gibt es bereits.`);
+      return false;
+    }
+
+    setStudentDatabase((current) => renameStudentGroup(current, groupId, className));
+    setDraftBundle((current) => ({
+      ...current,
+      workspaces: current.workspaces.map((workspace) =>
+        workspace.assignedGroupId === groupId
+          ? { ...workspace, exam: { ...workspace.exam, meta: { ...workspace.exam.meta, course: className } } }
+          : workspace,
+      ),
+    }));
+    pushNotice("success", "Klasse umbenannt", `${group.className} heißt jetzt ${className}. Verknüpfte Klassenarbeiten wurden aktualisiert.`);
+    return true;
+  };
+
   const handleChangeParticipationStatus = (status: StudentParticipationStatus) => {
     if (!activeStudentId || !activeWorkspace) return;
     if (activeGroupIsProtected && !activeGroupPassword) {
@@ -2782,6 +2924,34 @@ function App() {
     setStudentDatabase((current) =>
       updateStudentParticipationStatus(current, activeWorkspace.id, activeStudentId, status),
     );
+  };
+
+  const handleCreateAnswerSheetCodes = () => {
+    if (!activeWorkspace || !activeGroup) return;
+    if (activeGroupIsProtected && !activeGroupPassword) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Arbeitscodes werden zusammen mit den Bewertungsdaten geschützt gespeichert.");
+      return;
+    }
+    setStudentDatabase((current) => activeGroup.students.reduce((next, student) => {
+      const assessment = getStudentAssessment(next, student.id, activeWorkspace.id);
+      return assessment.answerSheetCode
+        ? next
+        : updateStudentAnswerSheetCode(next, activeWorkspace.id, student.id, createAnswerSheetCode());
+    }, current));
+    pushNotice("success", "Arbeitscodes vorbereitet", "Die Antwortbögen können jetzt ohne Klarnamen gedruckt werden.");
+  };
+
+  const handleApplyBogencheckScores = (studentId: string, scoresByTaskId: Record<string, number>) => {
+    if (!activeWorkspace || !activeGroup) return;
+    if (activeGroupIsProtected && !activeGroupPassword) return;
+    const taskMaximums = new Map(activeWorkspace.exam.sections.flatMap((section) => section.tasks.map((task) => [task.id, task.maxPoints] as const)));
+    setStudentDatabase((current) => Object.entries(scoresByTaskId).reduce((next, [taskId, score]) => {
+      const maximum = taskMaximums.get(taskId);
+      if (maximum === undefined) return next;
+      return updateStudentScore(next, activeWorkspace.id, studentId, taskId, Math.min(maximum, Math.max(0, score)));
+    }, current));
+    setActiveStudentId(studentId);
+    pushNotice("success", "Bogencheck übernommen", "Die Multiple-Choice-Punkte wurden in die Punktetabelle übertragen.");
   };
 
   const handleRemoveStudent = (groupId: string, studentId: string) => {
@@ -4285,8 +4455,53 @@ function App() {
                 }
                 onRevealGroupStudentNames={handleRevealGroupStudentNames}
                 onApplyStudentOrder={handleApplyStudentOrder}
+                onRenameGroup={handleRenameGroup}
               />
             )}
+            </div>
+
+            <div
+              id={getTabPanelId("bogencheck")}
+              role="tabpanel"
+              aria-labelledby={getTabButtonId("bogencheck")}
+              hidden={activeTab !== "bogencheck"}
+              tabIndex={0}
+              className="space-y-6"
+            >
+              {activeTab === "bogencheck" ? (
+                activeWorkspace && activeGroup ? (
+                  <>
+                    <BogencheckPanel
+                      exam={activeWorkspace.exam}
+                      groupLabel={`${activeGroup.subject} · ${activeGroup.className}`}
+                      disabled={assessmentLocked}
+                      students={activeGroup.students.map((student) => ({
+                        id: student.id,
+                        alias: student.alias,
+                        fullName: globalSearchStudentNames[student.id] ?? student.alias,
+                        answerSheetCode: getStudentAssessment(studentDatabase, student.id, activeWorkspace.id).answerSheetCode ?? "",
+                      }))}
+                      onChange={syncBogencheckSettings}
+                      onCreateLinkedTask={createBogencheckTask}
+                      onCreateCodes={handleCreateAnswerSheetCodes}
+                    />
+                    <BogencheckScanner
+                      exam={activeWorkspace.exam}
+                      disabled={assessmentLocked}
+                      students={activeGroup.students.map((student) => ({
+                        id: student.id,
+                        label: globalSearchStudentNames[student.id] ? `${globalSearchStudentNames[student.id]} · ${student.alias}` : student.alias,
+                        answerSheetCode: getStudentAssessment(studentDatabase, student.id, activeWorkspace.id).answerSheetCode ?? "",
+                      })).filter((student) => Boolean(student.answerSheetCode))}
+                      onApplyScores={handleApplyBogencheckScores}
+                    />
+                  </>
+                ) : (
+                  <Card title="Bogencheck vorbereiten" subtitle="Lege zuerst einen Erwartungshorizont an und ordne ihm eine Lerngruppe zu.">
+                    <p className="themed-muted text-sm leading-6">Danach kannst du hier Antwortbögen mit QR-Arbeitscodes drucken und direkt über die Kamera prüfen.</p>
+                  </Card>
+                )
+              ) : null}
             </div>
 
             <div

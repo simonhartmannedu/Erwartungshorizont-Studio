@@ -17,6 +17,57 @@ const normalizeHeader = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "");
 
+/**
+ * Some exports from spreadsheet software contain UTF-8 bytes that were once
+ * read as a western European encoding (for example, `MÃ¼ller`). Repair only
+ * recognisable patterns so correctly encoded names stay untouched.
+ */
+const repairMojibake = (value: string) => {
+  let repaired = value;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!/(?:Ã[\u0080-\u00bf]|Â[\u0080-\u00bf]|â[\u0080-\u00bf][\u0080-\u00bf]|ï»¿)/.test(repaired)) {
+      break;
+    }
+
+    const bytes = Array.from(repaired, (character) => character.charCodeAt(0));
+    if (bytes.some((byte) => byte > 0xff)) break;
+
+    try {
+      const candidate = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+      if (candidate === repaired) break;
+      repaired = candidate;
+    } catch {
+      break;
+    }
+  }
+
+  return repaired;
+};
+
+const cleanCell = (value: string) => repairMojibake(value).trim();
+
+const decodeCsvFile = async (file: File) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  }
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  }
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return new TextDecoder("utf-8").decode(bytes.subarray(3));
+  }
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    // Excel's legacy CSV export on Windows is commonly Windows-1252.
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+};
+
 const detectDelimiter = (headerLine: string) => {
   const candidates = [";", ",", "\t"];
   return candidates.reduce(
@@ -28,10 +79,39 @@ const detectDelimiter = (headerLine: string) => {
   ).delimiter;
 };
 
-const splitRow = (line: string, delimiter: string) =>
-  line
-    .split(delimiter)
-    .map((value) => value.trim().replace(/^"|"$/g, "").replace(/""/g, "\""));
+const parseDelimitedRows = (content: string, delimiter: string) => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index]!;
+    if (character === '"') {
+      if (quoted && content[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === delimiter && !quoted) {
+      row.push(cleanCell(cell));
+      cell = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && content[index + 1] === "\n") index += 1;
+      row.push(cleanCell(cell));
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+
+  row.push(cleanCell(cell));
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+};
 
 const HEADER_ALIASES = {
   firstName: new Set(["vorname", "name", "firstname", "givenname", "rufname"]),
@@ -41,7 +121,7 @@ const HEADER_ALIASES = {
 
 const parseStudentRows = (rows: string[][]): ImportedStudentRow[] => {
   const normalizedRows = rows
-    .map((row) => row.map((value) => value.trim()))
+    .map((row) => row.map((value) => cleanCell(value)))
     .filter((row) => row.some(Boolean));
 
   if (normalizedRows.length === 0) {
@@ -94,23 +174,20 @@ const parseStudentRows = (rows: string[][]): ImportedStudentRow[] => {
 };
 
 export const parseStudentImport = (content: string): ImportedStudentRow[] => {
-  const lines = content
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^\uFEFF/, "").trim())
-    .filter(Boolean);
-
-  if (lines.length === 0) {
+  const normalizedContent = content.replace(/^\uFEFF/, "");
+  const firstLine = normalizedContent.split(/\r?\n/, 1)[0] ?? "";
+  if (!firstLine.trim()) {
     throw new Error("Die Importdatei enthält keine Schülerdaten.");
   }
 
-  const delimiter = detectDelimiter(lines[0]);
-  return parseStudentRows(lines.map((line) => splitRow(line, delimiter)));
+  const delimiter = detectDelimiter(firstLine);
+  return parseStudentRows(parseDelimitedRows(normalizedContent, delimiter));
 };
 
 export const parseStudentImportFile = async (file: File): Promise<ImportedStudentRow[]> => {
   const fileName = file.name.toLocaleLowerCase("de-DE");
   if (fileName.endsWith(".csv") || fileName.endsWith(".txt")) {
-    return parseStudentImport(await file.text());
+    return parseStudentImport(await decodeCsvFile(file));
   }
 
   const XLSX = await import("xlsx");
@@ -129,7 +206,7 @@ export const parseStudentImportFile = async (file: File): Promise<ImportedStuden
     },
   );
 
-  return parseStudentRows(rows.map((row) => row.map((value) => String(value ?? ""))));
+  return parseStudentRows(rows.map((row) => row.map((value) => cleanCell(String(value ?? "")))));
 };
 
 export const sortImportedStudentRows = (

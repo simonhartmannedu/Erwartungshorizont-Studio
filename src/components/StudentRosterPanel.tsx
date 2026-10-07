@@ -44,6 +44,7 @@ interface Props {
   onRemoveGroup: (groupId: string, groupLabel: string, studentCount: number) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   onApplyStudentOrder: (groupId: string, orderedStudentIds: string[]) => void;
+  onRenameGroup: (groupId: string, className: string) => boolean;
 }
 
 const collator = new Intl.Collator("de-DE", { sensitivity: "base", numeric: true });
@@ -170,6 +171,7 @@ export const StudentRosterPanel = ({
   onRemoveGroup,
   onRevealGroupStudentNames,
   onApplyStudentOrder,
+  onRenameGroup,
 }: Props) => {
   const [subject, setSubject] = useState("");
   const [className, setClassName] = useState("");
@@ -188,6 +190,8 @@ export const StudentRosterPanel = ({
   const [sortStateByGroupId, setSortStateByGroupId] = useState<
     Record<string, { field: GroupSortField; direction: SortDirection }>
   >({});
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renamedClassName, setRenamedClassName] = useState("");
 
   useEffect(() => {
     setImportSubject((current) => current || defaultImportSubject);
@@ -670,6 +674,17 @@ export const StudentRosterPanel = ({
                             onSelectStudent(group.students[0]?.id ?? "");
                           }}
                         />
+                        <button
+                          type="button"
+                          className="button-secondary px-3 py-2 text-xs"
+                          onClick={() => {
+                            setCollapsedGroupIds((current) => current.filter((entry) => entry !== group.id));
+                            setRenamingGroupId(group.id);
+                            setRenamedClassName(group.className);
+                          }}
+                        >
+                          Klasse umbenennen
+                        </button>
                         <IconButton
                           onClick={() => onRemoveGroup(group.id, `${group.subject} · ${group.className}`, group.students.length)}
                           title="Lerngruppe entfernen"
@@ -685,6 +700,43 @@ export const StudentRosterPanel = ({
 
                     {!isCollapsed && (
                       <div className="border-t px-5 py-5" style={{ borderColor: "var(--app-border)" }}>
+                        {renamingGroupId === group.id ? (
+                          <form
+                            className="surface-muted mb-5 flex flex-wrap items-end gap-3 rounded-2xl p-4"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              if (onRenameGroup(group.id, renamedClassName)) {
+                                setRenamingGroupId(null);
+                                setRenamedClassName("");
+                              }
+                            }}
+                          >
+                            <label className="min-w-[12rem] flex-1">
+                              <span className="label">Neue Klassenbezeichnung</span>
+                              <input
+                                className="field mt-1"
+                                value={renamedClassName}
+                                onChange={(event) => setRenamedClassName(event.target.value)}
+                                autoFocus
+                                aria-label={`Neue Klassenbezeichnung für ${group.className}`}
+                              />
+                            </label>
+                            <button type="submit" className="button-primary px-3 py-2 text-sm" disabled={!renamedClassName.trim()}>
+                              Umbenennen
+                            </button>
+                            <button
+                              type="button"
+                              className="button-secondary px-3 py-2 text-sm"
+                              onClick={() => {
+                                setRenamingGroupId(null);
+                                setRenamedClassName("");
+                              }}
+                            >
+                              Abbrechen
+                            </button>
+                            <p className="themed-muted basis-full text-xs leading-5">Die Schülercodes und Bewertungen bleiben erhalten; verknüpfte Klassenarbeiten erhalten die neue Klassenbezeichnung.</p>
+                          </form>
+                        ) : null}
                         <div className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(260px,0.95fr)]">
                           <div className="surface-muted rounded-2xl p-4">
                             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">

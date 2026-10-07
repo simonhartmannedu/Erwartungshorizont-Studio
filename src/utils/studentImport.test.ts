@@ -16,6 +16,27 @@ describe("Schülerimport", () => {
     ]);
   });
 
+  it("bewahrt Umlaute aus älteren Excel-CSV-Dateien und repariert bereits falsch gelesene Tabellenwerte", async () => {
+    const windows1252Csv = new Uint8Array([
+      ...new TextEncoder().encode("Vorname;Nachname;Klasse\nJ"),
+      0xf6,
+      ...new TextEncoder().encode("rg;M"),
+      0xfc,
+      ...new TextEncoder().encode("ller;10a"),
+    ]);
+    const file = {
+      name: "klasse.csv",
+      arrayBuffer: async () => windows1252Csv.buffer,
+    } as File;
+
+    await expect(parseStudentImportFile(file)).resolves.toEqual([
+      { firstName: "Jörg", lastName: "Müller", className: "10a" },
+    ]);
+    expect(parseStudentImport("Vorname;Nachname;Klasse\nJÃ¶rg;MÃ¼ller;10a")).toEqual([
+      { firstName: "Jörg", lastName: "Müller", className: "10a" },
+    ]);
+  });
+
   it("sortiert Importdaten stabil nach Klasse und dem gewählten Feld", () => {
     const sorted = sortImportedStudentRows(
       [
@@ -48,5 +69,26 @@ describe("Schülerimport", () => {
     await expect(parseStudentImportFile(file)).resolves.toEqual([
       { firstName: "Alex", lastName: "Beispiel", className: "8b" },
     ]);
+  });
+
+  it("liest Umlaute aus Excel- und LibreOffice-Calc-Dateien", async () => {
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ["Vorname", "Nachname", "Klasse"],
+        ["Jörg", "Müller", "10ä"],
+      ]),
+      "Lerngruppe",
+    );
+
+    for (const [bookType, extension] of [["xlsx", "xlsx"], ["ods", "ods"]] as const) {
+      const content = XLSX.write(workbook, { bookType, type: "array" });
+      const file = { name: `klasse.${extension}`, arrayBuffer: async () => content } as File;
+      await expect(parseStudentImportFile(file)).resolves.toEqual([
+        { firstName: "Jörg", lastName: "Müller", className: "10ä" },
+      ]);
+    }
   });
 });

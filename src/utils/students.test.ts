@@ -3,6 +3,7 @@ import { createPasswordVerifier, encryptText } from "./crypto";
 import {
   getStudentParticipationStatus,
   hydrateSensitiveAssessmentsForGroup,
+  renameStudentGroup,
   serializeStudentDatabaseForStorage,
   updateStudentParticipationStatus,
 } from "./students";
@@ -55,5 +56,44 @@ describe("arbeitsbezogene Teilnahme", () => {
 
     const hydrated = await hydrateSensitiveAssessmentsForGroup(stored, groupId, password);
     expect(getStudentParticipationStatus(hydrated, studentId, "arbeit-1")).toBe("excused");
+  });
+});
+
+describe("Klassen umbenennen", () => {
+  it("behält die Gruppen-ID und damit Schüler- und Bewertungszuordnungen bei", () => {
+    const database: StudentDatabase = {
+      version: 1,
+      groups: [{
+        id: "gruppe-9a",
+        subject: "Deutsch",
+        className: "9a",
+        passwordVerifier: null,
+        students: [{
+          id: "schueler-1",
+          alias: "D9A-01",
+          encryptedName: { ciphertext: "cipher", iv: "iv", salt: "salt" },
+          createdAt: "2026-08-18T08:00:00.000Z",
+        }],
+        createdAt: "2026-08-18T08:00:00.000Z",
+        updatedAt: "2026-08-18T08:00:00.000Z",
+      }],
+      assessments: {
+        "arbeit-1::schueler-1": {
+          workspaceId: "arbeit-1",
+          studentId: "schueler-1",
+          taskScores: { aufgabe: 4 },
+          teacherComment: "",
+          signatureDataUrl: null,
+          updatedAt: "2026-08-18T08:00:00.000Z",
+          printedAt: null,
+        },
+      },
+      updatedAt: "2026-08-18T08:00:00.000Z",
+    };
+
+    const renamed = renameStudentGroup(database, "gruppe-9a", "10a");
+    expect(renamed.groups[0]).toMatchObject({ id: "gruppe-9a", className: "10a" });
+    expect(renamed.groups[0]?.students[0]?.id).toBe("schueler-1");
+    expect(renamed.assessments["arbeit-1::schueler-1"]?.taskScores).toEqual({ aufgabe: 4 });
   });
 });

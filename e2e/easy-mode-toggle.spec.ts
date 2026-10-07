@@ -20,3 +20,13 @@ test("switches between Easy Mode and the full workflow without losing the normal
   await expect(page.getByRole("tab", { name: "EWH-Archiv" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Backup" })).toBeVisible();
 });
+
+test("honours the Easy- and Expert-Mode links from the landing page", async ({ page }) => {
+  await page.goto("/?mode=easy");
+  await expect(page.getByRole("tab", { name: "EWH erstellen" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeHidden();
+
+  await page.goto("/?mode=expert");
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Backup" })).toBeVisible();
+});

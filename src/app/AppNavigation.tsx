@@ -1,9 +1,10 @@
 import { type KeyboardEvent, type MutableRefObject, useMemo, useState } from "react";
-import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon, SearchIcon, WizardIcon } from "../components/icons";
+import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, WizardIcon } from "../components/icons";
 import type { GlobalSearchResult } from "./AppHeader";
 
-export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "archive" | "backup";
+export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "bogencheck" | "archive" | "backup";
 
+/** Bogencheck remains implemented, but is not released in the primary navigation yet. */
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
   { id: "wizard", label: "EWH-Wizard" },
@@ -33,6 +34,8 @@ export const TabIcon = ({ id }: { id: AppTabId }) => {
       return <DashboardIcon />;
     case "groups":
       return <GroupIcon />;
+    case "bogencheck":
+      return <ScanIcon />;
     case "archive":
       return <ArchiveIcon />;
     case "backup":
