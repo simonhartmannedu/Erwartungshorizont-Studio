@@ -19,8 +19,6 @@
       <section class="start" id="start" aria-labelledby="start-title">
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
-        <p class="intro">Wähle den Umfang, der zu deiner Aufgabe passt. Du kannst ihn später jederzeit in den Einstellungen ändern.</p>
-
         <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.7.0">
           <div class="terminal-bar">
             <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -78,30 +76,27 @@
         const writeImmediately = () => { output.textContent = lines.join("\n"); };
         if (reduceMotion) { writeImmediately(); return; }
 
-        let line = 0;
-        let character = 0;
-        const type = () => {
-          output.textContent += lines[line][character] ?? "";
-          character += 1;
-          if (character < lines[line].length) {
-            window.setTimeout(type, 18);
-            return;
+        // Keep the finished notes on screen. Replaying by clearing the element made
+        // the terminal intermittently look empty, especially after a background tab
+        // had delayed its timers. Frame-based updates also avoid one DOM write per
+        // character when release notes get longer.
+        const characters = Array.from(lines.join("\n"));
+        const duration = Math.min(3600, Math.max(800, characters.length * 18));
+        const startedAt = performance.now();
+        let rendered = 0;
+
+        const type = (now) => {
+          const next = Math.min(
+            characters.length,
+            Math.floor((now - startedAt) / duration * characters.length)
+          );
+          if (next > rendered) {
+            output.textContent = characters.slice(0, next).join("");
+            rendered = next;
           }
-          if (line < lines.length - 1) {
-            output.textContent += "\n";
-            line += 1;
-            character = 0;
-            window.setTimeout(type, 210);
-            return;
-          }
-          window.setTimeout(() => {
-            output.textContent = "";
-            line = 0;
-            character = 0;
-            type();
-          }, 4200);
+          if (rendered < characters.length) window.requestAnimationFrame(type);
         };
-        type();
+        window.requestAnimationFrame(type);
       })();
     </script>
   </body>
