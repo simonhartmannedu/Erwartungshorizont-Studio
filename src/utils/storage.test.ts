@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Exam } from "../types";
-import { parseArchiveEntries, parseDraftBundle, parseStudentDatabaseState } from "./storage";
+import { loadVisualTheme, parseArchiveEntries, parseDraftBundle, parseStudentDatabaseState } from "./storage";
 
 const legacyExam: Exam = {
   id: "legacy-exam",
@@ -42,6 +42,19 @@ const legacyExam: Exam = {
 };
 
 describe("Storage-Normalisierung", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("startet neue Browserprofile mit dem Erklärvideo-Theme und behält eine Wahl bei", () => {
+    const localStorage = { getItem: vi.fn<(key: string) => string | null>(() => null) };
+    vi.stubGlobal("window", { localStorage });
+    expect(loadVisualTheme()).toBe("video-tutorial");
+
+    localStorage.getItem.mockReturnValue("waldmeister-schorle");
+    expect(loadVisualTheme()).toBe("waldmeister-schorle");
+  });
+
   it("hebt ein Legacy-Exam ohne Datenverlust in ein Workspace-Bundle", () => {
     const bundle = parseDraftBundle(JSON.stringify(legacyExam));
 

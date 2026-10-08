@@ -498,7 +498,7 @@ export const loadVisualTheme = (): VisualTheme => {
     case "kopierer-0758":
       return raw;
     default:
-      return "nrw-trikolore";
+      return "video-tutorial";
   }
 };
 

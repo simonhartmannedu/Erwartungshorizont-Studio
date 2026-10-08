@@ -1,4 +1,19 @@
-import { type CSSProperties, type DragEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ExamTemplateDefinition, TemplateSchoolForm } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
 import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
@@ -8,6 +23,7 @@ import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
 import { ExamHeaderForm } from "./ExamHeaderForm";
 import {
   ChevronRightIcon,
+  DuplicateIcon,
   DragIcon,
   InfoIcon,
   PencilIcon,
@@ -361,6 +377,127 @@ const cloneComposerTask = (task: Task, category: string): Task => ({
   achievedPoints: 0,
 });
 
+const composerTaskDndId = (taskId: string) => `composer-task:${taskId}`;
+const composerSectionDndId = (sectionId: string) => `composer-section:${sectionId}`;
+
+const ComposerLibraryTask = ({
+  item,
+  onAdd,
+}: {
+  item: ComposerLibraryItem;
+  onAdd: () => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `library-task:${item.id}`,
+    data: { type: "library-task", itemId: item.id },
+  });
+
+  return (
+    <article
+      ref={setNodeRef}
+      className={`composer-library-task ${isDragging ? "composer-library-task-dragging" : ""}`}
+      style={{ transform: CSS.Translate.toString(transform) }}
+    >
+      <button
+        type="button"
+        className="composer-drag-handle"
+        aria-label={`Aufgabe ${item.task.title} ziehen`}
+        title="Aufgabe ziehen"
+        {...attributes}
+        {...listeners}
+      >
+        <DragIcon />
+      </button>
+      <div className="min-w-0 flex-1">
+        <strong>{item.task.title}</strong>
+        <p>{item.sectionTitle} · {formatNumber(item.task.maxPoints)} P.</p>
+      </div>
+      <button type="button" className="button-secondary composer-add-button" onClick={onAdd}>
+        +
+        <span className="sr-only">Zu aktivem Teil hinzufügen</span>
+      </button>
+    </article>
+  );
+};
+
+const ComposerSectionDropArea = ({ sectionId, children }: { sectionId: string; children: ReactNode }) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: composerSectionDndId(sectionId),
+    data: { type: "section", sectionId },
+  });
+
+  return (
+    <div ref={setNodeRef} className={`composer-section-drop-area ${isOver ? "composer-section-drop-area-over" : ""}`}>
+      {children}
+    </div>
+  );
+};
+
+const ComposerTaskRow = ({
+  section,
+  task,
+  sections,
+  onPointsChange,
+  onRemove,
+  onDuplicate,
+  onMoveToSection,
+}: {
+  section: ComposerSection;
+  task: Task;
+  sections: ComposerSection[];
+  onPointsChange: (value: number) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+  onMoveToSection: (sectionId: string) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: composerTaskDndId(task.id),
+    data: { type: "composer-task", sectionId: section.id, taskId: task.id },
+  });
+  const destinations = sections.filter((candidate) => candidate.id !== section.id);
+
+  return (
+    <article
+      ref={setNodeRef}
+      className={`composer-task-row ${isDragging ? "composer-task-row-dragging" : ""}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      <button
+        type="button"
+        className="composer-drag-handle"
+        aria-label={`Aufgabe ${task.title} verschieben`}
+        title="Aufgabe ziehen oder mit Leertaste verschieben"
+        {...attributes}
+        {...listeners}
+      >
+        <DragIcon />
+      </button>
+      <div className="min-w-0 flex-1">
+        <strong>{task.title}</strong>
+        <p>{task.description || task.expectation || "Ohne Beschreibung"}</p>
+      </div>
+      <NumberInput className="field composer-task-points" value={task.maxPoints} min={0} step={0.5} onCommit={onPointsChange} />
+      <div className="composer-task-actions">
+        {destinations.length > 0 ? (
+          <select
+            className="field composer-task-move"
+            value=""
+            aria-label={`${task.title} in einen anderen Teil verschieben`}
+            onChange={(event) => {
+              if (event.target.value) onMoveToSection(event.target.value);
+            }}
+          >
+            <option value="" disabled>Verschieben</option>
+            {destinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.title || "Unbenannter Teil"}</option>)}
+          </select>
+        ) : null}
+        <button type="button" className="icon-button" title="Aufgabe duplizieren" onClick={onDuplicate}><DuplicateIcon /></button>
+        <button type="button" className="icon-button" title="Aufgabe entfernen" onClick={onRemove}><TrashIcon /></button>
+      </div>
+    </article>
+  );
+};
+
 const polarToCartesian = (cx: number, cy: number, radius: number, angleInDegrees: number) => {
   const radians = ((angleInDegrees - 90) * Math.PI) / 180;
   return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
@@ -606,7 +743,10 @@ export const GuidedExamBuilder = ({
   const [composerQuery, setComposerQuery] = useState("");
   const [composerSubjectFilter, setComposerSubjectFilter] = useState<string>(initialSubject || "all");
   const [activeComposerSectionId, setActiveComposerSectionId] = useState<string | null>(null);
-  const [composerDropTarget, setComposerDropTarget] = useState<string | null>(null);
+  const [composerSidebarTab, setComposerSidebarTab] = useState<"outline" | "library">("library");
+  const [composerToolsOpen, setComposerToolsOpen] = useState(false);
+  const [composerReviewOpen, setComposerReviewOpen] = useState(false);
+  const [draggedTaskTitle, setDraggedTaskTitle] = useState<string | null>(null);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
   const [activeTemplateSectionIndex, setActiveTemplateSectionIndex] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>(initialTarget);
@@ -623,6 +763,10 @@ export const GuidedExamBuilder = ({
     initialSections.length > 0 ? initialSections : createFallbackSections(initialTotalPoints),
   );
   const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({ ...initialMeta }));
+  const composerSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const availableSubjects = useMemo(
     () =>
@@ -692,6 +836,10 @@ export const GuidedExamBuilder = ({
   const composerSubject = composerTemplate?.subject || metaDraft.subject.trim() || initialSubject.trim() || "Alle Fächer";
   const composerStage = composerTemplate?.schoolStage ?? manualStage;
   const composerTotalPoints = useMemo(() => getComposerTotal(composerSections), [composerSections]);
+  const composerTaskCount = useMemo(
+    () => composerSections.reduce((sum, section) => sum + section.tasks.length, 0),
+    [composerSections],
+  );
   const composerLibrary = useMemo<ComposerLibraryItem[]>(() => {
     const normalizedQuery = normalizeText(composerQuery);
     return templates.flatMap((template) =>
@@ -817,6 +965,9 @@ export const GuidedExamBuilder = ({
     setComposerSubjectFilter(template.subject);
     setComposerQuery("");
     setActiveComposerSectionId(sections[0]?.id ?? null);
+    setComposerSidebarTab("library");
+    setComposerToolsOpen(false);
+    setComposerReviewOpen(false);
     const nextTotal = getComposerTotal(sections);
     setTotalPoints(nextTotal);
     setGradeScale((current) => gradeScaleFor(current, nextTotal, template.schoolStage));
@@ -837,6 +988,9 @@ export const GuidedExamBuilder = ({
     setComposerSubjectFilter("all");
     setComposerQuery("");
     setActiveComposerSectionId(sections[0].id);
+    setComposerSidebarTab("library");
+    setComposerToolsOpen(false);
+    setComposerReviewOpen(false);
     setTotalPoints(0);
     setGradeScale((current) => gradeScaleFor(current, 1, manualStage));
   };
@@ -876,34 +1030,70 @@ export const GuidedExamBuilder = ({
     });
   };
 
-  const handleComposerDrop = (event: DragEvent<HTMLElement>, targetSectionId: string, insertionIndex: number) => {
-    event.preventDefault();
-    setComposerDropTarget(null);
-    const libraryId = event.dataTransfer.getData("application/x-ewh-library-task");
-    if (libraryId) {
-      const item = composerLibrary.find((entry) => entry.id === libraryId);
+  const updateComposerTask = (sectionId: string, taskId: string, updater: (task: Task) => Task) => {
+    updateComposerSections((current) => current.map((section) => section.id === sectionId
+      ? { ...section, tasks: section.tasks.map((task) => task.id === taskId ? updater(task) : task) }
+      : section));
+  };
+
+  const getComposerDropDestination = (overId: string | number) => {
+    const id = String(overId);
+    if (id.startsWith("composer-section:")) {
+      const sectionId = id.slice("composer-section:".length);
+      const section = composerSections.find((entry) => entry.id === sectionId);
+      return section ? { sectionId, insertionIndex: section.tasks.length } : null;
+    }
+    if (!id.startsWith("composer-task:")) return null;
+    const taskId = id.slice("composer-task:".length);
+    const section = composerSections.find((entry) => entry.tasks.some((task) => task.id === taskId));
+    if (!section) return null;
+    return { sectionId: section.id, insertionIndex: section.tasks.findIndex((task) => task.id === taskId) };
+  };
+
+  const handleComposerDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current;
+    if (data?.type === "library-task") {
+      setDraggedTaskTitle(composerLibrary.find((item) => item.id === data.itemId)?.task.title ?? "Aufgabe");
+      return;
+    }
+    if (data?.type === "composer-task") {
+      const source = composerSections.find((section) => section.id === data.sectionId);
+      setDraggedTaskTitle(source?.tasks.find((task) => task.id === data.taskId)?.title ?? "Aufgabe");
+    }
+  };
+
+  const handleComposerDragEnd = (event: DragEndEvent) => {
+    setDraggedTaskTitle(null);
+    if (!event.over) return;
+    const dropDestination = getComposerDropDestination(event.over.id);
+    if (!dropDestination) return;
+    const data = event.active.data.current;
+    if (data?.type === "library-task") {
+      const item = composerLibrary.find((entry) => entry.id === data.itemId);
       if (!item) return;
-      const destination = composerSections.find((section) => section.id === targetSectionId);
-      if (!destination) return;
-      updateComposerSections((current) => current.map((section) => section.id === targetSectionId
+      updateComposerSections((current) => current.map((section) => section.id === dropDestination.sectionId
         ? {
             ...section,
             tasks: [
-              ...section.tasks.slice(0, insertionIndex),
+              ...section.tasks.slice(0, dropDestination.insertionIndex),
               cloneComposerTask(item.task, section.title),
-              ...section.tasks.slice(insertionIndex),
+              ...section.tasks.slice(dropDestination.insertionIndex),
             ],
           }
         : section));
+      setActiveComposerSectionId(dropDestination.sectionId);
       return;
     }
-    const rawTask = event.dataTransfer.getData("application/x-ewh-composer-task");
-    if (!rawTask) return;
-    try {
-      const { sourceSectionId, taskId } = JSON.parse(rawTask) as { sourceSectionId: string; taskId: string };
-      moveComposerTask(sourceSectionId, taskId, targetSectionId, insertionIndex);
-    } catch {
-      // Ignore data not created by this composer.
+    if (data?.type === "composer-task") {
+      let destination = dropDestination;
+      if (data.sectionId === destination.sectionId) {
+        const sourceIndex = composerSections.find((section) => section.id === data.sectionId)?.tasks.findIndex((task) => task.id === data.taskId) ?? -1;
+        if (sourceIndex >= 0 && sourceIndex < destination.insertionIndex) {
+          destination = { ...destination, insertionIndex: destination.insertionIndex + 1 };
+        }
+      }
+      moveComposerTask(data.sectionId, data.taskId, destination.sectionId, destination.insertionIndex);
+      setActiveComposerSectionId(destination.sectionId);
     }
   };
 
@@ -1122,23 +1312,6 @@ export const GuidedExamBuilder = ({
       </section>
     ) : null;
 
-  const renderComposerMetaEditor = () => (
-    <div className="template-composer-meta">
-      <div>
-        <p className="label">Rahmendaten</p>
-        <h4 className="themed-strong mt-1 text-lg font-semibold">Direkt bearbeiten</h4>
-        <p className="themed-muted mt-1 text-sm leading-6">Diese Angaben werden direkt in den neuen EWH übernommen.</p>
-      </div>
-      <ExamHeaderForm
-        meta={metaDraft}
-        showNotesListTransform={false}
-        onChange={(key, value) => {
-          setMetaDraft((current) => ({ ...current, [key]: value }));
-        }}
-      />
-    </div>
-  );
-
   const renderTemplateCard = (template: ExamTemplateDefinition, index: number) => {
     const selected = selectedTemplate?.id === template.id;
     const subjectTheme = getSubjectTheme(template.subject);
@@ -1173,100 +1346,139 @@ export const GuidedExamBuilder = ({
 
   const renderComposer = () => {
     const composerSubjects = availableSubjects.filter((subject) => templates.some((template) => template.subject === subject));
+    const addComposerSection = () => {
+      const section: ComposerSection = {
+        id: crypto.randomUUID(),
+        title: `Teil ${String.fromCharCode(65 + composerSections.length)}`,
+        description: "",
+        note: "",
+        tasks: [],
+      };
+      updateComposerSections((current) => [...current, section]);
+      setActiveComposerSectionId(section.id);
+      setComposerSidebarTab("outline");
+    };
+
     return (
-      <div className="template-composer" aria-label="Klausur zusammenstellen">
-        <div className="template-composer-header" style={getSubjectThemeStyle(getSubjectTheme(composerSubject))}>
-          <div>
-            <p className="label">Zusammenstellung</p>
-            <h3 className="themed-strong mt-1 text-xl font-semibold">{composerTemplate?.title ?? "Leere Klausur zusammenstellen"}</h3>
-            <p className="themed-muted mt-1 text-sm leading-6">Ziehe Aufgaben zwischen den Teilen um oder ergänze passende Elemente aus der Bibliothek. Die Punktzahl und der Notenschlüssel werden sofort aus der Auswahl berechnet.</p>
+      <DndContext
+        sensors={composerSensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleComposerDragStart}
+        onDragCancel={() => setDraggedTaskTitle(null)}
+        onDragEnd={handleComposerDragEnd}
+        accessibility={{
+          screenReaderInstructions: {
+            draggable: "Leertaste oder Enter nimmt eine Aufgabe auf. Mit den Pfeiltasten verschiebst du sie, mit Leertaste oder Enter legst du sie ab. Escape bricht ab.",
+          },
+        }}
+      >
+        <div className="composer" aria-label="Klausur zusammenstellen">
+          <div className="composer-header" style={getSubjectThemeStyle(getSubjectTheme(composerSubject))}>
+            <div>
+              <p className="label">Zusammenstellung</p>
+              <h3 className="themed-strong mt-1 text-xl font-semibold">{composerTemplate?.title ?? "Leere Klausur zusammenstellen"}</h3>
+              <p className="themed-muted mt-1 text-sm leading-6">Aufgaben auswählen, Reihenfolge festlegen, dann Rahmendaten prüfen.</p>
+            </div>
+            <div className="composer-header-actions">
+              <span className="composer-stat"><strong>{formatNumber(composerTotalPoints)} P.</strong><small>{composerTaskCount} Aufgaben</small></span>
+              <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={() => { setComposerTemplateId(null); setBlankComposer(false); setComposerReviewOpen(false); setMode("templates"); }}>Vorlage wechseln</button>
+              <button type="button" className="button-primary px-3 py-2 text-xs" disabled={!canSubmitCurrentMode} onClick={() => setComposerReviewOpen(true)}>Vorschau &amp; erstellen</button>
+            </div>
           </div>
-          <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={() => { setComposerTemplateId(null); setBlankComposer(false); setMode("templates"); }}>Vorlage wechseln</button>
-        </div>
 
-        <div className="template-composer-layout">
-          <aside className="template-composer-library">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="themed-strong font-semibold">Aufgaben-Bibliothek</h4>
-                <p className="themed-muted mt-1 text-xs leading-5">{composerTemplate ? `Zunächst ${composerSubject}; andere Fächer lassen sich bewusst dazunehmen.` : "Wähle passende Aufgaben aus der Bibliothek und stelle deine Klausur frei zusammen."}</p>
+          <div className={`composer-layout ${composerToolsOpen ? "composer-layout-tools-open" : ""}`}>
+            <aside className="composer-sidebar">
+              <button type="button" className="composer-sidebar-close" onClick={() => setComposerToolsOpen(false)}>Werkzeuge schließen</button>
+              <div className="composer-sidebar-tabs" role="tablist" aria-label="Werkzeuge für die Zusammenstellung">
+                <button type="button" role="tab" aria-selected={composerSidebarTab === "outline"} className={composerSidebarTab === "outline" ? "composer-sidebar-tab-active" : ""} onClick={() => { setComposerSidebarTab("outline"); setComposerToolsOpen(false); }}>Gliederung</button>
+                <button type="button" role="tab" aria-selected={composerSidebarTab === "library"} className={composerSidebarTab === "library" ? "composer-sidebar-tab-active" : ""} onClick={() => setComposerSidebarTab("library")}>Bibliothek <span>{composerLibrary.length}</span></button>
               </div>
-              <span className="template-badge">{composerLibrary.length}</span>
-            </div>
-            <input className="field mt-3" value={composerQuery} onChange={(event) => setComposerQuery(event.target.value)} placeholder="Aufgabe suchen …" aria-label="Aufgaben durchsuchen" />
-            <div className="template-filter-row" aria-label="Fachfilter für Aufgaben">
-              {composerTemplate ? <button type="button" className={`template-filter-chip ${composerSubjectFilter === composerSubject ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter(composerSubject)}>{composerSubject}</button> : null}
-              <button type="button" className={`template-filter-chip ${composerSubjectFilter === "all" ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter("all")}>Alle Fächer</button>
-              {composerSubjects.filter((subject) => subject !== composerSubject).map((subject) => (
-                <button key={subject} type="button" className={`template-filter-chip ${composerSubjectFilter === subject ? "template-filter-chip-active" : ""}`} onClick={() => setComposerSubjectFilter(subject)}>{subject}</button>
-              ))}
-            </div>
-            <div className="template-composer-library-list">
-              {composerLibrary.map((item) => (
-                <article
-                  key={item.id}
-                  className="template-library-task"
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "copy";
-                    event.dataTransfer.setData("application/x-ewh-library-task", item.id);
-                  }}
-                >
-                  <div className="template-library-task-title"><DragIcon /><strong>{item.task.title}</strong></div>
-                  <p>{item.task.description}</p>
-                  <div><span>{item.subject} · {item.sectionTitle}</span><strong>{formatNumber(item.task.maxPoints)} P.</strong></div>
-                  <button type="button" className="button-secondary px-2 py-1 text-xs" onClick={() => appendLibraryItem(item)}>Zu aktivem Teil</button>
-                </article>
-              ))}
-              {composerLibrary.length === 0 && <p className="themed-muted text-sm">Keine passenden Elemente gefunden.</p>}
-            </div>
-          </aside>
 
-          <section className="template-composer-workspace">
-            <div className="template-composer-summary">
-              <div><span>Ausgewählt</span><strong>{formatNumber(composerTotalPoints)} Punkte</strong></div>
-              <div><span>Aufgaben</span><strong>{composerSections.reduce((sum, section) => sum + section.tasks.length, 0)}</strong></div>
-              <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={() => {
-                const section: ComposerSection = { id: crypto.randomUUID(), title: `Teil ${String.fromCharCode(65 + composerSections.length)}`, description: "", note: "", tasks: [] };
-                updateComposerSections((current) => [...current, section]);
-                setActiveComposerSectionId(section.id);
-              }}><PlusIcon />Teil ergänzen</button>
-            </div>
-            {composerSections.map((section) => (
-              <section key={section.id} className={`template-composer-section ${activeComposerSectionId === section.id ? "template-composer-section-active" : ""}`} onClick={() => setActiveComposerSectionId(section.id)}>
-                <div className="template-composer-section-header">
-                  <input className="field" value={section.title} aria-label="Titel des Aufgabenteils" onChange={(event) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, title: event.target.value } : entry))} />
-                  <strong>{formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</strong>
+              {composerSidebarTab === "outline" ? (
+                <div className="composer-outline" role="tabpanel">
+                  <p className="themed-muted text-xs leading-5">Wähle einen Teil aus oder ergänze einen neuen.</p>
+                  {composerSections.map((section, index) => (
+                    <button key={section.id} type="button" className={`composer-outline-item ${activeComposerSectionId === section.id ? "composer-outline-item-active" : ""}`} onClick={() => setActiveComposerSectionId(section.id)}>
+                      <span>{getPartLabel(index)}</span><strong>{section.title || "Unbenannter Teil"}</strong><small>{section.tasks.length} Aufgaben · {formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</small>
+                    </button>
+                  ))}
+                  <button type="button" className="button-secondary mt-2 w-full justify-center gap-2" onClick={addComposerSection}><PlusIcon />Teil ergänzen</button>
                 </div>
-                <div
-                  className={`template-composer-dropzone ${composerDropTarget === `${section.id}:0` ? "template-composer-dropzone-active" : ""}`}
-                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setComposerDropTarget(`${section.id}:0`); }}
-                  onDragLeave={() => setComposerDropTarget(null)}
-                  onDrop={(event) => handleComposerDrop(event, section.id, 0)}
-                >Aufgabe hier ablegen</div>
-                {section.tasks.map((task, index) => (
-                  <div key={task.id}>
-                    <article className="template-composer-task" draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-ewh-composer-task", JSON.stringify({ sourceSectionId: section.id, taskId: task.id })); }}>
-                      <DragIcon />
-                      <div><strong>{task.title}</strong><p>{task.description || task.expectation || "Ohne Beschreibung"}</p></div>
-                      <NumberInput className="field" value={task.maxPoints} min={0} step={0.5} onCommit={(value) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.map((candidate) => candidate.id === task.id ? { ...candidate, maxPoints: value, achievedPoints: Math.min(candidate.achievedPoints, value) } : candidate) } : entry))} />
-                      <button type="button" className="icon-button" title="Aufgabe entfernen" onClick={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.filter((candidate) => candidate.id !== task.id) } : entry))}><TrashIcon /></button>
-                    </article>
-                    <div className={`template-composer-dropzone template-composer-dropzone-between ${composerDropTarget === `${section.id}:${index + 1}` ? "template-composer-dropzone-active" : ""}`} onDragOver={(event) => { event.preventDefault(); setComposerDropTarget(`${section.id}:${index + 1}`); }} onDragLeave={() => setComposerDropTarget(null)} onDrop={(event) => handleComposerDrop(event, section.id, index + 1)}>Hier ablegen</div>
+              ) : (
+                <div className="composer-library" role="tabpanel">
+                  <div className="composer-library-heading">
+                    <p className="themed-muted text-xs leading-5">{composerTemplate ? `Aufgaben für ${composerSubject}; andere Fächer sind optional.` : "Wähle passende Aufgaben aus der Bibliothek."}</p>
                   </div>
-                ))}
-              </section>
-            ))}
-          </section>
+                  <input className="field" value={composerQuery} onChange={(event) => setComposerQuery(event.target.value)} placeholder="Aufgabe suchen …" aria-label="Aufgaben durchsuchen" />
+                  <select className="field composer-library-filter" value={composerSubjectFilter} aria-label="Fach für Aufgaben filtern" onChange={(event) => setComposerSubjectFilter(event.target.value)}>
+                    {composerTemplate ? <option value={composerSubject}>{composerSubject}</option> : null}
+                    <option value="all">Alle Fächer</option>
+                    {composerSubjects.filter((subject) => subject !== composerSubject).map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+                  </select>
+                  <div className="composer-library-list">
+                    {composerLibrary.map((item) => <ComposerLibraryTask key={item.id} item={item} onAdd={() => appendLibraryItem(item)} />)}
+                    {composerLibrary.length === 0 && <p className="themed-muted text-sm">Keine passenden Elemente gefunden.</p>}
+                  </div>
+                </div>
+              )}
+            </aside>
 
-          <aside className="template-composer-settings template-preview-panel">
-            <h4 className="themed-strong text-lg font-semibold">Übernehmen</h4>
-            <p className="themed-muted mt-1 text-sm leading-6">Die Auswahl wird als bearbeitbarer EWH angelegt. Punkte, Erwartungen und Aufgabentexte bleiben erhalten.</p>
-            {renderTargetControls()}
-            {renderComposerMetaEditor()}
-          </aside>
+            <section className="composer-canvas">
+              <div className="composer-canvas-toolbar">
+                <div><span>Aufbau</span><strong>{formatNumber(composerTotalPoints)} Punkte · {composerTaskCount} Aufgaben</strong></div>
+                <div className="flex gap-2"><button type="button" className="button-secondary composer-mobile-tools-trigger px-3 py-2 text-xs" onClick={() => setComposerToolsOpen(true)}>Bibliothek</button><button type="button" className="button-secondary px-3 py-2 text-xs" onClick={addComposerSection}><PlusIcon />Teil ergänzen</button></div>
+              </div>
+              {composerSections.map((section, index) => (
+                <section key={section.id} className={`composer-section ${activeComposerSectionId === section.id ? "composer-section-active" : ""}`} onFocus={() => setActiveComposerSectionId(section.id)}>
+                  <div className="composer-section-header">
+                    <span className="composer-part-label">{getPartLabel(index)}</span>
+                    <input className="field" value={section.title} aria-label="Titel des Aufgabenteils" onFocus={() => setActiveComposerSectionId(section.id)} onChange={(event) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, title: event.target.value } : entry))} />
+                    <strong>{formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</strong>
+                  </div>
+                  <ComposerSectionDropArea sectionId={section.id}>
+                    <SortableContext items={section.tasks.map((task) => composerTaskDndId(task.id))} strategy={verticalListSortingStrategy}>
+                      <div className="composer-task-list">
+                        {section.tasks.map((task) => (
+                          <ComposerTaskRow
+                            key={task.id}
+                            section={section}
+                            task={task}
+                            sections={composerSections}
+                            onPointsChange={(value) => updateComposerTask(section.id, task.id, (current) => ({ ...current, maxPoints: value, achievedPoints: Math.min(current.achievedPoints, value) }))}
+                            onRemove={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.filter((candidate) => candidate.id !== task.id) } : entry))}
+                            onDuplicate={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: [...entry.tasks, cloneComposerTask(task, entry.title)] } : entry))}
+                            onMoveToSection={(targetSectionId) => moveComposerTask(section.id, task.id, targetSectionId, composerSections.find((entry) => entry.id === targetSectionId)?.tasks.length ?? 0)}
+                          />
+                        ))}
+                        {section.tasks.length === 0 ? <p className="composer-empty-dropzone">Aufgabe hier ablegen oder aus der Bibliothek hinzufügen</p> : null}
+                      </div>
+                    </SortableContext>
+                  </ComposerSectionDropArea>
+                  <button type="button" className="composer-add-inline" onClick={() => { setActiveComposerSectionId(section.id); setComposerSidebarTab("library"); setComposerToolsOpen(true); }}>+ Aufgabe aus Bibliothek</button>
+                </section>
+              ))}
+            </section>
+          </div>
+
+          {composerReviewOpen ? (
+            <div className="composer-review-backdrop" role="presentation">
+              <section className="composer-review" role="dialog" aria-modal="true" aria-labelledby="composer-review-title">
+                <div className="composer-review-header">
+                  <div><p className="label">Letzter Schritt</p><h4 id="composer-review-title" className="themed-strong mt-1 text-xl font-semibold">Vorschau &amp; erstellen</h4><p className="themed-muted mt-1 text-sm leading-6">{formatNumber(composerTotalPoints)} Punkte in {composerTaskCount} Aufgaben werden als bearbeitbarer EWH angelegt.</p></div>
+                  <button type="button" className="icon-button" title="Vorschau schließen" onClick={() => setComposerReviewOpen(false)}>×</button>
+                </div>
+                {renderTargetControls()}
+                <div className="composer-review-meta">
+                  <p className="label">Rahmendaten</p>
+                  <ExamHeaderForm meta={metaDraft} showNotesListTransform={false} onChange={(key, value) => setMetaDraft((current) => ({ ...current, [key]: value }))} />
+                </div>
+                <div className="composer-review-actions"><button type="button" className="button-secondary" onClick={() => setComposerReviewOpen(false)}>Zurück zum Aufbau</button><button type="button" className="button-primary" disabled={!canSubmitCurrentMode} onClick={submitCurrentMode}>EWH erstellen</button></div>
+              </section>
+            </div>
+          ) : null}
         </div>
-      </div>
+        <DragOverlay dropAnimation={null}>{draggedTaskTitle ? <div className="composer-drag-overlay"><DragIcon />{draggedTaskTitle}</div> : null}</DragOverlay>
+      </DndContext>
     );
   };
 
@@ -1288,20 +1500,21 @@ export const GuidedExamBuilder = ({
         </div>
       </div>
 
-      <div className="template-mode-tabs">
-        {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
-        {renderModeButton("manual", "Leere Struktur", "Frei zusammenstellen")}
-        <button
-          type="button"
-          className="template-create-button button-primary gap-2"
-          disabled={!canSubmitCurrentMode}
-          onClick={submitCurrentMode}
-          title={mode === "templates" && !isComposerOpen ? "Wähle zuerst eine Vorlage für die Zusammenstellung." : undefined}
-        >
-          <span className="inline-flex items-center gap-2"><PlusIcon />{mode === "templates" && !composerTemplate ? "Vorlage wählen" : "EWH erstellen"}</span>
-          <ChevronRightIcon />
-        </button>
-      </div>
+      {!isComposerOpen ? (
+        <div className="template-mode-tabs">
+          {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
+          {renderModeButton("manual", "Leere Struktur", "Frei zusammenstellen")}
+          <button
+            type="button"
+            className="template-create-button button-primary gap-2"
+            disabled
+            title="Wähle zuerst eine Vorlage für die Zusammenstellung."
+          >
+            <span className="inline-flex items-center gap-2"><PlusIcon />Vorlage wählen</span>
+            <ChevronRightIcon />
+          </button>
+        </div>
+      ) : null}
 
       {isComposerOpen ? renderComposer() : null}
 
@@ -1323,25 +1536,13 @@ export const GuidedExamBuilder = ({
               )}
             </div>
 
-            <div className="template-filter-row" aria-label="Fachfilter">
-              <button
-                type="button"
-                className={`template-filter-chip ${subjectFilter === "all" ? "template-filter-chip-active" : ""}`}
-                onClick={() => setSubjectFilter("all")}
-              >
-                Alle Fächer
-              </button>
-              {availableSubjects.map((subject) => (
-                <button
-                  key={subject}
-                  type="button"
-                  className={`template-filter-chip ${subjectFilter === subject ? "template-filter-chip-active" : ""}`}
-                  onClick={() => setSubjectFilter(subject)}
-                >
-                  {subject}
-                </button>
-              ))}
-            </div>
+            <label className="template-subject-filter">
+              <span className="label">Fach</span>
+              <select className="field" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}>
+                <option value="all">Alle Fächer</option>
+                {availableSubjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+              </select>
+            </label>
 
             <div className="template-filter-row" aria-label="Schulformfilter">
               {[

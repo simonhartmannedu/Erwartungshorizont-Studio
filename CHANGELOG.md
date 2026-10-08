@@ -2,6 +2,15 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## 0.8.0 – 08.10.2026
+
+- Der geführte Klausur-Builder bündelt Aufgabenbibliothek und Gliederung in einer ruhigen Seitenleiste; der Klausuraufbau erhält mehr Platz und bleibt der klare Arbeitsfokus.
+- Aufgaben lassen sich per Maus, Touch oder Tastatur zwischen Teilen sortieren. Hinzufügen, Verschieben, Duplizieren und Entfernen bleiben zusätzlich ohne Drag & Drop erreichbar.
+- Rahmendaten, Lerngruppe und Ziel der Klassenarbeit erscheinen erst im Schritt „Vorschau & erstellen“ statt dauerhaft neben dem Aufbau.
+- Die mobile Aufgabenbibliothek öffnet als Bottom Drawer; der Vorlageneinstieg nutzt einen kompakten Fachfilter.
+- „EWH erstellen“ bleibt als hervorgehobene Aktion dauerhaft in der Hauptnavigation erreichbar.
+- Neue Browserprofile starten mit der Darstellung „Erklärvideo bei 1,25×“; bereits gewählte Darstellungen bleiben gespeichert.
+
 ## 0.7.0 – 07.10.2026
 
 - Arbeitsbereiche, Klassenarbeitskontext und Korrekturansicht klarer gegliedert.

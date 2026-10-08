@@ -3632,6 +3632,108 @@
   .template-composer-meta { display: grid; gap: 0.85rem; border-top: 1px solid color-mix(in srgb, #9a78c6 28%, var(--app-border)); padding-top: 1rem; }
   .template-composer-meta > :last-child { grid-template-columns: minmax(0, 1fr) !important; gap: 0.8rem; }
 
+  /* The composer deliberately uses one calm working surface. Source material,
+     structure and the final settings are separate contexts instead of three
+     competing columns. */
+  .template-subject-filter { display: grid; gap: 0.35rem; max-width: 17rem; }
+
+  .composer { display: grid; gap: 1rem; margin-top: 1rem; }
+  .composer-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid color-mix(in srgb, var(--template-subject-accent, var(--app-field-focus)) 28%, var(--app-border));
+    border-radius: 1rem;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--template-subject-pastel, var(--app-soft-bg)) 26%, var(--app-panel-bg));
+  }
+  .composer-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .composer-stat { display: grid; gap: 0.1rem; min-width: 6.2rem; padding-right: 0.65rem; color: var(--app-text-strong); text-align: right; }
+  .composer-stat strong { font-size: 0.95rem; }
+  .composer-stat small { color: var(--app-text-muted); font-size: 0.72rem; font-weight: 700; }
+
+  .composer-layout { display: grid; gap: 1rem; align-items: start; }
+  .composer-sidebar,
+  .composer-canvas {
+    border: 1px solid color-mix(in srgb, var(--app-border) 88%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--app-panel-bg) 97%, transparent);
+  }
+  .composer-sidebar { padding: 0.75rem; }
+  .composer-sidebar-close,
+  .composer-mobile-tools-trigger { display: none; }
+  .composer-sidebar-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; padding-bottom: 0.75rem; border-bottom: 1px solid color-mix(in srgb, var(--app-border) 82%, transparent); }
+  .composer-sidebar-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 2.4rem;
+    border: 1px solid transparent;
+    border-radius: 0.65rem;
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+  .composer-sidebar-tabs button span { display: inline-grid; min-width: 1.3rem; place-items: center; border-radius: 999px; background: var(--app-soft-bg); color: var(--app-soft-text); font-size: 0.66rem; }
+  .composer-sidebar-tabs .composer-sidebar-tab-active { border-color: color-mix(in srgb, var(--app-field-focus) 35%, var(--app-border)); background: var(--app-field-ring); color: var(--app-text-strong); }
+  .composer-outline,
+  .composer-library { display: grid; gap: 0.65rem; padding-top: 0.75rem; }
+  .composer-outline-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.15rem 0.5rem; border: 1px solid color-mix(in srgb, var(--app-border) 85%, transparent); border-radius: 0.75rem; padding: 0.7rem; text-align: left; }
+  .composer-outline-item > span { grid-row: span 2; color: var(--app-text-muted); font-size: 0.7rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+  .composer-outline-item strong { min-width: 0; overflow: hidden; color: var(--app-text-strong); font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
+  .composer-outline-item small { color: var(--app-text-muted); font-size: 0.7rem; }
+  .composer-outline-item-active { border-color: color-mix(in srgb, var(--app-field-focus) 46%, var(--app-border)); background: var(--app-field-ring); }
+  .composer-library-filter { min-height: 2.45rem; }
+  .composer-library-list { display: grid; max-height: min(60vh, 42rem); gap: 0.45rem; overflow: auto; padding-right: 0.15rem; }
+  .composer-library-task { display: flex; min-width: 0; align-items: flex-start; gap: 0.5rem; border: 1px solid color-mix(in srgb, var(--app-border) 82%, transparent); border-radius: 0.7rem; padding: 0.65rem; background: color-mix(in srgb, var(--app-secondary-bg) 72%, transparent); }
+  .composer-library-task:hover { border-color: color-mix(in srgb, var(--app-field-focus) 42%, var(--app-border)); background: color-mix(in srgb, var(--app-soft-bg) 36%, var(--app-secondary-bg)); }
+  .composer-library-task-dragging { opacity: 0.45; }
+  .composer-library-task strong { display: block; overflow: hidden; color: var(--app-text-strong); font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+  .composer-library-task p { margin-top: 0.15rem; color: var(--app-text-muted); font-size: 0.7rem; line-height: 1.35; }
+  .composer-add-button { display: grid; width: 2rem; min-width: 2rem; min-height: 2rem; place-items: center; padding: 0; font-size: 1rem; }
+  .composer-drag-handle { display: grid; width: 2rem; min-width: 2rem; height: 2rem; place-items: center; border-radius: 0.5rem; color: var(--app-text-muted); cursor: grab; touch-action: none; }
+  .composer-drag-handle:focus-visible { outline: 2px solid var(--app-field-focus); outline-offset: 2px; }
+  .composer-drag-handle:active { cursor: grabbing; }
+
+  .composer-canvas { display: grid; gap: 0.85rem; padding: 1rem; }
+  .composer-canvas-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid color-mix(in srgb, var(--app-border) 84%, transparent); padding-bottom: 0.85rem; }
+  .composer-canvas-toolbar div:first-child { display: grid; gap: 0.14rem; }
+  .composer-canvas-toolbar span { color: var(--app-text-muted); font-size: 0.68rem; font-weight: 850; letter-spacing: 0.1em; text-transform: uppercase; }
+  .composer-canvas-toolbar strong { color: var(--app-text-strong); font-size: 0.9rem; }
+  .composer-section { border: 1px solid color-mix(in srgb, var(--app-border) 82%, transparent); border-radius: 0.9rem; padding: 0.8rem; background: color-mix(in srgb, var(--app-secondary-bg) 66%, transparent); }
+  .composer-section-active { border-color: color-mix(in srgb, var(--app-field-focus) 42%, var(--app-border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 12%, transparent); }
+  .composer-section-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; }
+  .composer-section-header input { min-width: 0; min-height: 2.45rem; font-weight: 800; }
+  .composer-part-label { color: var(--app-text-muted); font-size: 0.68rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+  .composer-section-header strong { color: var(--app-text-strong); font-size: 0.8rem; white-space: nowrap; }
+  .composer-section-drop-area { min-height: 2.5rem; margin-top: 0.65rem; border-radius: 0.75rem; transition: background-color 140ms ease, box-shadow 140ms ease; }
+  .composer-section-drop-area-over { background: color-mix(in srgb, var(--app-field-ring) 70%, transparent); box-shadow: inset 0 0 0 1px var(--app-field-focus); }
+  .composer-task-list { display: grid; gap: 0.45rem; }
+  .composer-task-row { display: flex; min-width: 0; align-items: flex-start; gap: 0.55rem; border: 1px solid color-mix(in srgb, var(--app-border) 82%, transparent); border-radius: 0.7rem; padding: 0.75rem; background: var(--app-secondary-bg); }
+  .composer-task-row:hover,
+  .composer-task-row:focus-within { border-color: color-mix(in srgb, var(--app-field-focus) 42%, var(--app-border)); }
+  .composer-task-row-dragging { opacity: 0.32; }
+  .composer-task-row strong { display: block; color: var(--app-text-strong); font-size: 0.88rem; }
+  .composer-task-row p { margin-top: 0.2rem; color: var(--app-text-muted); font-size: 0.78rem; line-height: 1.4; }
+  .composer-task-points { width: 4.75rem; min-height: 2.2rem; padding-inline: 0.45rem; text-align: right; }
+  .composer-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
+  .composer-task-move { width: 7.4rem; min-height: 2.2rem; padding: 0.25rem 0.45rem; font-size: 0.72rem; }
+  .composer-empty-dropzone { border: 1px dashed color-mix(in srgb, var(--app-field-focus) 42%, var(--app-border)); border-radius: 0.65rem; padding: 0.8rem; color: var(--app-text-muted); font-size: 0.8rem; text-align: center; }
+  .composer-add-inline { width: 100%; margin-top: 0.65rem; border-radius: 0.65rem; padding: 0.5rem; color: var(--app-text-muted); font-size: 0.78rem; font-weight: 750; text-align: left; }
+  .composer-add-inline:hover { background: var(--app-soft-bg); color: var(--app-text-strong); }
+  .composer-drag-overlay { display: flex; max-width: 20rem; align-items: center; gap: 0.55rem; border: 1px solid var(--app-field-focus); border-radius: 0.7rem; padding: 0.7rem; background: var(--app-panel-bg); box-shadow: 0 15px 35px color-mix(in srgb, var(--app-text-strong) 22%, transparent); color: var(--app-text-strong); font-size: 0.84rem; font-weight: 800; }
+
+  .composer-review-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; overflow: auto; place-items: start center; padding: 5vh 1rem; background: color-mix(in srgb, #0f172a 52%, transparent); }
+  .composer-review { width: min(100%, 52rem); border: 1px solid var(--app-border); border-radius: 1rem; padding: 1rem; background: var(--app-panel-bg); box-shadow: 0 24px 80px color-mix(in srgb, #020617 45%, transparent); }
+  .composer-review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--app-border); }
+  .composer-review > .space-y-4 { margin-top: 1rem; }
+  .composer-review-meta { display: grid; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--app-border); }
+  .composer-review-meta > :last-child { grid-template-columns: minmax(0, 1fr) !important; }
+  .composer-review-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.65rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--app-border); }
+
   @media (min-width: 768px) {
     .template-decision-header {
       grid-template-columns: minmax(0, 1fr) auto;
@@ -3683,6 +3785,48 @@
 
     .template-composer-library,
     .template-composer-settings { position: sticky; top: 1rem; }
+  }
+
+  @media (min-width: 960px) {
+    .composer-layout { grid-template-columns: minmax(235px, 0.48fr) minmax(0, 1.52fr); }
+    .composer-sidebar { position: sticky; top: 1rem; }
+  }
+
+  @media (max-width: 959px) {
+    .composer-mobile-tools-trigger { display: inline-flex; }
+    .composer-sidebar { display: none; }
+    .composer-layout-tools-open .composer-sidebar {
+      position: fixed;
+      z-index: 35;
+      inset: auto 0 0;
+      display: grid;
+      max-height: min(78vh, 42rem);
+      overflow: auto;
+      border-radius: 1rem 1rem 0 0;
+      padding: 1rem;
+      background: var(--app-panel-bg);
+      box-shadow: 0 -18px 50px color-mix(in srgb, #020617 28%, transparent);
+    }
+    .composer-sidebar-close { display: inline-flex; justify-self: end; color: var(--app-text-muted); font-size: 0.78rem; font-weight: 800; }
+    .composer-library-list { max-height: min(48vh, 28rem); }
+  }
+
+  @media (max-width: 640px) {
+    .composer-header { align-items: stretch; }
+    .composer-header-actions { justify-content: space-between; }
+    .composer-header-actions > button { flex: 1 1 auto; justify-content: center; }
+    .composer-stat { order: -1; width: 100%; padding: 0 0 0.5rem; border-bottom: 1px solid color-mix(in srgb, var(--app-border) 76%, transparent); text-align: left; }
+    .composer-canvas { padding: 0.75rem; }
+    .composer-section { padding: 0.65rem; }
+    .composer-section-header { grid-template-columns: auto minmax(0, 1fr); }
+    .composer-section-header strong { grid-column: 2; justify-self: start; }
+    .composer-task-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .composer-task-row > .min-w-0 { grid-column: 2 / -1; }
+    .composer-task-points { grid-column: 2; }
+    .composer-task-actions { grid-column: 3; grid-row: 2; }
+    .composer-task-move { width: 2.2rem; color: transparent; }
+    .composer-review { padding: 0.85rem; }
+    .composer-review-actions > button { flex: 1 1 auto; justify-content: center; }
   }
 
   .student-performance-view {
@@ -5596,6 +5740,7 @@
   .app-navigation-tab {
     border-radius: 0.45rem;
   }
+
 
   .field {
     padding: 0.62rem 0.75rem;

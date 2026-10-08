@@ -6,25 +6,26 @@ export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups
 
 /** Bogencheck remains implemented, but is not released in the primary navigation yet. */
 /**
- * These are the durable destinations of the workspace. Creation and the
- * wizard remain available as contextual actions; making them top-level tabs
- * made the same job appear in three different places.
+ * These are the durable destinations of the workspace. Creating an EWH is
+ * deliberately kept next to the classwork area as a permanent primary action.
+ * The wizard remains contextual so it does not duplicate the same workflow.
  */
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
   { id: "builder", label: "Klassenarbeiten" },
+  { id: "guidedBuilder", label: "EWH erstellen" },
   { id: "groups", label: "Lerngruppen" },
   { id: "archive", label: "Archiv" },
   { id: "backup", label: "Backup" },
 ];
 
 /** The compact workflow deliberately exposes only creating and finishing an EWH. */
-export const easyModeTabs = tabs.filter((tab) => tab.id === "builder");
+export const easyModeTabs = tabs.filter((tab) => tab.id === "builder" || tab.id === "guidedBuilder");
 export const getVisibleTabs = (easyMode: boolean) => (easyMode ? easyModeTabs : tabs);
 
 /** Contextual views keep their old state IDs for compatibility with existing calls. */
 export const getNavigationTabId = (tabId: AppTabId): AppTabId =>
-  tabId === "guidedBuilder" || tabId === "wizard" ? "builder" : tabId;
+  tabId === "wizard" ? "builder" : tabId;
 
 export const getTabButtonId = (tabId: AppTabId) => `app-tab-${tabId}`;
 export const getTabPanelId = (tabId: AppTabId) => `app-tabpanel-${tabId}`;
@@ -163,7 +164,7 @@ export const AppNavigation = ({
             type="button"
             onClick={() => onSelectTab(tab.id)}
             onKeyDown={(event) => onTabKeyDown(event, tab.id)}
-            className={`${navigationTab === tab.id ? "button-primary" : "button-secondary"} app-navigation-tab shrink-0 gap-2 whitespace-nowrap`}
+            className={`${navigationTab === tab.id || tab.id === "guidedBuilder" ? "button-primary" : "button-secondary"} app-navigation-tab shrink-0 gap-2 whitespace-nowrap`}
           >
             <TabIcon id={tab.id} />
             {tab.label}

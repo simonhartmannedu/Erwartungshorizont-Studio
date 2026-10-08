@@ -193,6 +193,7 @@ const testEncryptedAppBackupRoundTrip = async () => {
           exam: sampleExam,
           activeArchiveEntryId: null,
           assignedGroupId: null,
+          setupCompletedAt: null,
           updatedAt: "2026-03-03T12:00:00.000Z",
           versions: [],
         },

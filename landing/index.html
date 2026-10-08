@@ -19,13 +19,13 @@
       <section class="start" id="start" aria-labelledby="start-title">
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
-        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.7.0">
+        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.8.0">
           <div class="terminal-bar">
             <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
             <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-            <span class="terminal-version">v0.7.0</span>
+            <span class="terminal-version">v0.8.0</span>
           </div>
-          <pre aria-label="Aktuelle Änderungen in Version 0.7.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+          <pre aria-label="Aktuelle Änderungen in Version 0.8.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
         </section>
 
         <div class="mode-grid">
@@ -66,11 +66,12 @@
         const output = document.getElementById("release-terminal-output");
         if (!output) return;
         const lines = [
-          "$ release v0.7.0",
-          "✓ Arbeitsbereiche und Korrektur klarer gegliedert",
-          "✓ Teilnahme verbindet Korrektur, Druck & Durchschnitt",
-          "✓ Backups: lokal verschlüsselt, optional via Nextcloud-Ordner",
-          "✓ Sperrstatus und EWH-Versionen übersichtlich gehalten"
+          "$ release v0.8.0",
+          "✓ Klausur-Builder: Bibliothek und Gliederung klar getrennt",
+          "✓ Aufgaben mit Maus, Touch oder Tastatur neu anordnen",
+          "✓ Vorschau bündelt Rahmendaten und das Erstellen des EWH",
+          "✓ EWH erstellen bleibt immer in der Hauptnavigation erreichbar",
+          "✓ Neue Browser starten mit „Erklärvideo bei 1,25×“"
         ];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const writeImmediately = () => { output.textContent = lines.join("\n"); };

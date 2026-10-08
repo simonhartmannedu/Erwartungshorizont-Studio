@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __EWH_APP_MODE__: string | undefined;
+
 declare module "sql.js" {
   export interface SqlJsStatement {
     bind(values: unknown[]): void;
