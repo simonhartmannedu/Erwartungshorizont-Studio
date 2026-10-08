@@ -146,9 +146,11 @@ type SavePickerOptions = {
   description: string;
   accept: Record<string, string[]>;
 };
-type PreparedFileSave = {
+export type PreparedFileSave = {
   save: (blob: Blob) => Promise<FileSaveResult>;
 };
+
+export type PreparedFileSavePromise = Promise<PreparedFileSave | null>;
 
 const getSaveFilePicker = () => {
   const candidate = window as Window & { showSaveFilePicker?: BrowserSaveFilePicker };
@@ -212,6 +214,44 @@ export const saveBlobWithDialog = async (
   const target = await prepareFileSave(filename, options);
   if (!target) return "cancelled" as const;
   return target.save(blob);
+};
+
+const docxSaveOptions: SavePickerOptions = {
+  description: "Word-Dokument",
+  accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
+};
+
+/**
+ * Starts Chromium's save dialog while the button click is still trusted. The
+ * document itself may then be assembled asynchronously without the browser
+ * treating the dialog as an unsolicited popup.
+ */
+export const prepareDocxFileSave = (filename: string): PreparedFileSavePromise =>
+  prepareFileSave(filename, docxSaveOptions);
+
+const savePreparedBlob = async (targetPromise: PreparedFileSavePromise, blob: Blob) => {
+  const target = await targetPromise;
+  return target ? target.save(blob) : "cancelled" as const;
+};
+
+export const getEditableExamDocxFilename = (exam: Exam, identity?: PrintIdentity) => {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return `${sanitizeFilenamePart(identity?.alias || exam.meta.title || "Bewertungsbogen")}_${timestamp}.docx`;
+};
+
+export const getClassEditableExamDocxFilename = (exam: Exam, reports: PrintPayload[]) => {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return `${sanitizeFilenamePart(reports[0]?.identity?.className || exam.meta.course || exam.meta.title || "Klasse")}_${timestamp}.docx`;
+};
+
+export const getGradeScaleDocxFilename = (exam: Exam, filenamePrefix?: string) => {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return `${sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche")}_Notenbereiche_${timestamp}.docx`;
+};
+
+export const getClassOverviewDocxFilename = (exam: Exam, context?: { className?: string }) => {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Klassenuebersicht")}_${timestamp}.docx`;
 };
 
 const createEditableExamDocxChildren = (
@@ -301,8 +341,10 @@ export const exportEditableExamDocx = async (
   exam: Exam,
   summary: ExamSummary,
   identity?: PrintIdentity,
-  options?: { hideResults?: boolean },
+  options?: { hideResults?: boolean; saveTarget?: PreparedFileSavePromise },
 ) => {
+  const filename = getEditableExamDocxFilename(exam, identity);
+  const saveTarget = options?.saveTarget ?? prepareDocxFileSave(filename);
   const docx = await import("docx");
   const { Packer } = docx;
   const children = createEditableExamDocxChildren(docx, exam, summary, identity, options);
@@ -312,16 +354,17 @@ export const exportEditableExamDocx = async (
     children,
   });
   const blob = await Packer.toBlob(document);
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const filename = `${sanitizeFilenamePart(identity?.alias || exam.meta.title || "Bewertungsbogen")}_${timestamp}.docx`;
-  return saveBlobWithDialog(filename, blob, {
-    description: "Word-Dokument",
-    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
-  });
+  return savePreparedBlob(saveTarget, blob);
 };
 
 /** Combines the same individual student sheets into one editable class document. */
-export const exportClassEditableExamDocx = async (exam: Exam, reports: PrintPayload[]) => {
+export const exportClassEditableExamDocx = async (
+  exam: Exam,
+  reports: PrintPayload[],
+  options?: { saveTarget?: PreparedFileSavePromise },
+) => {
+  const filename = getClassEditableExamDocxFilename(exam, reports);
+  const saveTarget = options?.saveTarget ?? prepareDocxFileSave(filename);
   const docx = await import("docx");
   const { Packer, PageBreak, Paragraph } = docx;
   const children = reports.flatMap((report, index) => [
@@ -333,15 +376,17 @@ export const exportClassEditableExamDocx = async (exam: Exam, reports: PrintPayl
     subtitle: [exam.meta.subject, exam.meta.course].filter(Boolean).join(" · "),
     children,
   }));
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const filename = `${sanitizeFilenamePart(reports[0]?.identity?.className || exam.meta.course || exam.meta.title || "Klasse")}_${timestamp}.docx`;
-  return saveBlobWithDialog(filename, blob, {
-    description: "Word-Dokument",
-    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
-  });
+  return savePreparedBlob(saveTarget, blob);
 };
 
-export const exportGradeScaleDocx = async (exam: Exam, summary: ExamSummary, filenamePrefix?: string) => {
+export const exportGradeScaleDocx = async (
+  exam: Exam,
+  summary: ExamSummary,
+  filenamePrefix?: string,
+  options?: { saveTarget?: PreparedFileSavePromise },
+) => {
+  const filename = getGradeScaleDocxFilename(exam, filenamePrefix);
+  const saveTarget = options?.saveTarget ?? prepareDocxFileSave(filename);
   const docx = await import("docx");
   const { Packer, Paragraph, TableRow, TextRun } = docx;
   const ranges = getGradeScaleRanges(exam, summary.totalMaxPoints);
@@ -365,19 +410,17 @@ export const exportGradeScaleDocx = async (exam: Exam, summary: ExamSummary, fil
     subtitle: exam.gradeScale.title || "Notenschlüssel",
     children,
   }));
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const filename = `${sanitizeFilenamePart(filenamePrefix || exam.meta.title || "Notenbereiche")}_Notenbereiche_${timestamp}.docx`;
-  return saveBlobWithDialog(filename, blob, {
-    description: "Word-Dokument",
-    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
-  });
+  return savePreparedBlob(saveTarget, blob);
 };
 
 export const exportClassOverviewDocx = async (
   exam: Exam,
   overview: ClassOverviewData,
   context?: { subject?: string; className?: string },
+  options?: { saveTarget?: PreparedFileSavePromise },
 ) => {
+  const filename = getClassOverviewDocxFilename(exam, context);
+  const saveTarget = options?.saveTarget ?? prepareDocxFileSave(filename);
   const docx = await import("docx");
   const { Packer, Paragraph, TableRow, TextRun } = docx;
   const children = [
@@ -403,12 +446,7 @@ export const exportClassOverviewDocx = async (
     subtitle: [context?.subject, context?.className].filter(Boolean).join(" · "),
     children,
   }));
-  const timestamp = new Date().toISOString().slice(0, 10);
-  const filename = `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Klassenuebersicht")}_${timestamp}.docx`;
-  return saveBlobWithDialog(filename, blob, {
-    description: "Word-Dokument",
-    accept: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"] },
-  });
+  return savePreparedBlob(saveTarget, blob);
 };
 
 interface PrintIdentity {

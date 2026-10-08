@@ -137,6 +137,11 @@ import {
   openGradeScalePrintWindow,
   openPrintPopupHost,
   openPrintWindow,
+  getClassEditableExamDocxFilename,
+  getClassOverviewDocxFilename,
+  getEditableExamDocxFilename,
+  getGradeScaleDocxFilename,
+  prepareDocxFileSave,
   openSecurityTokenPrintWindow,
   prepareFileSave,
   resolveCommentTemplate,
@@ -3624,8 +3629,8 @@ function App() {
     })();
   };
 
-  const printWithResolvedIdentity = async (password?: string) => {
-    const popup = openPrintPopupHost();
+  const printWithResolvedIdentity = async (password?: string, preparedPopup?: Window | null) => {
+    const popup = preparedPopup ?? openPrintPopupHost();
     if (!popup) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
       return false;
@@ -3651,6 +3656,7 @@ function App() {
         unlockActivityAtRef.current = Date.now();
         fullName = await decryptText(activeStudentRecord.encryptedName, password);
       } catch {
+        popup.close();
         pushNotice("danger", "Klarname konnte nicht entschlüsselt werden");
         return false;
       }
@@ -3680,8 +3686,9 @@ function App() {
     return true;
   };
 
-  const printWholeClassWithResolvedIdentity = async (password?: string) => {
+  const printWholeClassWithResolvedIdentity = async (password?: string, preparedPopup?: Window | null) => {
     if (!activeGroup) {
+      preparedPopup?.close();
       pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
       return false;
     }
@@ -3690,11 +3697,12 @@ function App() {
       isStudentParticipating(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null),
     );
     if (participatingStudents.length === 0) {
+      preparedPopup?.close();
       pushNotice("warning", "Keine teilnehmenden Schüler", "Für diese Klassenarbeit ist keine teilnehmende Schüler:in ausgewählt.");
       return false;
     }
 
-    const popup = openPrintPopupHost();
+    const popup = preparedPopup ?? openPrintPopupHost();
     if (!popup) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
       return false;
@@ -3767,11 +3775,16 @@ function App() {
     return true;
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (activeStudentRecord && activeGroup?.passwordVerifier) {
-      const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
-      if (unlockedPassword) {
-        await printWithResolvedIdentity(unlockedPassword);
+      const cachedPassword = unlockedGroupPasswordsRef.current[activeGroup.id]?.trim();
+      if (cachedPassword) {
+        const popup = openPrintPopupHost();
+        if (!popup) {
+          pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+          return;
+        }
+        void printWithResolvedIdentity(cachedPassword, popup);
         return;
       }
 
@@ -3781,10 +3794,18 @@ function App() {
       return;
     }
 
-    await printWithResolvedIdentity();
+    void printWithResolvedIdentity();
   };
 
   const handleExportDocx = async () => {
+    if (activeStudentRecord && activeGroup?.passwordVerifier && !unlockedGroupPasswordsRef.current[activeGroup.id]?.trim()) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Für den editierbaren Export werden die lokalen Bewertungsdaten benötigt.");
+      return;
+    }
+    const saveTarget = prepareDocxFileSave(getEditableExamDocxFilename(
+      displayExam,
+      activeStudentRecord ? { alias: activeStudentRecord.alias } : undefined,
+    ));
     let fullName: string | null = null;
     if (activeStudentRecord && activeGroup?.passwordVerifier) {
       const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
@@ -3815,6 +3836,7 @@ function App() {
             teacherComment: latestAssessment?.teacherComment ?? "",
           }
         : undefined,
+      { saveTarget },
     );
     if (result !== "cancelled") {
       pushNotice("success", "Word-Dokument erstellt", "Der Bewertungsbogen kann in Word oder LibreOffice weiterbearbeitet werden.");
@@ -3830,6 +3852,16 @@ function App() {
       pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
       return;
     }
+    if (activeGroup.passwordVerifier && !unlockedGroupPasswordsRef.current[activeGroup.id]?.trim()) {
+      pushNotice("warning", "Klasse zuerst entsperren", "Für den Klassenexport werden die lokalen Bewertungsdaten benötigt.");
+      return;
+    }
+
+    const saveTarget = prepareDocxFileSave(getClassEditableExamDocxFilename(exam, [{
+      exam,
+      summary,
+      identity: { alias: "", className: activeGroup.className },
+    }]));
 
     const password = activeGroup.passwordVerifier
       ? await getUsableUnlockedGroupPassword(activeGroup.id)
@@ -3868,7 +3900,7 @@ function App() {
       });
     }
 
-    const result = await exportClassEditableExamDocx(exam, reports);
+    const result = await exportClassEditableExamDocx(exam, reports, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Klassendokument erstellt", "Die editierbare Punktetabelle für die aktive Klasse wurde erstellt.");
     }
@@ -3882,14 +3914,17 @@ function App() {
         tasks: section.tasks.map((task) => ({ ...task, achievedPoints: 0 })),
       })),
     };
-    const result = await exportEditableExamDocx(emptyExam, calculateExamSummary(emptyExam), undefined, { hideResults: true });
+    const saveTarget = prepareDocxFileSave(getEditableExamDocxFilename(emptyExam));
+    const result = await exportEditableExamDocx(emptyExam, calculateExamSummary(emptyExam), undefined, { hideResults: true, saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Leerer Word-EWH erstellt", "Der editierbare Erwartungshorizont wurde ohne individuelle Bewertungsdaten erstellt.");
     }
   };
 
   const handleExportGradeScaleDocx = async () => {
-    const result = await exportGradeScaleDocx(displayExam, summary, activeStudentRecord?.alias ?? displayExam.meta.title);
+    const filenamePrefix = activeStudentRecord?.alias ?? displayExam.meta.title;
+    const saveTarget = prepareDocxFileSave(getGradeScaleDocxFilename(displayExam, filenamePrefix));
+    const result = await exportGradeScaleDocx(displayExam, summary, filenamePrefix, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Notenbereiche erstellt", "Der editierbare Notenschlüssel wurde erstellt.");
     }
@@ -3900,10 +3935,12 @@ function App() {
       pushNotice("warning", "Keine Klassenübersicht verfügbar", "Bitte zuerst eine Klasse mit auswertbaren Daten auswählen.");
       return;
     }
+    const context = { subject: activeGroup.subject, className: activeGroup.className };
+    const saveTarget = prepareDocxFileSave(getClassOverviewDocxFilename(displayExam, context));
     const result = await exportClassOverviewDocx(displayExam, classOverview, {
       subject: activeGroup.subject,
       className: activeGroup.className,
-    });
+    }, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Klassenübersicht erstellt", "Die editierbare Klassenübersicht wurde erstellt.");
     }
@@ -3932,11 +3969,16 @@ function App() {
     }
   };
 
-  const handlePrintClass = async () => {
+  const handlePrintClass = () => {
     if (activeGroup?.passwordVerifier) {
-      const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
-      if (unlockedPassword) {
-        await printWholeClassWithResolvedIdentity(unlockedPassword);
+      const cachedPassword = unlockedGroupPasswordsRef.current[activeGroup.id]?.trim();
+      if (cachedPassword) {
+        const popup = openPrintPopupHost();
+        if (!popup) {
+          pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+          return;
+        }
+        void printWholeClassWithResolvedIdentity(cachedPassword, popup);
         return;
       }
 
@@ -3946,7 +3988,7 @@ function App() {
       return;
     }
 
-    await printWholeClassWithResolvedIdentity();
+    void printWholeClassWithResolvedIdentity();
   };
 
   const handlePrintClassOverview = () => {
