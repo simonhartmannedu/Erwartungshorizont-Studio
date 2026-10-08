@@ -3799,7 +3799,7 @@ function App() {
 
   const handleExportDocx = async () => {
     if (activeStudentRecord && activeGroup?.passwordVerifier && !unlockedGroupPasswordsRef.current[activeGroup.id]?.trim()) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Für den editierbaren Export werden die lokalen Bewertungsdaten benötigt.");
+      openHeaderUnlockDialog();
       return;
     }
     const saveTarget = prepareDocxFileSave(getEditableExamDocxFilename(
@@ -3810,7 +3810,7 @@ function App() {
     if (activeStudentRecord && activeGroup?.passwordVerifier) {
       const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
       if (!unlockedPassword) {
-        pushNotice("warning", "Klasse zuerst entsperren", "Für den editierbaren Export werden die lokalen Bewertungsdaten benötigt.");
+        openHeaderUnlockDialog();
         return;
       }
       try {
@@ -3853,7 +3853,7 @@ function App() {
       return;
     }
     if (activeGroup.passwordVerifier && !unlockedGroupPasswordsRef.current[activeGroup.id]?.trim()) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Für den Klassenexport werden die lokalen Bewertungsdaten benötigt.");
+      openHeaderUnlockDialog();
       return;
     }
 
@@ -3867,7 +3867,7 @@ function App() {
       ? await getUsableUnlockedGroupPassword(activeGroup.id)
       : null;
     if (activeGroup.passwordVerifier && !password) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Für den Klassenexport werden die lokalen Bewertungsdaten benötigt.");
+      openHeaderUnlockDialog();
       return;
     }
 
@@ -3998,7 +3998,7 @@ function App() {
     }
 
     if (activeGroup.passwordVerifier && !activeGroupPassword) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Die Klassenübersicht wird erst nach Entsperrung mit echten Bewertungsdaten erstellt.");
+      openHeaderUnlockDialog();
       return;
     }
 
@@ -4031,7 +4031,7 @@ function App() {
 
   const handleExportStudentCsv = () => {
     if (activeGroup?.passwordVerifier && !activeGroupPassword) {
-      pushNotice("warning", "Klasse zuerst entsperren", "CSV-Exporte mit Bewertungsdaten sind für diese Lerngruppe erst nach Entsperrung möglich.");
+      openHeaderUnlockDialog();
       return;
     }
 
@@ -4062,7 +4062,7 @@ function App() {
     }
 
     if (activeGroup.passwordVerifier && !activeGroupPassword) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Klassenexporte mit Bewertungsdaten sind erst nach Entsperrung möglich.");
+      openHeaderUnlockDialog();
       return;
     }
 
@@ -4141,7 +4141,7 @@ function App() {
     }
 
     if (activeGroup.passwordVerifier && !activeGroupPassword) {
-      pushNotice("warning", "Klasse zuerst entsperren", "Die Klassenübersicht wird erst nach Entsperrung berechnet und exportiert.");
+      openHeaderUnlockDialog();
       return;
     }
 
