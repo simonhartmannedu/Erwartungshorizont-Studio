@@ -5,6 +5,7 @@ import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
 interface Props {
   tasks: Task[];
   scoresLocked?: boolean;
+  showScores?: boolean;
   onLockedScoreAttempt?: () => void;
   getTaskAnchorId?: (task: Task) => string;
   onChange: (taskId: string, patch: Partial<Task>) => void;
@@ -17,6 +18,7 @@ interface Props {
 export const TaskTable = ({
   tasks,
   scoresLocked = false,
+  showScores = true,
   onLockedScoreAttempt,
   getTaskAnchorId,
   onChange,
@@ -114,7 +116,7 @@ export const TaskTable = ({
                 placeholder="Stichpunkte oder mögliche Schülerantwort"
               />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${showScores ? "grid-cols-2" : ""}`}>
               <Field label="Max.">
                 <NumberInput
                   className="field w-full !px-2 !py-2 text-center text-sm font-semibold"
@@ -124,13 +126,15 @@ export const TaskTable = ({
                   onCommit={(value) => onChange(task.id, { maxPoints: value })}
                 />
               </Field>
-              <Field label="Erreicht">
-                {renderScoreInput(
-                  task,
-                  "field score-input w-full !px-2 !py-2 text-center text-sm font-semibold",
-                  "w-full",
-                )}
-              </Field>
+              {showScores ? (
+                <Field label="Erreicht">
+                  {renderScoreInput(
+                    task,
+                    "field score-input w-full !px-2 !py-2 text-center text-sm font-semibold",
+                    "w-full",
+                  )}
+                </Field>
+              ) : null}
             </div>
           </div>
         </div>
@@ -145,7 +149,7 @@ export const TaskTable = ({
               <col className="w-[20%]" />
               <col className="w-[52%]" />
               <col className="w-[7%]" />
-              <col className="w-[7%]" />
+              {showScores ? <col className="w-[7%]" /> : null}
               <col className="w-[14%]" />
             </colgroup>
             <thead className="themed-table-head">
@@ -153,7 +157,7 @@ export const TaskTable = ({
                 <th className="px-3 py-2.5">Aufgabe</th>
                 <th className="px-3 py-2.5">Mögl. Schülerantwort</th>
                 <th className="px-3 py-2.5 text-center">Max.</th>
-                <th className="px-3 py-2.5 text-center">Erreicht</th>
+                {showScores ? <th className="px-3 py-2.5 text-center">Erreicht</th> : null}
                 <th className="px-3 py-2.5 text-right">Aktionen</th>
               </tr>
             </thead>
@@ -199,13 +203,15 @@ export const TaskTable = ({
                       onCommit={(value) => onChange(task.id, { maxPoints: value })}
                     />
                   </td>
-                  <td className="px-3 py-3">
-                    {renderScoreInput(
-                      task,
-                      "field score-input w-16 !px-2 !py-2 text-center text-sm font-semibold",
-                      "mx-auto w-16",
-                    )}
-                  </td>
+                  {showScores ? (
+                    <td className="px-3 py-3">
+                      {renderScoreInput(
+                        task,
+                        "field score-input w-16 !px-2 !py-2 text-center text-sm font-semibold",
+                        "mx-auto w-16",
+                      )}
+                    </td>
+                  ) : null}
                   <td className="px-3 py-3">
                     <div className="flex justify-end">
                       <div className="control-cluster inline-flex items-center gap-1 rounded-full border p-1">
@@ -237,7 +243,7 @@ export const TaskTable = ({
         Unteraufgabe ergänzen
       </button>
     </Field>
-      <p className="status-note text-xs leading-5">Punkte werden sofort gespeichert. Mit Enter springst du zum nächsten Punktefeld.</p>
+      {showScores ? <p className="status-note text-xs leading-5">Punkte werden sofort gespeichert. Mit Enter springst du zum nächsten Punktefeld.</p> : null}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("keeps the composer focused and moves final settings into review", async ({ page }) => {
+test("keeps the composer focused and leaves metadata for the editor", async ({ page }) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await page.getByRole("button", { name: "EWH erstellen" }).first().click();
@@ -30,6 +30,7 @@ test("keeps the composer focused and moves final settings into review", async ({
 
   await page.getByRole("button", { name: "Vorschau & erstellen" }).click();
   await expect(page.getByRole("dialog", { name: "Vorschau & erstellen" })).toBeVisible();
+  await expect(page.getByText("Rahmendaten", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "EWH erstellen" })).toBeVisible();
   await page.getByRole("button", { name: "Zurück zum Aufbau" }).click();
   await expect(page.locator(".composer-review")).toHaveCount(0);

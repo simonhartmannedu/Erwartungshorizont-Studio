@@ -1832,8 +1832,8 @@ function App() {
   }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup, storageReady]);
 
   const displayExam = useMemo(
-    () => (storageReady ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
-    [activeWorkspace?.id, exam, storageReady, studentDatabase, selectedStudent],
+    () => (storageReady && !easyMode ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
+    [activeWorkspace?.id, easyMode, exam, storageReady, studentDatabase, selectedStudent],
   );
   const summary = useMemo(
     () => (storageReady ? calculateExamSummary(displayExam) : calculateExamSummary(exam)),
@@ -3827,7 +3827,7 @@ function App() {
     const result = await exportEditableExamDocx(
       displayExam,
       summary,
-      activeStudentRecord && activeGroup
+      !easyMode && activeStudentRecord && activeGroup
         ? {
             alias: activeStudentRecord.alias,
             fullName,
@@ -3950,7 +3950,7 @@ function App() {
     const opened = openPrintWindow(
       displayExam,
       summary,
-      activeStudentRecord && activeGroup
+      !easyMode && activeStudentRecord && activeGroup
         ? {
             alias: activeStudentRecord.alias,
             subject: activeGroup.subject,
@@ -4630,6 +4630,7 @@ function App() {
               <>
                 <EditorSectionTabs
                   activeTab={activeEditorTab}
+                  easyMode={easyMode}
                   onSelectTab={(tabId) => {
                     if (tabId === "tasks") setCollapsedSectionIds(displayExam.sections.map((section) => section.id));
                     setActiveEditorTab(tabId);
@@ -4884,7 +4885,7 @@ function App() {
                   hidden={activeEditorTab !== "tasks"}
                   className="space-y-6"
                 >
-                {activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
+                {!easyMode && activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
                   <Card title="Korrektur starten" subtitle="Die Rubrik bleibt unverändert; Punkte gehören immer zu einer ausgewählten Schüler:in.">
                     <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-strong font-semibold">{selectedStudent ? "Schüler:in nimmt nicht teil" : "Noch keine Schüler:in ausgewählt"}</p>
@@ -4905,7 +4906,7 @@ function App() {
                   </Card>
                 ) : (
                   <>
-                {activeWorkspace ? (
+                {!easyMode && activeWorkspace ? (
                   <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 surface-muted">
                     <div>
                       <p className="label">Individuelle Korrektur</p>
@@ -4934,7 +4935,7 @@ function App() {
                   </div>
                 ) : null}
 
-                {activeWorkspace && selectedStudent ? (
+                {!easyMode && activeWorkspace && selectedStudent ? (
                   <section className="rounded-xl border p-4 surface-muted" aria-label="Teilnahme an dieser Klassenarbeit">
                     <label className="flex cursor-pointer items-start gap-3 text-sm leading-5">
                       <input
@@ -4956,8 +4957,12 @@ function App() {
 
                 {activeWorkspace ? (
                   <div className="rounded-xl border p-4 surface-muted">
-                    <p className="themed-strong text-sm font-semibold">Geteilte Rubrik, individuelle Punkte</p>
-                    <p className="themed-muted mt-1 text-sm leading-6">Aufgabentitel, erwartete Antworten und Maximalpunkte gehören zur gemeinsamen Rubrik. Nur die Spalte „Erreicht“ wird für {activeStudentLiveLabel ?? "die ausgewählte Schüler:in"} gespeichert. Änderungen an der Rubrik wirken sich auf alle Korrekturen aus.</p>
+                    <p className="themed-strong text-sm font-semibold">{easyMode ? "Erwartungshorizont überarbeiten" : "Geteilte Rubrik, individuelle Punkte"}</p>
+                    <p className="themed-muted mt-1 text-sm leading-6">
+                      {easyMode
+                        ? "Aufgabentitel, erwartete Antworten und Maximalpunkte kannst du direkt bearbeiten. Anschließend steht der fertige Erwartungshorizont zum Drucken oder Exportieren bereit."
+                        : `Aufgabentitel, erwartete Antworten und Maximalpunkte gehören zur gemeinsamen Rubrik. Nur die Spalte „Erreicht“ wird für ${activeStudentLiveLabel ?? "die ausgewählte Schüler:in"} gespeichert. Änderungen an der Rubrik wirken sich auf alle Korrekturen aus.`}
+                    </p>
                   </div>
                 ) : null}
 
@@ -5004,8 +5009,9 @@ function App() {
                           )
                         }
                         onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
-                        scoresLocked={assessmentLocked}
-                        onLockedScoreAttempt={() => openHeaderUnlockDialog("scores")}
+                        scoresLocked={easyMode ? false : assessmentLocked}
+                        showScores={!easyMode}
+                        onLockedScoreAttempt={easyMode ? undefined : () => openHeaderUnlockDialog("scores")}
                         onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
                         onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
                         onDuplicate={() => duplicateSection(entry.id)}
@@ -5099,29 +5105,33 @@ function App() {
                   {activeWorkspace ? (
                     <div id={EDITOR_RESULT_ANCHOR_ID} className="scroll-mt-24">
                       <Card
-                        title="Ergebnis und Abschlussbereich"
-                        subtitle="Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."
+                        title={easyMode ? "Drucken und exportieren" : "Ergebnis und Abschlussbereich"}
+                        subtitle={easyMode
+                          ? "Gib den fertigen Erwartungshorizont ohne Schülerdaten als Druck-PDF oder Word-Datei aus."
+                          : "Gesamtergebnis, Notenübersicht und der Bereich für Kommentar und Unterschrift als eigener Abschnitt."}
                         collapsible
                         collapsed={resultSectionCollapsed}
                         onToggleCollapse={() => setResultSectionCollapsed((current) => !current)}
                       >
-                        <ReportSummarySection
-                          exam={displayExam}
-                          summary={summary}
-                          teacherComment={activeAssessment?.teacherComment ?? ""}
-                          commentPreview={resolvedTeacherCommentPreview}
-                          signatureDataUrl={activeSignatureDataUrl}
-                          onTeacherCommentChange={
-                            activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
-                              ? handleTeacherCommentChange
-                              : undefined
-                          }
-                          onSignatureChange={
-                            activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
-                              ? handleSignatureChange
-                              : undefined
-                          }
-                        />
+                        {!easyMode ? (
+                          <ReportSummarySection
+                            exam={displayExam}
+                            summary={summary}
+                            teacherComment={activeAssessment?.teacherComment ?? ""}
+                            commentPreview={resolvedTeacherCommentPreview}
+                            signatureDataUrl={activeSignatureDataUrl}
+                            onTeacherCommentChange={
+                              activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                                ? handleTeacherCommentChange
+                                : undefined
+                            }
+                            onSignatureChange={
+                              activeStudentRecord && (!activeGroup?.passwordVerifier || Boolean(activeGroupPassword))
+                                ? handleSignatureChange
+                                : undefined
+                            }
+                          />
+                        ) : null}
                       </Card>
                       {!easyMode ? (
                       <div className="mt-6 flex flex-col gap-3 rounded-2xl border p-4 surface-muted sm:flex-row sm:items-center sm:justify-between">

@@ -623,8 +623,12 @@ const buildPrintActivationScript = (waitForImages = false) => `
       if (button) button.hidden = false;
     });
 
+    // Make the manual route available immediately. Some browsers do not honour an
+    // automatic print request from a newly opened popup, and a delayed image must
+    // never leave the popup without a working print control.
+    ensureToolbar();
+
     const afterReady = async () => {
-      ensureToolbar();
       ${waitForImages
         ? `const images = Array.from(document.images);
       if (images.length > 0) {
@@ -634,6 +638,7 @@ const buildPrintActivationScript = (waitForImages = false) => `
             const finish = () => resolve();
             image.addEventListener("load", finish, { once: true });
             image.addEventListener("error", finish, { once: true });
+            window.setTimeout(finish, 4000);
           });
         }));
       }`

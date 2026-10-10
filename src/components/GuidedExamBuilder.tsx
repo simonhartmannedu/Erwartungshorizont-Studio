@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -20,7 +20,6 @@ import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../type
 import { formatNumber } from "../utils/format";
 import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
 import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
-import { ExamHeaderForm } from "./ExamHeaderForm";
 import {
   ChevronRightIcon,
   DuplicateIcon,
@@ -722,7 +721,6 @@ export const GuidedExamBuilder = ({
   onApplyManualStructure,
   onApplyComposedTemplate,
 }: Props) => {
-  const metaEditorRef = useRef<HTMLElement | null>(null);
   const detectedInitialSubject =
     BUILDER_SUBJECT_OPTIONS.find((option) => normalizeText(option) === normalizeText(initialSubject)) ?? null;
   const initialTemplateId =
@@ -751,7 +749,6 @@ export const GuidedExamBuilder = ({
   const [activeTemplateSectionIndex, setActiveTemplateSectionIndex] = useState(0);
   const [target, setTarget] = useState<GuidedBuilderTarget>(initialTarget);
   const [targetGroupId, setTargetGroupId] = useState(activeGroupId);
-  const [showMetaSettings, setShowMetaSettings] = useState(false);
   const [manualSubject, setManualSubject] = useState<string>(detectedInitialSubject ?? "Englisch");
   const [manualCustomSubject, setManualCustomSubject] = useState(detectedInitialSubject ? "" : initialSubject.trim());
   const [manualStage, setManualStage] = useState<BuilderSchoolStage>("sek1");
@@ -1111,18 +1108,6 @@ export const GuidedExamBuilder = ({
     setGradeScale((current) => gradeScaleFor(current, manualGuidance.preset.totalPoints, manualStage));
   };
 
-  const openMetaSettings = () => {
-    setShowMetaSettings(true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        metaEditorRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
-    });
-  };
-
   const renderModeButton = (nextMode: DecisionMode, label: string, description: string) => {
     const active = mode === nextMode;
     const Icon = nextMode === "templates" ? TemplateIcon : PencilIcon;
@@ -1239,79 +1224,6 @@ export const GuidedExamBuilder = ({
     </div>
   );
 
-  const renderMetaSummary = () => (
-    <div className="template-meta-summary">
-      <div>
-        <span>Schuljahr</span>
-        <strong>{metaDraft.schoolYear.trim() || "Hier Schuljahr eintragen"}</strong>
-      </div>
-      <div>
-        <span>Fach</span>
-        <strong>{metaDraft.subject.trim() || "Hier Fach eintragen"}</strong>
-      </div>
-      <div>
-        <span>Jahrgang</span>
-        <strong>{metaDraft.gradeLevel.trim() || "Hier Jahrgang eintragen"}</strong>
-      </div>
-      <div>
-        <span>Kurs / Klasse</span>
-        <strong>{metaDraft.course.trim() || "Hier Kurs oder Klasse eintragen"}</strong>
-      </div>
-      <div>
-        <span>Lehrkraft</span>
-        <strong>{metaDraft.teacher.trim() || "Hier Lehrkraft eintragen"}</strong>
-      </div>
-      <div>
-        <span>Titel</span>
-        <strong>{metaDraft.title.trim() || "Hier Titel eintragen"}</strong>
-      </div>
-      <div>
-        <span>Datum</span>
-        <strong>{metaDraft.examDate || "Hier Datum eintragen"}</strong>
-      </div>
-      <button
-        type="button"
-        className="button-secondary w-full"
-        onClick={() => {
-          if (showMetaSettings) {
-            setShowMetaSettings(false);
-            return;
-          }
-          openMetaSettings();
-        }}
-      >
-        {showMetaSettings ? "Rahmendaten ausblenden" : "Allgemeine Rahmendaten bearbeiten"}
-      </button>
-    </div>
-  );
-
-  const renderMetaEditor = () =>
-    showMetaSettings ? (
-      <section ref={metaEditorRef} className="template-meta-editor">
-        <div className="template-meta-editor-header">
-          <div>
-            <p className="label">Allgemeine Rahmendaten</p>
-            <h3 className="themed-strong text-lg font-semibold">EWH vor dem Öffnen beschriften</h3>
-            <p className="themed-muted mt-1 text-sm leading-6">
-              Schuljahr, Fach, Jahrgang, Lerngruppe, Lehrkraft, Titel, Thema und Datum werden direkt in den neuen Erwartungshorizont übernommen.
-            </p>
-          </div>
-          <button type="button" className="button-soft px-3 py-2 text-xs" onClick={() => setShowMetaSettings(false)}>
-            Schließen
-          </button>
-        </div>
-        <ExamHeaderForm
-          meta={metaDraft}
-          onChange={(key, value) => {
-            setMetaDraft((current) => ({
-              ...current,
-              [key]: value,
-            }));
-          }}
-        />
-      </section>
-    ) : null;
-
   const renderTemplateCard = (template: ExamTemplateDefinition, index: number) => {
     const selected = selectedTemplate?.id === template.id;
     const subjectTheme = getSubjectTheme(template.subject);
@@ -1377,7 +1289,7 @@ export const GuidedExamBuilder = ({
             <div>
               <p className="label">Zusammenstellung</p>
               <h3 className="themed-strong mt-1 text-xl font-semibold">{composerTemplate?.title ?? "Leere Klausur zusammenstellen"}</h3>
-              <p className="themed-muted mt-1 text-sm leading-6">Aufgaben auswählen, Reihenfolge festlegen, dann Rahmendaten prüfen.</p>
+              <p className="themed-muted mt-1 text-sm leading-6">Aufgaben auswählen und Reihenfolge festlegen. Die Rahmendaten bearbeitest du anschließend im EWH-Editor.</p>
             </div>
             <div className="composer-header-actions">
               <span className="composer-stat"><strong>{formatNumber(composerTotalPoints)} P.</strong><small>{composerTaskCount} Aufgaben</small></span>
@@ -1468,10 +1380,6 @@ export const GuidedExamBuilder = ({
                   <button type="button" className="icon-button" title="Vorschau schließen" onClick={() => setComposerReviewOpen(false)}>×</button>
                 </div>
                 {renderTargetControls()}
-                <div className="composer-review-meta">
-                  <p className="label">Rahmendaten</p>
-                  <ExamHeaderForm meta={metaDraft} showNotesListTransform={false} onChange={(key, value) => setMetaDraft((current) => ({ ...current, [key]: value }))} />
-                </div>
                 <div className="composer-review-actions"><button type="button" className="button-secondary" onClick={() => setComposerReviewOpen(false)}>Zurück zum Aufbau</button><button type="button" className="button-primary" disabled={!canSubmitCurrentMode} onClick={submitCurrentMode}>EWH erstellen</button></div>
               </section>
             </div>
@@ -1659,7 +1567,6 @@ export const GuidedExamBuilder = ({
                     <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
                   </Field>
                   {renderTargetControls()}
-                  {renderMetaSummary()}
                   <button type="button" className="button-primary gap-2" onClick={() => openComposer(selectedTemplate)}><DragIcon />Klausur zusammenstellen</button>
                 </div>
 
@@ -1671,7 +1578,6 @@ export const GuidedExamBuilder = ({
               </div>
             )}
           </aside>
-          {renderMetaEditor()}
         </div>
       )}
 
@@ -1713,7 +1619,6 @@ export const GuidedExamBuilder = ({
               <NumberInput className="field" value={totalPoints} min={1} step={0.5} onCommit={updateTotalPoints} />
             </Field>
             {renderTargetControls()}
-            {renderMetaSummary()}
           </section>
 
           <section className="template-manual-panel">
@@ -1790,7 +1695,6 @@ export const GuidedExamBuilder = ({
             </div>
 
           </section>
-          {renderMetaEditor()}
         </div>
       )}
     </Card>

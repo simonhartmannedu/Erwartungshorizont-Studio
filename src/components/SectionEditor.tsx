@@ -43,6 +43,7 @@ interface Props {
   index: number;
   totalMaxPoints: number;
   scoresLocked?: boolean;
+  showScores?: boolean;
   onLockedScoreAttempt?: () => void;
   draggable?: boolean;
   isDragging?: boolean;
@@ -73,6 +74,7 @@ export const SectionEditor = ({
   index,
   totalMaxPoints,
   scoresLocked = false,
+  showScores = true,
   onLockedScoreAttempt,
   draggable,
   isDragging,
@@ -193,7 +195,7 @@ export const SectionEditor = ({
           )}
           {linkedSectionTitle && <Badge tone="slate">Verknüpft mit {linkedSectionTitle}</Badge>}
           <Badge tone="amber">{formatNumber(result.percentage)} %</Badge>
-          <Badge tone="slate">{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge>
+          {showScores ? <Badge tone="slate">{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge> : null}
           {collapsed && (
             <span className="themed-muted w-full text-xs font-medium sm:ml-auto sm:w-auto">
               {section.tasks.length} Unteraufgaben
@@ -234,19 +236,23 @@ export const SectionEditor = ({
               placeholder="Hinweise, Bewertungsraster, Erwartungshorizont"
             />
           </Field>
-          <div className={`surface-muted grid gap-2 rounded-2xl p-4 ${writingMetrics ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+          <div className={`surface-muted grid gap-2 rounded-2xl p-4 ${showScores ? (writingMetrics ? "md:grid-cols-4" : "md:grid-cols-3") : (writingMetrics ? "md:grid-cols-2" : "")}`}>
             <div>
               <p className="label">Maximalpunkte</p>
               <p className="themed-strong text-xl font-semibold">{formatNumber(result.maxPoints)}</p>
             </div>
-            <div>
-              <p className="label">Erreicht</p>
-              <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : formatNumber(result.achievedPoints)}</p>
-            </div>
-            <div>
-              <p className="label">Ergebnis</p>
-              <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : `${formatNumber(result.percentage)} %`}</p>
-            </div>
+            {showScores ? (
+              <>
+                <div>
+                  <p className="label">Erreicht</p>
+                  <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : formatNumber(result.achievedPoints)}</p>
+                </div>
+                <div>
+                  <p className="label">Ergebnis</p>
+                  <p className="themed-strong text-xl font-semibold">{scoresLocked ? "Gesperrt" : `${formatNumber(result.percentage)} %`}</p>
+                </div>
+              </>
+            ) : null}
             {writingMetrics && (
               <div>
                 <p className="label">Sprach-Ziel</p>
@@ -260,6 +266,7 @@ export const SectionEditor = ({
         <TaskTable
           tasks={section.tasks}
           scoresLocked={scoresLocked}
+          showScores={showScores}
           onLockedScoreAttempt={onLockedScoreAttempt}
           getTaskAnchorId={(task) => getEditorTaskAnchorId(section.id, task.id)}
           onChange={onTaskChange}

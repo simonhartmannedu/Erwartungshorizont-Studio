@@ -14,10 +14,19 @@ export const getEditorSectionPanelId = (tabId: EditorSectionTabId) => `ewh-edito
 export const EditorSectionTabs = ({
   activeTab,
   onSelectTab,
+  easyMode = false,
 }: {
   activeTab: EditorSectionTabId;
   onSelectTab: (tabId: EditorSectionTabId) => void;
+  easyMode?: boolean;
 }) => {
+  const visibleEditorTabs = editorSectionTabs.map((tab) =>
+    easyMode && tab.id === "tasks"
+      ? { ...tab, label: "Überarbeiten", description: "Aufgaben, Erwartungshorizonte und Punkte bearbeiten" }
+      : easyMode && tab.id === "result"
+        ? { ...tab, label: "Drucken & Exportieren", description: "Fertigen Erwartungshorizont ausgeben" }
+        : tab,
+  );
   const buttonRefs = useRef<Record<EditorSectionTabId, HTMLButtonElement | null>>({
     setup: null,
     tasks: null,
@@ -25,29 +34,29 @@ export const EditorSectionTabs = ({
   });
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabId: EditorSectionTabId) => {
-    const currentIndex = editorSectionTabs.findIndex((tab) => tab.id === tabId);
+    const currentIndex = visibleEditorTabs.findIndex((tab) => tab.id === tabId);
     const targetIndex =
       event.key === "ArrowRight"
-        ? (currentIndex + 1) % editorSectionTabs.length
+        ? (currentIndex + 1) % visibleEditorTabs.length
         : event.key === "ArrowLeft"
-          ? (currentIndex - 1 + editorSectionTabs.length) % editorSectionTabs.length
+          ? (currentIndex - 1 + visibleEditorTabs.length) % visibleEditorTabs.length
           : event.key === "Home"
             ? 0
             : event.key === "End"
-              ? editorSectionTabs.length - 1
+            ? visibleEditorTabs.length - 1
               : -1;
 
     if (targetIndex === -1) return;
 
     event.preventDefault();
-    const targetTab = editorSectionTabs[targetIndex]!;
+    const targetTab = visibleEditorTabs[targetIndex]!;
     onSelectTab(targetTab.id);
     buttonRefs.current[targetTab.id]?.focus();
   };
 
   return (
     <div className="editor-section-tabs no-print" role="tablist" aria-label="Bereiche des EWH-Editors">
-      {editorSectionTabs.map((tab) => (
+      {visibleEditorTabs.map((tab) => (
         <button
           key={tab.id}
           ref={(element) => {
