@@ -15,7 +15,8 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await expect(page.getByRole("heading", { name: "Erwartungshorizont-Archiv" })).toBeVisible();
 
   await page.getByRole("tab", { name: "Lerngruppen" }).click();
-  const manualGroupForm = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
+  await page.getByRole("button", { name: "Keine Liste? Lerngruppe manuell anlegen", exact: true }).click();
+  const manualGroupForm = page.getByRole("region", { name: "Keine Liste? Lerngruppe manuell anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
   await manualGroupForm.getByLabel("Klasse").fill(className);
   await manualGroupForm.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();

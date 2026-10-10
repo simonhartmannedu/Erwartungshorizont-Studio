@@ -1977,6 +1977,44 @@
     background: linear-gradient(135deg, color-mix(in srgb, var(--app-soft-text) 8%, transparent), transparent 48%), var(--app-secondary-bg);
   }
 
+  .group-manual-trigger {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 0;
+    padding: 1rem 1.25rem;
+    color: inherit;
+    background: transparent;
+    transition: background-color 160ms ease;
+  }
+
+  .group-manual-trigger:hover {
+    background: color-mix(in srgb, var(--app-soft-text) 7%, transparent);
+  }
+
+  .group-manual-trigger:focus-visible {
+    outline: 2px solid var(--app-field-focus);
+    outline-offset: -3px;
+  }
+
+  .group-manual-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.8rem;
+  }
+
+  .group-manual-chevron {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: 0 0 auto;
+    color: var(--app-soft-text);
+  }
+
+  .group-manual-form {
+    border-top: 1px solid var(--app-secondary-border);
+    padding: 1rem 1.25rem 1.25rem;
+  }
+
   .group-action-icon {
     width: 3.1rem;
     height: 3.1rem;

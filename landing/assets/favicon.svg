@@ -1,3 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="Erwartungshorizont Studio">
-  <image href="favicon_new.png" width="1254" height="1254"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Erwartungshorizont Studio</title>
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="#132039"/>
+  <path d="M19 13h19l9 9v28a4 4 0 0 1-4 4H19a4 4 0 0 1-4-4V17a4 4 0 0 1 4-4Z" fill="#d9e7ff"/>
+  <path d="M38 13v9h9" fill="#aebeda"/>
+  <path d="M23 27h12M23 33h8" fill="none" stroke="#527092" stroke-linecap="round" stroke-width="3"/>
+  <path d="m24 42 5 5 12-14" fill="none" stroke="#08785f" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
 </svg>

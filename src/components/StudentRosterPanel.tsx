@@ -7,7 +7,6 @@ import {
   DownloadIcon,
   EyeIcon,
   GroupIcon,
-  LockIcon,
   PlusIcon,
   TrashIcon,
   UploadIcon,
@@ -177,6 +176,7 @@ export const StudentRosterPanel = ({
   const [className, setClassName] = useState("");
   const [groupAccessMode, setGroupAccessMode] = useState<GroupAccessMode>("generated");
   const [groupPassword, setGroupPassword] = useState("");
+  const [manualGroupFormOpen, setManualGroupFormOpen] = useState(false);
   const [importAccessMode, setImportAccessMode] = useState<GroupAccessMode>("generated");
   const [importPassword, setImportPassword] = useState("");
   const [importSubject, setImportSubject] = useState(defaultImportSubject);
@@ -443,29 +443,9 @@ export const StudentRosterPanel = ({
       <div className="space-y-6">
         <Card
           title="Lerngruppen anlegen"
-          subtitle="Wähle den einfachen Weg, der zu deiner Ausgangslage passt."
+          subtitle="Importiere eine vorhandene Klassenliste oder lege ausnahmsweise eine einzelne Klasse manuell an."
         >
-          <div className="mb-5 grid gap-3 lg:grid-cols-3">
-            <div className="group-guide-step group-guide-step-import rounded-2xl border p-4">
-              <span className="group-guide-icon"><UploadIcon /></span>
-              <p className="label mt-3">Der schnelle Weg</p>
-              <p className="themed-strong mt-1 text-sm font-semibold">Liste importieren</p>
-              <p className="themed-muted mt-1 text-xs leading-5">Nutze eine CSV-, Excel- oder ODS-Datei, wenn du bereits eine Klassenliste hast.</p>
-            </div>
-            <div className="group-guide-step rounded-2xl border p-4">
-              <span className="group-guide-icon"><PlusIcon /></span>
-              <p className="label mt-3">Oder einzeln starten</p>
-              <p className="themed-strong mt-1 text-sm font-semibold">Klasse manuell anlegen</p>
-              <p className="themed-muted mt-1 text-xs leading-5">Lege Fach und Klasse an; Schülercodes kannst du anschließend ergänzen.</p>
-            </div>
-            <div className="group-guide-step rounded-2xl border p-4">
-              <span className="group-guide-icon"><LockIcon /></span>
-              <p className="label mt-3">Gut geschützt</p>
-              <p className="themed-strong mt-1 text-sm font-semibold">Zugang sichern</p>
-              <p className="themed-muted mt-1 text-xs leading-5">Ein Token schützt Klarnamen und Bewertungen. Bewahre es getrennt von der Liste auf.</p>
-            </div>
-          </div>
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="space-y-4">
             <div id="group-import" className="group-action-card group-action-card-import scroll-mt-24 rounded-2xl border p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="group-action-icon"><UploadIcon /></span>
@@ -554,64 +534,82 @@ export const StudentRosterPanel = ({
               </p>
             </div>
 
-            <section id="group-manual" className="group-action-card group-action-card-manual scroll-mt-24 space-y-4 rounded-2xl border p-5" aria-labelledby="manual-group-heading">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="group-action-icon"><GroupIcon /></span>
-                <div>
-                  <p className="label">Schritt 1 · Für eine einzelne Klasse</p>
-                  <h3 id="manual-group-heading" className="themed-strong text-base font-semibold">Manuelle Lerngruppe anlegen</h3>
-                </div>
-              </div>
-              <p className="themed-muted text-sm leading-6">Danach kannst du in der Klassenliste Schülercodes und verschlüsselte Klarnamen hinzufügen.</p>
-              <Field label="Fach">
-                <input className="field" placeholder="Fach, z. B. Englisch" value={subject} onChange={(event) => setSubject(event.target.value)} />
-              </Field>
-              <Field label="Klasse">
-                <input className="field" placeholder="Klasse, z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
-              </Field>
-              <Field as="div" label="Zugangsschutz">
-                <GroupAccessToggle
-                  mode={groupAccessMode}
-                  onChange={(mode) => {
-                    setGroupAccessMode(mode);
-                    if (mode === "generated") setGroupPassword("");
-                  }}
-                />
-              </Field>
-              {groupAccessMode === "manual" ? (
-                <Field label="Klassenpasswort">
-                  <input
-                    className="field"
-                    type="password"
-                    placeholder="Klassenpasswort für Verschlüsselung"
-                    value={groupPassword}
-                    onChange={(event) => setGroupPassword(event.target.value)}
-                  />
-                </Field>
-              ) : (
-                <p className="status-note text-xs leading-5">
-                  Beim Anlegen wird automatisch ein starkes Security-Token erzeugt und direkt als Druckkarte angeboten.
-                </p>
-              )}
+            <section id="group-manual" className="group-action-card group-action-card-manual group-manual-disclosure scroll-mt-24 rounded-2xl border" aria-labelledby="manual-group-heading">
               <button
                 type="button"
-                className="button-primary w-full gap-2"
-                onClick={async () => {
-                  if (!subject.trim() || !className.trim()) return;
-                  if (groupAccessMode === "manual" && !groupPassword.trim()) return;
-                  await onAddGroup(subject.trim(), className.trim(), {
-                    mode: groupAccessMode,
-                    password: groupAccessMode === "manual" ? groupPassword.trim() : undefined,
-                  });
-                  setSubject("");
-                  setClassName("");
-                  setGroupPassword("");
-                  setGroupAccessMode("generated");
-                }}
+                className="group-manual-trigger w-full text-left"
+                aria-label="Keine Liste? Lerngruppe manuell anlegen"
+                aria-expanded={manualGroupFormOpen}
+                aria-controls="manual-group-form"
+                onClick={() => setManualGroupFormOpen((current) => !current)}
               >
-                <PlusIcon />
-                Lerngruppe anlegen
+                <span className="group-action-icon group-manual-icon"><GroupIcon /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="label block">Alternative ohne Datei</span>
+                  <span id="manual-group-heading" className="themed-strong mt-1 block text-base font-semibold">Keine Liste? Lerngruppe manuell anlegen</span>
+                  <span className="themed-muted mt-1 block text-sm leading-5">Für eine einzelne Klasse Fach, Klasse und Zugangsschutz selbst festlegen.</span>
+                </span>
+                {manualGroupFormOpen ? <ChevronDownIcon className="group-manual-chevron" /> : <ChevronRightIcon className="group-manual-chevron" />}
               </button>
+              <div id="manual-group-form" hidden={!manualGroupFormOpen} className="group-manual-form">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Fach">
+                    <input className="field" placeholder="z. B. Englisch" value={subject} onChange={(event) => setSubject(event.target.value)} />
+                  </Field>
+                  <Field label="Klasse">
+                    <input className="field" placeholder="z. B. 8b" value={className} onChange={(event) => setClassName(event.target.value)} />
+                  </Field>
+                </div>
+                <p className="themed-muted mt-2 text-xs leading-5">Das Fach wird für Zuordnung, Suche und Klassenexporte verwendet.</p>
+                <div className="mt-4">
+                  <Field as="div" label="Zugangsschutz">
+                    <GroupAccessToggle
+                      mode={groupAccessMode}
+                      onChange={(mode) => {
+                        setGroupAccessMode(mode);
+                        if (mode === "generated") setGroupPassword("");
+                      }}
+                    />
+                  </Field>
+                </div>
+                {groupAccessMode === "manual" ? (
+                  <div className="mt-4">
+                    <Field label="Klassenpasswort">
+                      <input
+                        className="field"
+                        type="password"
+                        placeholder="Klassenpasswort für Verschlüsselung"
+                        value={groupPassword}
+                        onChange={(event) => setGroupPassword(event.target.value)}
+                      />
+                    </Field>
+                  </div>
+                ) : (
+                  <p className="status-note mt-4 text-xs leading-5">
+                    Beim Anlegen wird automatisch ein starkes Security-Token erzeugt und direkt als Druckkarte angeboten.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="button-primary mt-4 w-full gap-2 sm:w-auto"
+                  onClick={async () => {
+                    if (!subject.trim() || !className.trim()) return;
+                    if (groupAccessMode === "manual" && !groupPassword.trim()) return;
+                    await onAddGroup(subject.trim(), className.trim(), {
+                      mode: groupAccessMode,
+                      password: groupAccessMode === "manual" ? groupPassword.trim() : undefined,
+                    });
+                    setSubject("");
+                    setClassName("");
+                    setGroupPassword("");
+                    setGroupAccessMode("generated");
+                    setManualGroupFormOpen(false);
+                  }}
+                >
+                  <PlusIcon />
+                  Lerngruppe anlegen
+                </button>
+              </div>
             </section>
           </div>
         </Card>

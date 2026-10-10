@@ -9,8 +9,13 @@ test("searches clear names only during an unlocked class session", async ({ page
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.getByRole("tab", { name: "Lerngruppen" }).click();
+  const manualGroupTrigger = page.getByRole("button", { name: "Keine Liste? Lerngruppe manuell anlegen", exact: true });
+  await expect(manualGroupTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#manual-group-form")).toBeHidden();
+  await manualGroupTrigger.click();
+  await expect(manualGroupTrigger).toHaveAttribute("aria-expanded", "true");
 
-  const manualGroupForm = page.getByRole("region", { name: "Manuelle Lerngruppe anlegen" });
+  const manualGroupForm = page.getByRole("region", { name: "Keine Liste? Lerngruppe manuell anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
   await manualGroupForm.getByLabel("Klasse").fill(className);
   await manualGroupForm.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
