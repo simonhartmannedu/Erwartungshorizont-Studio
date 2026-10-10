@@ -8,7 +8,10 @@ const addManualGroup = async (page: import("@playwright/test").Page, subject: st
   await form.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
   await form.getByLabel("Klassenpasswort").fill("e2e-test-passwort");
   await form.getByRole("button", { name: "Lerngruppe anlegen" }).click();
-  await expect(page.getByRole("button", { name: `${subject} · ${className}`, exact: true })).toBeVisible();
+  // Creating a protected group derives a PBKDF2 verifier with 250,000
+  // iterations. On a loaded CI worker, especially in Firefox, this can take
+  // longer than Playwright's default five-second assertion window.
+  await expect(page.getByRole("button", { name: `${subject} · ${className}`, exact: true })).toBeVisible({ timeout: 20_000 });
 };
 
 test("stoppt einen veralteten zweiten Tab statt einen neueren Arbeitsstand zu überschreiben", async ({ context }) => {

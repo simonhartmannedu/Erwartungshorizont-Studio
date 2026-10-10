@@ -2,6 +2,14 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## 0.8.1 – 10.10.2026
+
+- Easy-Mode trennt das Überarbeiten eines Erwartungshorizonts klar von der individuellen Korrektur: Aufgaben, Erwartungen und Maximalpunkte lassen sich ohne Lerngruppe oder Schüler:in bearbeiten.
+- Der Easy-Mode druckt und exportiert ausschließlich den anonymen EWH; individuelle Punkte, Schülercodes und Kommentare werden nicht angezeigt oder ausgegeben.
+- Druckansichten stellen ihren manuellen Druckknopf sofort bereit. Verzögerte Bilder können die Ausgabe nicht mehr blockieren; die Druckabläufe wurden in Chromium und Firefox geprüft.
+- Die doppelte Pflege der Rahmendaten entfällt im Vorlagen-, Struktur- und Zusammenstellungsweg. Rahmendaten werden anschließend zentral im EWH-Editor vorbereitet.
+- Der Browser-Test für konkurrierende Tabs berücksichtigt die absichtlich rechenintensive lokale Passwortableitung und bleibt damit unter CI-Last stabil.
+
 ## 0.8.0 – 08.10.2026
 
 - Der geführte Klausur-Builder bündelt Aufgabenbibliothek und Gliederung in einer ruhigen Seitenleiste; der Klausuraufbau erhält mehr Platz und bleibt der klare Arbeitsfokus.
