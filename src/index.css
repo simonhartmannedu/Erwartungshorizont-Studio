@@ -5737,13 +5737,8 @@
 
   .app-navigation-tabs {
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
-  }
-
-  @media (min-width: 1024px) {
-    .app-navigation-tabs {
-      overflow: visible;
-    }
   }
 
   body,
