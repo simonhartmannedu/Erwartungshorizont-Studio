@@ -10,7 +10,7 @@ test("imports a local SVG signature without shipping it with the app", async ({ 
   await globalSearchResults.getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ }).click();
 
   await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
-  await page.getByRole("button", { name: "Klasse entsperren", exact: true }).click();
+  await page.locator(".app-navigation-security-button").click();
   await page.locator("#header-unlock-password").fill("demo");
   await page.getByRole("button", { name: "Entsperren", exact: true }).click();
 

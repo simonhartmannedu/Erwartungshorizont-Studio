@@ -4316,6 +4316,10 @@ function App() {
           searchResults={globalSearchResults}
           sensitiveSearchSessionVersion={sensitiveSearchSessionVersion}
           onSearchResultSelect={openGlobalSearchResult}
+          securityActionLabel={activeUnlockButtonLabel}
+          isSecurityActionAvailable={activeGroupIsProtected}
+          isActiveGroupUnlocked={activeGroupIsProtected && !assessmentLocked}
+          onToggleSecurity={handleHeaderLockToggle}
           easyMode={easyMode}
         />
 

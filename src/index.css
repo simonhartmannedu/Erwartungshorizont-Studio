@@ -5779,6 +5779,24 @@
     border-radius: 0.45rem;
   }
 
+  .app-navigation-security-button {
+    width: 2.35rem;
+    min-width: 2.35rem;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .app-navigation-security-button.is-locked {
+    border-color: color-mix(in srgb, #dc2626 42%, var(--app-secondary-border));
+    background: color-mix(in srgb, #ef4444 9%, var(--app-panel-bg));
+    color: #b91c1c;
+  }
+
+  .app-navigation-security-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
 
   .field {
     padding: 0.62rem 0.75rem;
@@ -5796,6 +5814,10 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.82rem;
     box-shadow: none;
+  }
+
+  .app-navigation-security-button {
+    padding-inline: 0;
   }
 
   .button-primary:hover,

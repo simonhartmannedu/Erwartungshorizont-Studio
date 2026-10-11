@@ -1,5 +1,5 @@
 import { type KeyboardEvent, type MutableRefObject, useMemo, useState } from "react";
-import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, WizardIcon } from "../components/icons";
+import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, LockIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, UnlockIcon, WizardIcon } from "../components/icons";
 import type { GlobalSearchResult } from "./AppHeader";
 
 export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "bogencheck" | "archive" | "backup";
@@ -60,6 +60,10 @@ type AppNavigationProps = {
   searchResults: GlobalSearchResult[];
   sensitiveSearchSessionVersion: number;
   onSearchResultSelect: (resultId: string) => void;
+  securityActionLabel: string;
+  isSecurityActionAvailable: boolean;
+  isActiveGroupUnlocked: boolean;
+  onToggleSecurity: () => void;
   easyMode: boolean;
 };
 
@@ -142,6 +146,10 @@ export const AppNavigation = ({
   searchResults,
   sensitiveSearchSessionVersion,
   onSearchResultSelect,
+  securityActionLabel,
+  isSecurityActionAvailable,
+  isActiveGroupUnlocked,
+  onToggleSecurity,
   easyMode,
 }: AppNavigationProps) => {
   const navigationTab = getNavigationTabId(activeTab);
@@ -171,6 +179,17 @@ export const AppNavigation = ({
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        className={`button-secondary app-navigation-security-button shrink-0 ${isSecurityActionAvailable && !isActiveGroupUnlocked ? "is-locked" : ""}`}
+        onClick={onToggleSecurity}
+        disabled={!isSecurityActionAvailable}
+        aria-label={securityActionLabel}
+        aria-pressed={isSecurityActionAvailable ? isActiveGroupUnlocked : undefined}
+        title={securityActionLabel}
+      >
+        {isActiveGroupUnlocked ? <UnlockIcon /> : <LockIcon />}
+      </button>
       {!easyMode ? (
         <GlobalSearch
           key={sensitiveSearchSessionVersion}

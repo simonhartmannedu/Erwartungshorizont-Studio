@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const openBogencheck = async (page: import("@playwright/test").Page) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
-  await page.getByRole("button", { name: "Klasse entsperren", exact: true }).click();
+  await page.locator(".app-navigation-security-button").click();
   await page.locator("#header-unlock-password").fill("demo");
   await page.getByRole("button", { name: "Entsperren", exact: true }).click();
   await page.getByRole("tab", { name: "Bogencheck" }).click();
