@@ -97,6 +97,7 @@ import {
   createStudentGroup,
   getStudentAssessment,
   getStudentCorrectionStatus,
+  getStudentParticipationStatus,
   isStudentParticipating,
   getEffectiveSignatureDataUrl,
   getStudentGroup,
@@ -120,6 +121,7 @@ import {
 } from "./utils/students";
 import { createAnswerSheetCode } from "./utils/answerSheets";
 import {
+  downloadCsvFile,
   exportEditableExamDocx,
   exportClassEditableExamDocx,
   exportClassOverviewDocx,
@@ -170,6 +172,7 @@ import { BogencheckScanner } from "./components/BogencheckScanner";
 import { StudentRosterPanel } from "./components/StudentRosterPanel";
 import { StudentSelectionPanel } from "./components/StudentSelectionPanel";
 import { SectionAllocationOverview } from "./components/SectionAllocationOverview";
+import { CorrectionDesk } from "./components/CorrectionDesk";
 import type { GuidedBuilderTarget, GuidedSectionDraft } from "./components/GuidedExamBuilder";
 import {
   ArchiveIcon,
@@ -957,6 +960,7 @@ function App() {
   const pendingLocalSaveCountRef = useRef(0);
   const hasLocalSaveFailureRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>(() => (userPreferences.easyMode ? "guidedBuilder" : "home"));
+  const [correctionMode, setCorrectionMode] = useState<"individual" | "desk">("individual");
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const [pendingSchoolYearCreation, setPendingSchoolYearCreation] = useState<PendingSchoolYearCreation | null>(null);
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -2342,6 +2346,18 @@ function App() {
               }),
         ),
       }),
+    );
+  };
+
+  const updateDeskScore = (studentId: string, taskId: string, score: number) => {
+    if (!activeWorkspace || !activeGroup || assessmentLocked) return;
+    if (!isStudentParticipating(studentDatabase, studentId, activeWorkspace.id)) return;
+
+    const task = exam.sections.flatMap((section) => section.tasks).find((entry) => entry.id === taskId);
+    if (!task || !Number.isFinite(score)) return;
+
+    setStudentDatabase((current) =>
+      updateStudentScore(current, activeWorkspace.id, studentId, taskId, Math.min(task.maxPoints, Math.max(0, score))),
     );
   };
 
@@ -4021,6 +4037,65 @@ function App() {
     }
   };
 
+  const handleExportClassCsv = async () => {
+    if (!activeGroup) {
+      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
+      return;
+    }
+    if (activeGroup.students.length === 0) {
+      pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
+      return;
+    }
+    if (activeGroup.passwordVerifier && !activeGroupPassword) {
+      openHeaderUnlockDialog();
+      return;
+    }
+
+    const namesByStudentId: Record<string, string> = {};
+    if (activeGroup.passwordVerifier) {
+      const password = await getUsableUnlockedGroupPassword(activeGroup.id);
+      if (password) {
+        const names = await Promise.all(activeGroup.students.map(async (student) => {
+          try {
+            return [student.id, await decryptText(student.encryptedName, password)] as const;
+          } catch {
+            return null;
+          }
+        }));
+        names.forEach((entry) => {
+          if (entry) namesByStudentId[entry[0]] = entry[1];
+        });
+      }
+    }
+
+    const rows = activeGroup.students.map((student) => {
+      const studentExam = buildExamForStudent(exam, studentDatabaseRef.current, {
+        groupId: activeGroup.id,
+        studentId: student.id,
+      }, activeWorkspace?.id ?? null);
+      const studentSummary = calculateExamSummary(studentExam);
+
+      return {
+        Schuelercode: student.alias,
+        Schuelername: namesByStudentId[student.id] ?? "",
+        Teilnahme: ({ present: "anwesend", absent: "abwesend", excused: "entschuldigt", makeup: "schreibt nach" } as const)[
+          getStudentParticipationStatus(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null)
+        ],
+        Fach: activeGroup.subject,
+        Klasse: activeGroup.className,
+        Titel: exam.meta.title,
+        Datum: exam.meta.examDate,
+        Punkte: studentSummary.totalAchievedPoints,
+        MaxPunkte: studentSummary.totalMaxPoints,
+        Prozent: Number(studentSummary.finalPercentage.toFixed(1)),
+        Note: studentSummary.grade.label,
+        Notenstufe: studentSummary.grade.verbalLabel,
+      };
+    });
+
+    void downloadCsvFile(`${activeGroup.className || "Klasse"}_Notenuebersicht`, rows);
+  };
+
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
   const printWithoutDetailsLabel = activeStudentRecord
     ? `Leerer EWH (${activeStudentRecord.alias})`
@@ -4033,10 +4108,10 @@ function App() {
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
       ? assessmentLocked
-        ? "Geschützte Lerngruppe: erst entsperren, dann stehen Druck und Word-Export mit vollständigen Bewertungsdaten bereit."
-        : "Geschützte Lerngruppe entsperrt: Druck und Word-Export arbeiten mit lokal entschlüsselten Bewertungsdaten."
-      : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und Word-Exporte nutzen deshalb nur den Schülercode."
-    : "PDF für Ausdrucke, Word für bearbeitbare Dokumente und JSON für Sicherungen.";
+        ? "Geschützte Lerngruppe: erst entsperren, dann stehen Druck, Word und die CSV-Notenübersicht mit vollständigen Bewertungsdaten bereit."
+        : "Geschützte Lerngruppe entsperrt: Druck, Word und CSV arbeiten mit lokal entschlüsselten Bewertungsdaten."
+      : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke, Word und CSV nutzen deshalb nur den Schülercode."
+    : "PDF für Ausdrucke, Word für bearbeitbare Dokumente, CSV für die Notenübernahme und JSON für Sicherungen.";
   const handlePrintSecurityTokens = () => {
     const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
     if (!opened) {
@@ -4709,7 +4784,47 @@ function App() {
                   hidden={activeEditorTab !== "tasks"}
                   className="space-y-6"
                 >
-                {!easyMode && activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
+                {!easyMode && activeWorkspace && activeGroup ? (
+                  <section className="no-print rounded-2xl border p-3 surface-muted" aria-label="Korrekturmodus">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="label">Korrekturmodus</p>
+                        <p className="themed-muted text-sm">Wähle zwischen der vertrauten Einzelansicht und der aufgabenweisen Tischansicht.</p>
+                      </div>
+                      <div className="control-cluster inline-flex rounded-full border p-1" role="group" aria-label="Korrekturmodus wählen">
+                        <button
+                          type="button"
+                          className={correctionMode === "individual" ? "button-primary px-3 py-2 text-xs" : "button-secondary px-3 py-2 text-xs"}
+                          aria-pressed={correctionMode === "individual"}
+                          onClick={() => setCorrectionMode("individual")}
+                        >
+                          Einzelkorrektur
+                        </button>
+                        <button
+                          type="button"
+                          className={correctionMode === "desk" ? "button-primary px-3 py-2 text-xs" : "button-secondary px-3 py-2 text-xs"}
+                          aria-pressed={correctionMode === "desk"}
+                          onClick={() => setCorrectionMode("desk")}
+                        >
+                          Korrektur-Tisch
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+                {!easyMode && activeWorkspace && activeGroup && correctionMode === "desk" ? (
+                  <CorrectionDesk
+                    exam={exam}
+                    database={studentDatabase}
+                    workspaceId={activeWorkspace.id}
+                    students={activeGroup.students}
+                    activeStudentId={activeStudentId}
+                    scoresLocked={assessmentLocked}
+                    onSelectStudent={setActiveStudentId}
+                    onScoreChange={updateDeskScore}
+                    onLockedScoreAttempt={() => openHeaderUnlockDialog("scores")}
+                  />
+                ) : !easyMode && activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
                   <Card title="Korrektur starten" subtitle="Die Rubrik bleibt unverändert; Punkte gehören immer zu einer ausgewählten Schüler:in.">
                     <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-strong font-semibold">{selectedStudent ? "Schüler:in nimmt nicht teil" : "Noch keine Schüler:in ausgewählt"}</p>
@@ -4983,11 +5098,13 @@ function App() {
                           onPrintGradeScale={!easyMode ? handlePrintGradeScale : undefined}
                           onPrintClass={!easyMode && activeGroup ? handlePrintClass : undefined}
                           onPrintClassOverview={!easyMode && activeGroup && classOverview ? handlePrintClassOverview : undefined}
+                          onExportClassCsv={!easyMode && activeGroup ? () => void handleExportClassCsv() : undefined}
                           printLabel={easyMode ? "EWH drucken" : printLabel}
                           printWithoutDetailsLabel={easyMode ? "EWH drucken" : printWithoutDetailsLabel}
                           printGradeScaleLabel={!easyMode ? printGradeScaleLabel : undefined}
                           classPrintLabel={classPrintLabel}
                           classOverviewPrintLabel={classOverviewPrintLabel}
+                          exportClassCsvLabel={activeGroup ? `Notenübersicht CSV (${activeGroup.className})` : undefined}
                           printHint={easyMode ? "Exportiere den fertigen Erwartungshorizont als Druck-PDF oder Word-Datei." : printHint}
                           simpleEwhExport={easyMode}
                         />

@@ -150,6 +150,8 @@ export const NumberInput = ({
   disabled = false,
   commitOnChange = false,
   onAdvance,
+  ariaLabel,
+  inputId,
 }: {
   value: number;
   onCommit: (value: number) => void;
@@ -162,6 +164,9 @@ export const NumberInput = ({
   commitOnChange?: boolean;
   /** Move focus after Enter; used by the score-entry flow. */
   onAdvance?: (source: HTMLInputElement) => void;
+  /** Gives compact numeric controls an explicit accessible name. */
+  ariaLabel?: string;
+  inputId?: string;
 }) => {
   const [draft, setDraft] = useState(() => formatEditableNumber(value));
 
@@ -222,9 +227,11 @@ export const NumberInput = ({
 
   return (
     <input
+      id={inputId}
       className={className}
       type="text"
       inputMode="decimal"
+      aria-label={ariaLabel}
       value={draft}
       placeholder={placeholder}
       disabled={disabled}

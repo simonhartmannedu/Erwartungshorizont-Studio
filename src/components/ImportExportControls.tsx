@@ -8,6 +8,7 @@ interface Props {
   onPrintGradeScale?: () => void;
   onPrintClass?: () => void;
   onPrintClassOverview?: () => void;
+  onExportClassCsv?: () => void;
   onImportBackup?: (file: File, passphrase: string) => void;
   onExportBackup?: (passphrase: string) => Promise<boolean>;
   onExportDocx?: () => void;
@@ -20,6 +21,7 @@ interface Props {
   printGradeScaleLabel?: string;
   classPrintLabel?: string;
   classOverviewPrintLabel?: string;
+  exportClassCsvLabel?: string;
   printHint?: string;
   simpleEwhExport?: boolean;
 }
@@ -37,11 +39,13 @@ export const ImportExportControls = ({
   onPrintGradeScale,
   onPrintClass,
   onPrintClassOverview,
+  onExportClassCsv,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
   classPrintLabel,
   classOverviewPrintLabel,
+  exportClassCsvLabel,
   printHint,
   simpleEwhExport = false,
 }: Props) => {
@@ -110,6 +114,16 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
+        {onExportClassCsv ? (
+          <div className="surface-muted rounded-2xl p-4">
+            <p className="label">Notenübernahme</p>
+            <p className="themed-muted mt-1 text-sm">Eine Zeile pro Schüler:in mit Punkten, Prozent und Note.</p>
+            <button type="button" className="button-secondary mt-3 gap-2" onClick={onExportClassCsv}>
+              <DownloadIcon />
+              {exportClassCsvLabel || "Notenübersicht als CSV"}
+            </button>
+          </div>
+        ) : null}
         {showBackupControls ? (
           <div className="surface-elevated rounded-2xl border p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">

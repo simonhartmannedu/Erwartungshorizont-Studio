@@ -2,6 +2,19 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## 0.9.0 – 13.10.2026
+
+- Der Korrektur-Tisch ergänzt die Einzelkorrektur: Eine Aufgabe wird für die ganze Lerngruppe zeilenweise bewertet. Mit Enter springt der Fokus zur nächsten Eingabe; Abwesenheiten bleiben gesperrt.
+- Die Einzelkorrektur bleibt unverändert verfügbar und kann direkt über den Korrekturmodus wieder gewählt werden.
+- Die Notenübersicht kann zusätzlich als einfache CSV-Datei ausgegeben werden.
+
+## 0.8.2 – 13.10.2026
+
+- Klassenlisten werden aus Sicherheitsgründen ausschließlich noch als CSV- oder TXT-Datei importiert.
+- Excel- und ODS-Tabellenimporte sowie Tabellenexporte sind entfernt. Als schlanke Ausnahme steht die Notenübersicht zusätzlich als CSV bereit; verfügbar bleiben außerdem Druck-PDF, Word-Dokumente und verschlüsselte JSON-Backups.
+- Die betroffene Tabellenbibliothek wurde aus dem Produktionsbundle entfernt. Der Produktions-Audit sperrt nun bereits bei Sicherheitslücken der Stufe `high`.
+- Das Inhaltsverzeichnis im EWH-Editor erklärt bei leeren Klassenarbeiten seinen Zustand und lässt sich einklappen.
+
 ## 0.8.1 – 10.10.2026
 
 - Easy-Mode trennt das Überarbeiten eines Erwartungshorizonts klar von der individuellen Korrektur: Aufgaben, Erwartungen und Maximalpunkte lassen sich ohne Lerngruppe oder Schüler:in bearbeiten.
@@ -46,7 +59,3 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 - Verschlüsselte Backups, kontrollierte Wiederherstellung und Backup-Status ergänzt.
 - Lokale Fachlogik und Workspace-Controller klarer getrennt.
 - AGPL-3.0-only, Sicherheitsrichtlinie und Hinweise zu Drittmaterial ergänzt.
-
-### Bekannte Grenze
-
-Für `xlsx@0.18.5` bestehen bekannte Upstream-Sicherheitshinweise ohne automatisch kompatible Korrektur. Vor einem Release bitte prüfen.

@@ -789,6 +789,34 @@ export const downloadDataFile = async (filename: string, payload: unknown) => {
   });
 };
 
+const escapeCsvCell = (value: string | number | boolean | null | undefined) => {
+  const normalized = value === null || value === undefined ? "" : String(value);
+  return `"${normalized.replace(/"/g, "\"\"")}"`;
+};
+
+export const downloadCsvFile = async (
+  filename: string,
+  rows: Array<Record<string, string | number | boolean | null | undefined>>,
+) => {
+  if (rows.length === 0) return "cancelled" as const;
+
+  const headers = Array.from(
+    rows.reduce((set, row) => {
+      Object.keys(row).forEach((key) => set.add(key));
+      return set;
+    }, new Set<string>()),
+  );
+  const csv = [
+    headers.map(escapeCsvCell).join(";"),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(";")),
+  ].join("\r\n");
+
+  return saveBlobWithDialog(`${filename}.csv`, new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" }), {
+    description: "CSV-Notenübersicht",
+    accept: { "text/csv": [".csv"] },
+  });
+};
+
 export const renderPrintDocument = (reports: PrintPayload[]) =>
   reports
     .map(({ exam, summary, identity, options }, reportIndex) => {

@@ -19,13 +19,13 @@
       <section class="start" id="start" aria-labelledby="start-title">
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
-        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.8.1">
+        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.0">
           <div class="terminal-bar">
             <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
             <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-            <span class="terminal-version">v0.8.1</span>
+            <span class="terminal-version">v0.9.0</span>
           </div>
-          <pre aria-label="Aktuelle Änderungen in Version 0.8.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+          <pre aria-label="Aktuelle Änderungen in Version 0.9.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
         </section>
 
         <div class="mode-grid">
@@ -66,7 +66,10 @@
         const output = document.getElementById("release-terminal-output");
         if (!output) return;
         const lines = [
-          "$ release v0.8.1",
+          "$ release v0.9.0",
+          "★ Für Lehrkräfte: Korrektur-Tisch – eine Aufgabe zeilenweise für die ganze Lerngruppe bewerten",
+          "✓ Ergänzt die vertraute Einzelkorrektur, die jederzeit verfügbar bleibt",
+          "✓ Notenübersicht zusätzlich als einfache CSV-Datei exportierbar",
           "✓ Sicherheitsupdate: Klassenlisten nur noch als CSV oder TXT importieren",
           "✓ Tabellenexporte vorübergehend entfernt – Ausgabe als Druck-PDF oder Word",
           "✓ Easy-Mode: EWH ohne Lerngruppe überarbeiten und ausgeben",
