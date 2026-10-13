@@ -190,23 +190,7 @@ export const parseStudentImportFile = async (file: File): Promise<ImportedStuden
     return parseStudentImport(await decodeCsvFile(file));
   }
 
-  const XLSX = await import("xlsx");
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) {
-    throw new Error("Die Tabellen-Datei enthaelt kein Arbeitsblatt.");
-  }
-
-  const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
-    workbook.Sheets[firstSheetName],
-    {
-      header: 1,
-      raw: false,
-      defval: "",
-    },
-  );
-
-  return parseStudentRows(rows.map((row) => row.map((value) => cleanCell(String(value ?? "")))));
+  throw new Error("Bitte importiere eine CSV- oder TXT-Datei. Excel- und ODS-Dateien werden derzeit aus Sicherheitsgründen nicht unterstützt.");
 };
 
 export const sortImportedStudentRows = (

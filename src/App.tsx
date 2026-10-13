@@ -97,7 +97,6 @@ import {
   createStudentGroup,
   getStudentAssessment,
   getStudentCorrectionStatus,
-  getStudentParticipationStatus,
   isStudentParticipating,
   getEffectiveSignatureDataUrl,
   getStudentGroup,
@@ -121,17 +120,10 @@ import {
 } from "./utils/students";
 import { createAnswerSheetCode } from "./utils/answerSheets";
 import {
-  downloadCsvFile,
   exportEditableExamDocx,
   exportClassEditableExamDocx,
   exportClassOverviewDocx,
-  exportClassOverviewCsv,
   exportGradeScaleDocx,
-  exportGradeScaleCsv,
-  exportScoringSheetCsv,
-  exportScoringSheetOds,
-  exportScoringSheetXlsx,
-  exportStudentExamCsv,
   openBatchPrintWindow,
   openClassOverviewPrintWindow,
   openGradeScalePrintWindow,
@@ -4029,169 +4021,6 @@ function App() {
     }
   };
 
-  const handleExportStudentCsv = () => {
-    if (activeGroup?.passwordVerifier && !activeGroupPassword) {
-      openHeaderUnlockDialog();
-      return;
-    }
-
-    exportStudentExamCsv(
-      displayExam,
-      summary,
-      activeStudentRecord && activeGroup
-        ? {
-            alias: activeStudentRecord.alias,
-            fullName: activeStudentLiveLabelTitle === "Aktiver Schülername" ? activeStudentLiveLabel : null,
-            subject: activeGroup.subject,
-            className: activeGroup.className,
-            teacherComment: activeAssessment?.teacherComment ?? "",
-          }
-        : undefined,
-    );
-  };
-
-  const handleExportClassCsv = async () => {
-    if (!activeGroup) {
-      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
-      return;
-    }
-
-    if (activeGroup.students.length === 0) {
-      pushNotice("warning", "Keine Schüler vorhanden", "Die aktive Klasse enthält noch keine Schüler.");
-      return;
-    }
-
-    if (activeGroup.passwordVerifier && !activeGroupPassword) {
-      openHeaderUnlockDialog();
-      return;
-    }
-
-    const namesByStudentId: Record<string, string> = {};
-    if (activeGroup.passwordVerifier) {
-      const unlockedPassword = await getUsableUnlockedGroupPassword(activeGroup.id);
-      if (unlockedPassword) {
-        const resolvedNames = await Promise.all(
-          activeGroup.students.map(async (student) => {
-            try {
-              const fullName = await decryptText(student.encryptedName, unlockedPassword);
-              return [student.id, fullName] as const;
-            } catch {
-              return null;
-            }
-          }),
-        );
-        resolvedNames.forEach((entry) => {
-          if (!entry) return;
-          namesByStudentId[entry[0]] = entry[1];
-        });
-      }
-    }
-
-    const rows = activeGroup.students.map((student) => {
-      const studentExam = buildExamForStudent(exam, studentDatabaseRef.current, {
-        groupId: activeGroup.id,
-        studentId: student.id,
-      }, activeWorkspace?.id ?? null);
-      const studentSummary = calculateExamSummary(studentExam);
-      const assessment = getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null);
-
-      return {
-        Schuelercode: student.alias,
-        Schuelername: namesByStudentId[student.id] ?? "",
-        Teilnahme: ({
-          present: "anwesend",
-          absent: "abwesend",
-          excused: "entschuldigt",
-          makeup: "schreibt nach",
-        } as const)[getStudentParticipationStatus(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null)],
-        Fach: activeGroup.subject,
-        Klasse: activeGroup.className,
-        Titel: exam.meta.title,
-        Datum: exam.meta.examDate,
-        Punkte: studentSummary.totalAchievedPoints,
-        MaxPunkte: studentSummary.totalMaxPoints,
-        Prozent: Number(studentSummary.finalPercentage.toFixed(1)),
-        Note: studentSummary.grade.label,
-        Notenstufe: studentSummary.grade.verbalLabel,
-        Kommentar: resolveCommentTemplate(assessment.teacherComment ?? "", {
-          alias: student.alias,
-          fullName: namesByStudentId[student.id] ?? null,
-          subject: activeGroup.subject,
-          className: activeGroup.className,
-          examTitle: exam.meta.title,
-          examDate: exam.meta.examDate,
-          totalAchievedPoints: studentSummary.totalAchievedPoints,
-          totalMaxPoints: studentSummary.totalMaxPoints,
-          percentage: studentSummary.finalPercentage,
-          gradeLabel: studentSummary.grade.label,
-          gradeVerbalLabel: studentSummary.grade.verbalLabel,
-        }),
-        ZuletztAktualisiert: assessment.updatedAt,
-        GedrucktAm: assessment.printedAt ?? "",
-      };
-    });
-
-    void downloadCsvFile(`${activeGroup.className || "Klasse"}_Klassendaten.csv`, rows);
-  };
-
-  const handleExportClassOverviewCsv = () => {
-    if (!activeGroup) {
-      pushNotice("warning", "Keine Klasse ausgewählt", "Bitte zuerst eine Klasse auswählen.");
-      return;
-    }
-
-    if (activeGroup.passwordVerifier && !activeGroupPassword) {
-      openHeaderUnlockDialog();
-      return;
-    }
-
-    if (!classOverview) {
-      pushNotice("warning", "Keine auswertbaren Daten", "Für die aktive Klasse liegen noch keine auswertbaren Daten vor.");
-      return;
-    }
-
-    exportClassOverviewCsv(displayExam, classOverview, {
-      subject: activeGroup.subject,
-      className: activeGroup.className,
-    });
-  };
-
-  const handleExportGradeScaleCsv = () => {
-    exportGradeScaleCsv(displayExam, summary, activeStudentRecord?.alias ?? displayExam.meta.title);
-  };
-
-  const getScoringExportStudents = () =>
-    activeGroup?.students.map((student) => ({
-      alias: student.alias,
-      fullName: "",
-      participationStatus: getStudentParticipationStatus(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null),
-      scores: getStudentAssessment(studentDatabaseRef.current, student.id, activeWorkspace?.id ?? null).taskScores,
-    }));
-
-  const handleExportScoringCsv = () => {
-    exportScoringSheetCsv(exam, {
-      subject: activeGroup?.subject ?? exam.meta.subject,
-      className: activeGroup?.className ?? exam.meta.course,
-      students: getScoringExportStudents(),
-    });
-  };
-
-  const handleExportScoringOds = () => {
-    void exportScoringSheetOds(exam, {
-      subject: activeGroup?.subject ?? exam.meta.subject,
-      className: activeGroup?.className ?? exam.meta.course,
-      students: getScoringExportStudents(),
-    });
-  };
-
-  const handleExportScoringXlsx = () => {
-    void exportScoringSheetXlsx(exam, {
-      subject: activeGroup?.subject ?? exam.meta.subject,
-      className: activeGroup?.className ?? exam.meta.course,
-      students: getScoringExportStudents(),
-    });
-  };
-
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
   const printWithoutDetailsLabel = activeStudentRecord
     ? `Leerer EWH (${activeStudentRecord.alias})`
@@ -4201,22 +4030,13 @@ function App() {
   const classOverviewPrintLabel = activeGroup
     ? `Klassenübersicht drucken (${activeGroup.className})`
     : "Klassenübersicht als PDF";
-  const exportCsvStudentLabel = activeStudentRecord ? `SuS als CSV (${activeStudentRecord.alias})` : "SuS als CSV";
-  const exportCsvClassLabel = activeGroup ? `Klasse als CSV (${activeGroup.className})` : "Klasse als CSV";
-  const exportCsvClassOverviewLabel = activeGroup
-    ? `Klassenübersicht als CSV (${activeGroup.className})`
-    : "Klassenübersicht als CSV";
-  const exportCsvGradeScaleLabel = "Notenbereiche als CSV";
-  const exportScoringCsvLabel = activeGroup ? `Punktetabelle CSV (${activeGroup.className})` : "Punktetabelle CSV";
-  const exportScoringOdsLabel = activeGroup ? `Punktetabelle ODS (${activeGroup.className})` : "Punktetabelle ODS";
-  const exportScoringXlsxLabel = activeGroup ? `Punktetabelle XLSX (${activeGroup.className})` : "Punktetabelle XLSX";
   const printHint = activeStudentRecord
     ? activeGroup?.passwordVerifier
       ? assessmentLocked
-        ? "Geschützte Lerngruppe: erst entsperren, dann stehen Druck und CSV mit vollständigen Bewertungsdaten bereit."
-        : "Geschützte Lerngruppe entsperrt: Druck und CSV arbeiten mit lokal entschlüsselten Bewertungsdaten."
-      : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und CSV-Exporte nutzen deshalb nur den Schülercode."
-    : "PDF für Ausdrucke, CSV für Tabellenkalkulationen und JSON für Sicherungen.";
+        ? "Geschützte Lerngruppe: erst entsperren, dann stehen Druck und Word-Export mit vollständigen Bewertungsdaten bereit."
+        : "Geschützte Lerngruppe entsperrt: Druck und Word-Export arbeiten mit lokal entschlüsselten Bewertungsdaten."
+      : "Für diese Klasse ist noch kein Passwort gesetzt. Ausdrucke und Word-Exporte nutzen deshalb nur den Schülercode."
+    : "PDF für Ausdrucke, Word für bearbeitbare Dokumente und JSON für Sicherungen.";
   const handlePrintSecurityTokens = () => {
     const opened = openSecurityTokenPrintWindow(pendingSecurityTokenCards);
     if (!opened) {
@@ -5163,25 +4983,11 @@ function App() {
                           onPrintGradeScale={!easyMode ? handlePrintGradeScale : undefined}
                           onPrintClass={!easyMode && activeGroup ? handlePrintClass : undefined}
                           onPrintClassOverview={!easyMode && activeGroup && classOverview ? handlePrintClassOverview : undefined}
-                          onExportCsvStudent={!easyMode ? handleExportStudentCsv : undefined}
-                          onExportCsvClass={!easyMode && activeGroup ? () => void handleExportClassCsv() : undefined}
-                          onExportCsvClassOverview={!easyMode && activeGroup && classOverview ? handleExportClassOverviewCsv : undefined}
-                          onExportCsvGradeScale={!easyMode ? handleExportGradeScaleCsv : undefined}
-                          onExportScoringCsv={!easyMode ? handleExportScoringCsv : undefined}
-                          onExportScoringOds={!easyMode ? handleExportScoringOds : undefined}
-                          onExportScoringXlsx={!easyMode ? handleExportScoringXlsx : undefined}
                           printLabel={easyMode ? "EWH drucken" : printLabel}
                           printWithoutDetailsLabel={easyMode ? "EWH drucken" : printWithoutDetailsLabel}
                           printGradeScaleLabel={!easyMode ? printGradeScaleLabel : undefined}
                           classPrintLabel={classPrintLabel}
                           classOverviewPrintLabel={classOverviewPrintLabel}
-                          exportCsvStudentLabel={exportCsvStudentLabel}
-                          exportCsvClassLabel={exportCsvClassLabel}
-                          exportCsvClassOverviewLabel={exportCsvClassOverviewLabel}
-                          exportCsvGradeScaleLabel={exportCsvGradeScaleLabel}
-                          exportScoringCsvLabel={exportScoringCsvLabel}
-                          exportScoringOdsLabel={exportScoringOdsLabel}
-                          exportScoringXlsxLabel={exportScoringXlsxLabel}
                           printHint={easyMode ? "Exportiere den fertigen Erwartungshorizont als Druck-PDF oder Word-Datei." : printHint}
                           simpleEwhExport={easyMode}
                         />

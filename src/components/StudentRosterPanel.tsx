@@ -515,7 +515,7 @@ export const StudentRosterPanel = ({
                   Klassenliste importieren
                   <input
                     type="file"
-                    accept=".csv,.txt,.xls,.xlsx,.ods,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet"
+                    accept=".csv,.txt,text/csv,text/plain"
                     className="hidden"
                     onChange={handleStudentImport}
                   />

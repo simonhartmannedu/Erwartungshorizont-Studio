@@ -21,6 +21,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --include=dev
+      - name: Security audit (high threshold)
+        run: npm audit --omit=dev --audit-level=high
       - name: Build downloadable app bundle
         env:
           TAG: ${{ github.ref_name }}

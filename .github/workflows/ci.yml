@@ -33,5 +33,5 @@ jobs:
           name: playwright-diagnostics
           path: test-results
           if-no-files-found: ignore
-      - name: Security audit (critical threshold)
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Security audit (high threshold)
+        run: npm audit --omit=dev --audit-level=high

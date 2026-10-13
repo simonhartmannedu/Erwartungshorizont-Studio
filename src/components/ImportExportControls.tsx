@@ -8,13 +8,6 @@ interface Props {
   onPrintGradeScale?: () => void;
   onPrintClass?: () => void;
   onPrintClassOverview?: () => void;
-  onExportCsvStudent?: () => void;
-  onExportCsvClass?: () => void;
-  onExportCsvClassOverview?: () => void;
-  onExportCsvGradeScale?: () => void;
-  onExportScoringCsv?: () => void;
-  onExportScoringOds?: () => void;
-  onExportScoringXlsx?: () => void;
   onImportBackup?: (file: File, passphrase: string) => void;
   onExportBackup?: (passphrase: string) => Promise<boolean>;
   onExportDocx?: () => void;
@@ -27,13 +20,6 @@ interface Props {
   printGradeScaleLabel?: string;
   classPrintLabel?: string;
   classOverviewPrintLabel?: string;
-  exportCsvStudentLabel?: string;
-  exportCsvClassLabel?: string;
-  exportCsvClassOverviewLabel?: string;
-  exportCsvGradeScaleLabel?: string;
-  exportScoringCsvLabel?: string;
-  exportScoringOdsLabel?: string;
-  exportScoringXlsxLabel?: string;
   printHint?: string;
   simpleEwhExport?: boolean;
 }
@@ -51,31 +37,16 @@ export const ImportExportControls = ({
   onPrintGradeScale,
   onPrintClass,
   onPrintClassOverview,
-  onExportCsvStudent,
-  onExportCsvClass,
-  onExportCsvClassOverview,
-  onExportCsvGradeScale,
-  onExportScoringCsv,
-  onExportScoringOds,
-  onExportScoringXlsx,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
   classPrintLabel,
   classOverviewPrintLabel,
-  exportCsvStudentLabel,
-  exportCsvClassLabel,
-  exportCsvClassOverviewLabel,
-  exportCsvGradeScaleLabel,
-  exportScoringCsvLabel,
-  exportScoringOdsLabel,
-  exportScoringXlsxLabel,
   printHint,
   simpleEwhExport = false,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [selectedDocumentOutput, setSelectedDocumentOutput] = useState<string | null>(null);
-  const [selectedTableOutputValue, setSelectedTableOutputValue] = useState<string | null>(null);
 
   const pdfOutputs = simpleEwhExport ? [
     { value: "ewh", label: "Fertiger EWH", action: onPrintWithoutDetails, docxAction: onExportEmptyDocx },
@@ -89,22 +60,6 @@ export const ImportExportControls = ({
   const selectedPdfOutput = pdfOutputs.find((output) => output.value === selectedDocumentOutput) ?? null;
   const showBackupControls = Boolean(onImportBackup && onExportBackup);
 
-  const tableOutputs = [
-    {
-      value: "scoring",
-      label: "Punktetabelle",
-      formats: [
-        ...(onExportScoringOds ? [{ value: "ods", label: exportScoringOdsLabel || "ODS", action: onExportScoringOds }] : []),
-        ...(onExportScoringXlsx ? [{ value: "xlsx", label: exportScoringXlsxLabel || "Excel (.xlsx)", action: onExportScoringXlsx }] : []),
-        ...(onExportScoringCsv ? [{ value: "csv", label: exportScoringCsvLabel || "CSV", action: onExportScoringCsv }] : []),
-      ],
-    },
-    ...(onExportCsvStudent ? [{ value: "students", label: exportCsvStudentLabel || "Schülerdaten", formats: [{ value: "csv", label: "CSV", action: onExportCsvStudent }] }] : []),
-    ...(onExportCsvClass ? [{ value: "class", label: exportCsvClassLabel || "Klassendaten", formats: [{ value: "csv", label: "CSV", action: onExportCsvClass }] }] : []),
-    ...(onExportCsvClassOverview ? [{ value: "overview", label: exportCsvClassOverviewLabel || "Klassenübersicht", formats: [{ value: "csv", label: "CSV", action: onExportCsvClassOverview }] }] : []),
-    ...(onExportCsvGradeScale ? [{ value: "grade-scale", label: exportCsvGradeScaleLabel || "Notenbereiche", formats: [{ value: "csv", label: "CSV", action: onExportCsvGradeScale }] }] : []),
-  ].filter((output) => output.formats.length > 0);
-  const selectedTableOutput = tableOutputs.find((output) => output.value === selectedTableOutputValue) ?? null;
 
   const handleBackupImport = (event: ChangeEvent<HTMLInputElement>) => {
     if (!onImportBackup) return;
@@ -155,47 +110,6 @@ export const ImportExportControls = ({
             </div>
           ) : null}
         </div>
-        {!simpleEwhExport ? (
-        <div className="surface-muted rounded-2xl p-4">
-          <p className="label">Tabellenexport</p>
-          <p className="themed-muted mt-1 text-sm">Wähle zuerst den Tabelleninhalt. Danach erscheinen die passenden Formate.</p>
-          <div className="export-choice-list mt-3" role="group" aria-label="Tabelleninhalt wählen">
-            {tableOutputs.map((output) => (
-              <button
-                key={output.value}
-                type="button"
-                className={`export-choice ${selectedTableOutputValue === output.value ? "export-choice-active" : ""}`}
-                aria-pressed={selectedTableOutputValue === output.value}
-                onClick={() => setSelectedTableOutputValue(output.value)}
-              >
-                <DownloadIcon />
-                {output.label}
-              </button>
-            ))}
-          </div>
-          {selectedTableOutput ? (
-            <div className="export-format-row mt-4">
-              <div>
-                <p className="label">Format für „{selectedTableOutput.label}“</p>
-                <p className="themed-muted text-sm">Wähle ein Format, um die Datei zu erstellen.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {selectedTableOutput.formats.map((format) => (
-                  <button
-                    key={format.value}
-                    type="button"
-                    className={format.value === "ods" ? "button-primary gap-2" : "button-secondary gap-2"}
-                    onClick={format.action}
-                  >
-                    <DownloadIcon />
-                    {format.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-        ) : null}
         {showBackupControls ? (
           <div className="surface-elevated rounded-2xl border p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">

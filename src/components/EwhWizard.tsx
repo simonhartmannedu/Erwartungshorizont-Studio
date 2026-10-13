@@ -23,7 +23,7 @@ const steps: WizardStep[] = [
     id: "import",
     eyebrow: "Schritt 2 · Klassenliste",
     title: "Klasse importieren oder anlegen",
-    description: "Importiere eine CSV-, Excel- oder ODS-Liste. EWH erstellt die Lerngruppe und die Schülercodes automatisch. Für kleine Gruppen kannst du sie auch manuell anlegen.",
+    description: "Importiere eine CSV- oder TXT-Liste. EWH erstellt die Lerngruppe und die Schülercodes automatisch. Für kleine Gruppen kannst du sie auch manuell anlegen.",
     tip: "Die Importvorlage steht direkt im Bereich „Lerngruppen“ bereit.",
     icon: UploadIcon,
   },

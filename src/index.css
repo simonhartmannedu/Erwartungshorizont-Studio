@@ -2241,6 +2241,31 @@
     color: var(--app-soft-text);
   }
 
+  .editor-toc-toggle {
+    color: var(--app-text-muted);
+  }
+
+  .editor-toc-toggle:hover,
+  .editor-toc-toggle:focus-visible {
+    background: color-mix(in srgb, var(--app-secondary-hover) 88%, transparent);
+    color: var(--app-text-strong);
+  }
+
+  .editor-toc-toggle:focus-visible {
+    outline: 2px solid var(--app-secondary-ring);
+    outline-offset: 2px;
+  }
+
+  .editor-toc-empty {
+    border: 1px dashed color-mix(in srgb, var(--app-secondary-border) 82%, transparent);
+    background: color-mix(in srgb, var(--app-secondary-bg) 74%, transparent);
+    color: var(--app-text-muted);
+  }
+
+  .editor-toc-empty p:first-child {
+    color: var(--app-text-strong);
+  }
+
   .editor-toc ul {
     border-color: var(--app-secondary-border);
   }

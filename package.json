@@ -28,8 +28,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sql.js": "^1.14.1",
-    "valibot": "^1.4.2",
-    "xlsx": "^0.18.5"
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

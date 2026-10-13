@@ -3,7 +3,7 @@ import type { MouseEvent } from "react";
 import type { Section } from "../types";
 import { calculateSectionResult } from "../utils/calculations";
 import { formatNumber } from "../utils/format";
-import { ListIcon } from "./icons";
+import { ChevronDownIcon, ChevronRightIcon, ListIcon } from "./icons";
 
 export const EDITOR_METADATA_ANCHOR_ID = "ewh-editor-metadata";
 export const EDITOR_POINTS_ANCHOR_ID = "ewh-editor-points-grade";
@@ -45,6 +45,7 @@ export const EditorToc = ({
   showPointSubsections: boolean;
   onNavigate?: (id: string) => void;
 }) => {
+  const [collapsed, setCollapsed] = useState(false);
   const items = useMemo<EditorTocItem[]>(() => [
     { id: EDITOR_METADATA_ANCHOR_ID, label: "Metadaten" },
     {
@@ -122,10 +123,10 @@ export const EditorToc = ({
     (logicalTarget ?? target)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const renderItems = (tocItems: EditorTocItem[], level = 0, parentNumber = "") => (
+  const renderItems = (tocItems: EditorTocItem[], level = 0, parentNumber = "", startIndex = 0) => (
     <ul className={level === 0 ? "space-y-1.5" : "mt-1 space-y-1 border-l pl-3"}>
       {tocItems.map((item, index) => {
-        const itemNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`;
+        const itemNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${startIndex + index + 1}`;
 
         return (
           <li key={item.id}>
@@ -149,18 +150,46 @@ export const EditorToc = ({
     </ul>
   );
 
+  const hasSections = sections.length > 0;
+  const subtitle = hasSections
+    ? `${sections.length} ${sections.length === 1 ? "Aufgabenabschnitt" : "Aufgabenabschnitte"}`
+    : "3 Editorbereiche · keine Aufgabenabschnitte";
+
   return (
     <nav className="editor-toc panel no-print p-4" aria-label="Inhaltsverzeichnis EWH-Editor">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <span className="editor-toc-icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl">
           <ListIcon />
         </span>
         <div className="min-w-0">
           <h2 className="card-title text-sm font-semibold">Inhalt</h2>
-          <p className="card-subtitle text-xs">EWH-Editor</p>
+          <p className="card-subtitle text-xs">{subtitle}</p>
         </div>
+        <button
+          type="button"
+          className="editor-toc-toggle ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+          onClick={() => setCollapsed((current) => !current)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Inhaltsverzeichnis aufklappen" : "Inhaltsverzeichnis einklappen"}
+          title={collapsed ? "Aufklappen" : "Einklappen"}
+        >
+          {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
+        </button>
       </div>
-      {renderItems(items)}
+      {!collapsed ? (
+        <div className="mt-3">
+          {hasSections ? renderItems(items) : (
+            <>
+              {renderItems(items.slice(0, 2))}
+              <div className="editor-toc-empty mt-1.5 rounded-2xl px-3 py-2" role="status">
+                <p className="text-sm font-medium">Noch keine Aufgabenabschnitte</p>
+                <p className="mt-0.5 text-xs">Füge im Reiter „Aufgaben“ einen Abschnitt hinzu.</p>
+              </div>
+              {renderItems(items.slice(-1), 0, "", items.length - 1)}
+            </>
+          )}
+        </div>
+      ) : null}
     </nav>
   );
 };

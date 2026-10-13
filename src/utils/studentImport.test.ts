@@ -49,46 +49,10 @@ describe("Schülerimport", () => {
     expect(sorted.map((row) => row.className)).toEqual(["8a", "8b"]);
   });
 
-  it("reads a generated XLSX roster with the same validation as CSV", async () => {
-    const XLSX = await import("xlsx");
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ["Vorname", "Nachname", "Klasse"],
-        ["Alex", "Beispiel", "8b"],
-      ]),
-      "Lerngruppe",
-    );
-    const content = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-    const file = {
-      name: "fiktive-lerngruppe.xlsx",
-      arrayBuffer: async () => content,
-    } as File;
-
-    await expect(parseStudentImportFile(file)).resolves.toEqual([
-      { firstName: "Alex", lastName: "Beispiel", className: "8b" },
-    ]);
-  });
-
-  it("liest Umlaute aus Excel- und LibreOffice-Calc-Dateien", async () => {
-    const XLSX = await import("xlsx");
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ["Vorname", "Nachname", "Klasse"],
-        ["Jörg", "Müller", "10ä"],
-      ]),
-      "Lerngruppe",
-    );
-
-    for (const [bookType, extension] of [["xlsx", "xlsx"], ["ods", "ods"]] as const) {
-      const content = XLSX.write(workbook, { bookType, type: "array" });
-      const file = { name: `klasse.${extension}`, arrayBuffer: async () => content } as File;
-      await expect(parseStudentImportFile(file)).resolves.toEqual([
-        { firstName: "Jörg", lastName: "Müller", className: "10ä" },
-      ]);
+  it("lehnt Excel- und ODS-Dateien ab", async () => {
+    for (const name of ["klasse.xls", "klasse.xlsx", "klasse.ods"]) {
+      const file = { name, arrayBuffer: async () => new ArrayBuffer(0) } as File;
+      await expect(parseStudentImportFile(file)).rejects.toThrow("CSV- oder TXT-Datei");
     }
   });
 });
