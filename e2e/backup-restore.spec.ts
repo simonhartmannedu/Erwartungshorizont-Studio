@@ -25,6 +25,9 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
 
   expect(backupPath).not.toBeNull();
   await expect(page.getByText("Backup exportiert")).toBeVisible();
+  const supportDialog = page.getByRole("heading", { name: "Export/Backup fertig. Kaffee verdient. ☕" });
+  await expect(supportDialog).toBeVisible();
+  await page.getByRole("button", { name: "Schließen" }).click();
 
   await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
   const wrongPasswordDialog = page.locator(".dialog-panel");

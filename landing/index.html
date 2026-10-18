@@ -26,6 +26,7 @@
             <span class="terminal-version">v0.9.0</span>
           </div>
           <pre aria-label="Aktuelle Änderungen in Version 0.9.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+          <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
         </section>
 
         <div class="mode-grid">
@@ -68,15 +69,11 @@
         const lines = [
           "$ release v0.9.0",
           "★ Für Lehrkräfte: Korrektur-Tisch – eine Aufgabe zeilenweise für die ganze Lerngruppe bewerten",
-          "✓ Ergänzt die vertraute Einzelkorrektur, die jederzeit verfügbar bleibt",
           "✓ Notenübersicht zusätzlich als einfache CSV-Datei exportierbar",
           "✓ Sicherheitsupdate: Klassenlisten nur noch als CSV oder TXT importieren",
-          "✓ Tabellenexporte vorübergehend entfernt – Ausgabe als Druck-PDF oder Word",
           "✓ Easy-Mode: EWH ohne Lerngruppe überarbeiten und ausgeben",
           "✓ Druck & Export im Easy-Mode bleiben vollständig anonym",
-          "✓ Druckansicht ist auch bei verzögerten Bildern sofort nutzbar",
-          "✓ Rahmendaten zentral im EWH-Editor statt mehrfach pflegen",
-          "✓ Stabilere Prüfung konkurrierender Browser-Tabs unter CI-Last"
+          "✓ Druckansicht ist auch bei verzögerten Bildern sofort nutzbar"
         ];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const writeImmediately = () => { output.textContent = lines.join("\n"); };

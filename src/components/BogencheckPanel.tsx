@@ -18,6 +18,7 @@ type Props = {
   onChange: (settings: AnswerSheetSettings) => void;
   onCreateLinkedTask: (type: BogencheckType, title: string, maxPoints: number) => string;
   onCreateCodes: () => void;
+  onPrintComplete?: () => void;
 };
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] ?? character);
@@ -56,7 +57,7 @@ const createAnswerTableMarkup = (block: SelectableBlock) => `
     <tbody>${block.correctAnswers.map((_, index) => `<tr><td>${index + 1}</td>${block.optionLabels.map(() => "<td><span class=\"answer-bubble\" aria-hidden=\"true\"></span></td>").join("")}</tr>`).join("")}</tbody></table>
   </section>`;
 
-export const BogencheckPanel = ({ exam, students, groupLabel, disabled, onChange, onCreateLinkedTask, onCreateCodes }: Props) => {
+export const BogencheckPanel = ({ exam, students, groupLabel, disabled, onChange, onCreateLinkedTask, onCreateCodes, onPrintComplete }: Props) => {
   const settings = exam.answerSheetSettings ?? { blocks: [] };
   const [printing, setPrinting] = useState(false);
   const tasks = useMemo(() => flattenTasks(exam), [exam]);
@@ -134,6 +135,7 @@ export const BogencheckPanel = ({ exam, students, groupLabel, disabled, onChange
         <article class="decoder"><div class="eyebrow">Nur für die Lehrkraft</div><h1 class="title">Bogencheck · Entschlüsselungstabelle</h1><p class="meta">${title}${groupLabel ? ` · ${escapeHtml(groupLabel)}` : ""}</p><table><thead><tr><th>Arbeitscode</th><th>Schüler:in</th><th>Kürzel</th></tr></thead><tbody>${codes.map((student) => `<tr><td class="code">${escapeHtml(student.answerSheetCode)}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.alias)}</td></tr>`).join("")}</tbody></table><p class="warn">Diese Tabelle enthält Klarnamen und bleibt bei der Lehrkraft. Die Antwortbeiblätter selbst enthalten ausschließlich zufällige Arbeitscodes.</p></article>
       <script>addEventListener('load',()=>setTimeout(()=>{focus();print()},250))</script></body></html>`);
       popup.document.close();
+      onPrintComplete?.();
     } finally {
       setPrinting(false);
     }

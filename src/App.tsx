@@ -164,7 +164,7 @@ import { EwhWizard } from "./components/EwhWizard";
 import { BackupPanel } from "./components/BackupPanel";
 import { HomeDashboard } from "./components/HomeDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import { AppFooter } from "./components/AppFooter";
+import { AppFooter, koFiUrl } from "./components/AppFooter";
 import { PointScaleControl } from "./components/PointScaleControl";
 import { GradeScaleRangeSection } from "./components/GradeScaleRangeSection";
 import { BogencheckPanel } from "./components/BogencheckPanel";
@@ -937,6 +937,7 @@ function App() {
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState<StorageErrorState | null>(null);
   const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
+  const [supportPromptOpen, setSupportPromptOpen] = useState(false);
   const unlockedGroupPasswordsRef = useRef<Record<string, string>>({});
   const [unlockedGroupIds, setUnlockedGroupIds] = useState<string[]>([]);
   const [globalSearchStudentNames, setGlobalSearchStudentNames] = useState<Record<string, string>>({});
@@ -1082,6 +1083,7 @@ function App() {
       detail,
     });
   };
+  const showSupportPrompt = () => setSupportPromptOpen(true);
 
   const clearSensitiveGlobalSearch = () => {
     searchNameResolutionVersionRef.current += 1;
@@ -3078,6 +3080,7 @@ function App() {
           ? `Verschlüsseltes Backup am gewählten Speicherort erstellt: ${filename}.`
           : `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`,
       );
+      showSupportPrompt();
       return true;
     } catch {
       const failure = { occurredAt: exportedAt, code: "BACKUP_EXPORT_FAILED" };
@@ -3125,6 +3128,7 @@ function App() {
       setLastBackupAt(backup.exportedAt);
       setLastBackupFailure(null);
       pushNotice("success", "Nextcloud-Backup gespeichert", "Die verschlüsselte Sicherung liegt im lokalen Nextcloud-Ordner. Der Nextcloud-Desktop-Client übernimmt die Synchronisation.");
+      showSupportPrompt();
       return true;
     } catch (error) {
       const failure = { occurredAt: exportedAt, code: "NEXTCLOUD_FOLDER_BACKUP_FAILED" };
@@ -3252,6 +3256,7 @@ function App() {
       saveResult === "saved" ? "Schuljahr archiviert" : "Schuljahr exportiert",
       `${workspacesToArchive.length} Klassenarbeiten aus ${getSchoolYearLabel(schoolYear)} wurden gesichert und aus der Arbeitsoberfläche entfernt. Das EWH-Archiv blieb unverändert.`,
     );
+    showSupportPrompt();
     return true;
   };
 
@@ -3691,6 +3696,7 @@ function App() {
       setStudentDatabase((current) => markStudentPrinted(current, activeWorkspace?.id ?? null, activeStudentId));
     }
 
+    showSupportPrompt();
     return true;
   };
 
@@ -3780,6 +3786,7 @@ function App() {
         current,
       ),
     );
+    showSupportPrompt();
     return true;
   };
 
@@ -3848,6 +3855,7 @@ function App() {
     );
     if (result !== "cancelled") {
       pushNotice("success", "Word-Dokument erstellt", "Der Bewertungsbogen kann in Word oder LibreOffice weiterbearbeitet werden.");
+      showSupportPrompt();
     }
   };
 
@@ -3911,6 +3919,7 @@ function App() {
     const result = await exportClassEditableExamDocx(exam, reports, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Klassendokument erstellt", "Die editierbare Punktetabelle für die aktive Klasse wurde erstellt.");
+      showSupportPrompt();
     }
   };
 
@@ -3926,6 +3935,7 @@ function App() {
     const result = await exportEditableExamDocx(emptyExam, calculateExamSummary(emptyExam), undefined, { hideResults: true, saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Leerer Word-EWH erstellt", "Der editierbare Erwartungshorizont wurde ohne individuelle Bewertungsdaten erstellt.");
+      showSupportPrompt();
     }
   };
 
@@ -3935,6 +3945,7 @@ function App() {
     const result = await exportGradeScaleDocx(displayExam, summary, filenamePrefix, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Notenbereiche erstellt", "Der editierbare Notenschlüssel wurde erstellt.");
+      showSupportPrompt();
     }
   };
 
@@ -3951,6 +3962,7 @@ function App() {
     }, { saveTarget });
     if (result !== "cancelled") {
       pushNotice("success", "Word-Klassenübersicht erstellt", "Die editierbare Klassenübersicht wurde erstellt.");
+      showSupportPrompt();
     }
   };
 
@@ -3974,7 +3986,9 @@ function App() {
 
     if (!opened) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return;
     }
+    showSupportPrompt();
   };
 
   const handlePrintClass = () => {
@@ -4022,7 +4036,9 @@ function App() {
 
     if (!opened) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return;
     }
+    showSupportPrompt();
   };
 
   const handlePrintGradeScale = () => {
@@ -4034,7 +4050,9 @@ function App() {
 
     if (!opened) {
       pushNotice("warning", "Druckfenster blockiert", "Bitte erlaube Pop-ups für diese Anwendung.");
+      return;
     }
+    showSupportPrompt();
   };
 
   const handleExportClassCsv = async () => {
@@ -4093,7 +4111,8 @@ function App() {
       };
     });
 
-    void downloadCsvFile(`${activeGroup.className || "Klasse"}_Notenuebersicht`, rows);
+    const result = await downloadCsvFile(`${activeGroup.className || "Klasse"}_Notenuebersicht`, rows);
+    if (result !== "cancelled") showSupportPrompt();
   };
 
   const printLabel = activeStudentRecord ? `Schülerbogen drucken (${activeStudentRecord.alias})` : "PDF / Drucken";
@@ -4120,6 +4139,7 @@ function App() {
     }
     setPendingSecurityTokenCards([]);
     pushNotice("success", "Druckkarte geöffnet", "Die Token stehen im neuen Fenster zum Drucken oder als PDF-Speichern bereit.");
+    showSupportPrompt();
   };
 
   const resolvedTeacherCommentPreview = resolveCommentTemplate(activeAssessment?.teacherComment ?? "", {
@@ -4477,6 +4497,7 @@ function App() {
                       onChange={syncBogencheckSettings}
                       onCreateLinkedTask={createBogencheckTask}
                       onCreateCodes={handleCreateAnswerSheetCodes}
+                      onPrintComplete={showSupportPrompt}
                     />
                     <BogencheckScanner
                       exam={activeWorkspace.exam}
@@ -5200,6 +5221,19 @@ function App() {
         </div>
         <AppFooter />
       </div>
+
+      <ConfirmDialog
+        open={supportPromptOpen}
+        title="Export/Backup fertig. Kaffee verdient. ☕"
+        description="Von einer Lehrkraft für Lehrkräfte entwickelt. Wenn dir die App Arbeit erspart hat, kannst du mir einen Kaffee spendieren."
+        onCancel={() => setSupportPromptOpen(false)}
+        onConfirm={() => {
+          window.open(koFiUrl, "_blank", "noopener,noreferrer");
+          setSupportPromptOpen(false);
+        }}
+        confirmLabel="Kaffee spendieren"
+        cancelLabel="Schließen"
+      />
 
       <ConfirmDialog
         open={quickBackupDialogOpen}

@@ -1,6 +1,7 @@
 import { CupIcon } from "./icons";
 
 export const communityLicenseLabel = "GNU Affero General Public License v3.0 (AGPL-3.0)";
+export const koFiUrl = "https://ko-fi.com/M4M41Y3MP2";
 
 export const AppFooter = () => {
   const emailUser = "simonhartmann";
@@ -57,7 +58,7 @@ export const AppFooter = () => {
           <p className="label">Support</p>
           <a
             className="app-footer-support-button"
-            href="https://ko-fi.com/M4M41Y3MP2"
+            href={koFiUrl}
             target="_blank"
             rel="noreferrer"
           >
@@ -66,7 +67,7 @@ export const AppFooter = () => {
           </a>
           <p className="app-footer-text">
             Direkter Link:{" "}
-            <a className="app-footer-link" href="https://ko-fi.com/M4M41Y3MP2" target="_blank" rel="noreferrer">
+            <a className="app-footer-link" href={koFiUrl} target="_blank" rel="noreferrer">
               ko-fi.com/M4M41Y3MP2
             </a>
           </p>

@@ -68,6 +68,7 @@ test("exportiert Word-Dokumente über den passenden Browser-Speicherweg", async 
     expect(download.suggestedFilename()).toMatch(/\.docx$/);
   }
   await expect(page.getByText("Word-Dokument erstellt")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Export/Backup fertig. Kaffee verdient. ☕" })).toBeVisible();
 });
 
 test("öffnet bei geschützten Exporten automatisch den Entsperr-Dialog", async ({ page }) => {

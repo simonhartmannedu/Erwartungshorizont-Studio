@@ -12,6 +12,7 @@ interface Props {
   onSaveAndConfirm?: () => void;
   saveAndConfirmLabel?: string;
   confirmLabel: string;
+  cancelLabel?: string;
   cancelDisabled?: boolean;
   confirmDisabled?: boolean;
 }
@@ -26,6 +27,7 @@ export const ConfirmDialog = ({
   onSaveAndConfirm,
   saveAndConfirmLabel = "Vorher speichern",
   confirmLabel,
+  cancelLabel = "Abbrechen",
   cancelDisabled = false,
   confirmDisabled = false,
 }: Props) => {
@@ -40,7 +42,7 @@ export const ConfirmDialog = ({
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button type="button" className="button-secondary gap-2" onClick={onCancel} disabled={cancelDisabled}>
             <CloseIcon />
-            Abbrechen
+            {cancelLabel}
           </button>
           {onSaveAndConfirm && (
             <button type="button" className="button-secondary gap-2" onClick={onSaveAndConfirm} disabled={confirmDisabled}>
