@@ -8,12 +8,14 @@ interface Props {
   onPrintGradeScale?: () => void;
   onPrintClass?: () => void;
   onPrintClassOverview?: () => void;
-  onExportClassCsv?: () => void;
+  onPrintGradeList?: () => void;
   onImportBackup?: (file: File, passphrase: string) => void;
   onExportBackup?: (passphrase: string) => Promise<boolean>;
   onExportDocx?: () => void;
   onExportClassDocx?: () => void;
   onExportClassOverviewDocx?: () => void;
+  onExportGradeListDocx?: () => void;
+  onExportGradeListCsv?: () => void;
   onExportEmptyDocx?: () => void;
   onExportGradeScaleDocx?: () => void;
   printLabel?: string;
@@ -21,9 +23,17 @@ interface Props {
   printGradeScaleLabel?: string;
   classPrintLabel?: string;
   classOverviewPrintLabel?: string;
-  exportClassCsvLabel?: string;
+  gradeListLabel?: string;
   printHint?: string;
   simpleEwhExport?: boolean;
+}
+
+interface DocumentOutput {
+  value: string;
+  label: string;
+  action: () => void;
+  docxAction?: () => void;
+  csvAction?: () => void;
 }
 
 export const ImportExportControls = ({
@@ -32,6 +42,8 @@ export const ImportExportControls = ({
   onExportDocx,
   onExportClassDocx,
   onExportClassOverviewDocx,
+  onExportGradeListDocx,
+  onExportGradeListCsv,
   onExportEmptyDocx,
   onExportGradeScaleDocx,
   onPrint,
@@ -39,29 +51,30 @@ export const ImportExportControls = ({
   onPrintGradeScale,
   onPrintClass,
   onPrintClassOverview,
-  onExportClassCsv,
+  onPrintGradeList,
   printLabel,
   printWithoutDetailsLabel,
   printGradeScaleLabel,
   classPrintLabel,
   classOverviewPrintLabel,
-  exportClassCsvLabel,
+  gradeListLabel,
   printHint,
   simpleEwhExport = false,
 }: Props) => {
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [selectedDocumentOutput, setSelectedDocumentOutput] = useState<string | null>(null);
 
-  const pdfOutputs = simpleEwhExport ? [
+  const documentOutputs: DocumentOutput[] = simpleEwhExport ? [
     { value: "ewh", label: "Fertiger EWH", action: onPrintWithoutDetails, docxAction: onExportEmptyDocx },
   ] : [
     { value: "current", label: printLabel || "Aktueller Bewertungsbogen", action: onPrint, docxAction: onExportDocx },
     ...(onPrintClass ? [{ value: "class", label: classPrintLabel || "Klassenbögen", action: onPrintClass, docxAction: onExportClassDocx }] : []),
     ...(onPrintClassOverview ? [{ value: "overview", label: classOverviewPrintLabel || "Klassenübersicht", action: onPrintClassOverview, docxAction: onExportClassOverviewDocx }] : []),
+    ...(onPrintGradeList ? [{ value: "grade-list", label: gradeListLabel || "Notenliste", action: onPrintGradeList, docxAction: onExportGradeListDocx, csvAction: onExportGradeListCsv }] : []),
     { value: "empty", label: printWithoutDetailsLabel || "Leerer EWH", action: onPrintWithoutDetails, docxAction: onExportEmptyDocx },
     ...(onPrintGradeScale ? [{ value: "grade-scale", label: printGradeScaleLabel || "Notenbereiche", action: onPrintGradeScale, docxAction: onExportGradeScaleDocx }] : []),
   ];
-  const selectedPdfOutput = pdfOutputs.find((output) => output.value === selectedDocumentOutput) ?? null;
+  const selectedDocumentOutputConfig = documentOutputs.find((output) => output.value === selectedDocumentOutput) ?? null;
   const showBackupControls = Boolean(onImportBackup && onExportBackup);
 
 
@@ -80,7 +93,7 @@ export const ImportExportControls = ({
           <p className="label">Dokumentausgabe</p>
           <p className="themed-muted mt-1 text-sm">Wähle zuerst den Inhalt. Danach erscheinen die verfügbaren Formate.</p>
           <div className="export-choice-list mt-3" role="group" aria-label="Dokumentausgabe wählen">
-            {pdfOutputs.map((output) => (
+            {documentOutputs.map((output) => (
               <button
                 key={output.value}
                 type="button"
@@ -93,37 +106,33 @@ export const ImportExportControls = ({
               </button>
             ))}
           </div>
-          {selectedPdfOutput ? (
+          {selectedDocumentOutputConfig ? (
             <div className="export-format-row mt-4">
               <div>
-                <p className="label">Format für „{selectedPdfOutput.label}“</p>
+                <p className="label">Format für „{selectedDocumentOutputConfig.label}“</p>
                 <p className="themed-muted text-sm">Wähle eine Ausgabe, um die Datei zu erstellen.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="button-primary gap-2" onClick={selectedPdfOutput.action}>
+                <button type="button" className="button-primary gap-2" onClick={selectedDocumentOutputConfig.action}>
                   <ReportIcon />
                   Druck-PDF
                 </button>
-                {selectedPdfOutput.docxAction ? (
-                  <button type="button" className="button-secondary gap-2" onClick={selectedPdfOutput.docxAction}>
+                {selectedDocumentOutputConfig.docxAction ? (
+                  <button type="button" className="button-secondary gap-2" onClick={selectedDocumentOutputConfig.docxAction}>
                     <DownloadIcon />
                     Word (.docx)
+                  </button>
+                ) : null}
+                {selectedDocumentOutputConfig.csvAction ? (
+                  <button type="button" className="button-secondary gap-2" onClick={selectedDocumentOutputConfig.csvAction}>
+                    <DownloadIcon />
+                    CSV
                   </button>
                 ) : null}
               </div>
             </div>
           ) : null}
         </div>
-        {onExportClassCsv ? (
-          <div className="surface-muted rounded-2xl p-4">
-            <p className="label">Notenübernahme</p>
-            <p className="themed-muted mt-1 text-sm">Eine Zeile pro Schüler:in mit Punkten, Prozent und Note.</p>
-            <button type="button" className="button-secondary mt-3 gap-2" onClick={onExportClassCsv}>
-              <DownloadIcon />
-              {exportClassCsvLabel || "Notenübersicht als CSV"}
-            </button>
-          </div>
-        ) : null}
         {showBackupControls ? (
           <div className="surface-elevated rounded-2xl border p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end">

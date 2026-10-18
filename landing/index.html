@@ -12,49 +12,71 @@
   <body>
     <main class="landing-shell">
       <a class="brand" href="#start" aria-label="Erwartungshorizont Studio – Startseite">
-        <span class="brand-mark" aria-hidden="true">E</span>
+        <img class="brand-mark" src="./assets/favicon.svg" alt="" />
         <span>Erwartungshorizont<br /><strong>Studio</strong></span>
       </a>
 
       <section class="start" id="start" aria-labelledby="start-title">
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
-        <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.0">
-          <div class="terminal-bar">
-            <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
-            <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-            <span class="terminal-version">v0.9.0</span>
+        <div class="start-content">
+          <aside class="benefit-ribbons" aria-label="Vorteile von Erwartungshorizont Studio">
+            <article class="benefit-ribbon">
+              <small>01 / Weniger Aufwand</small>
+              <strong>Keine Doppelarbeit</strong>
+              <p>Ein Arbeitsstand für EWH, Punkte, Noten und Druck.</p>
+            </article>
+            <article class="benefit-ribbon benefit-ribbon-mint">
+              <small>02 / Sicher rechnen</small>
+              <strong>Nie wieder verrechnen</strong>
+              <p>Punktesummen und Notenschlüssel immer im Blick.</p>
+            </article>
+            <article class="benefit-ribbon benefit-ribbon-blue">
+              <small>03 / Datenschutz</small>
+              <strong>Deine Daten bleiben bei dir</strong>
+              <p>Lokal, ohne Konto und ohne zentrale Datenbank.</p>
+            </article>
+          </aside>
+
+          <div class="start-actions">
+            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.0">
+              <div class="terminal-bar">
+                <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+                <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
+                <span class="terminal-version">v0.9.0</span>
+              </div>
+              <pre aria-label="Aktuelle Änderungen in Version 0.9.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+              <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
+            </section>
+
+            <div class="mode-grid">
+              <a class="mode-card mode-card-primary" href="./app/?mode=easy">
+                <span class="mode-symbol" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l3 3V20.5H7z"/><path d="M14 3.5v3h3M10 12l1.5 1.5L14.5 10.5"/></svg>
+                </span>
+                <span class="mode-copy">
+                  <small class="mode-label">01 / Schnellstart</small>
+                  <strong>Mit Easy-Mode starten</strong>
+                  <small class="mode-description">Nur EWH erstellen und drucken</small>
+                </span>
+                <span class="mode-arrow" aria-hidden="true">→</span>
+              </a>
+              <a class="mode-card" href="./app/?mode=expert">
+                <span class="mode-symbol mode-symbol-mint" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m7.5 10 2.5 2-2.5 2M13 15h3.5"/></svg>
+                </span>
+                <span class="mode-copy">
+                  <small class="mode-label">02 / Arbeitsbereich</small>
+                  <strong>Expert-Mode öffnen</strong>
+                  <small class="mode-description">Klassenimport, Auswertung und Druck</small>
+                </span>
+                <span class="mode-arrow" aria-hidden="true">→</span>
+              </a>
+            </div>
+
+            <p class="demo-link">Noch unsicher? <a href="./demo/">Demo mit fiktiven Daten ansehen <span aria-hidden="true">→</span></a></p>
           </div>
-          <pre aria-label="Aktuelle Änderungen in Version 0.9.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
-          <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
-        </section>
-
-        <div class="mode-grid">
-          <a class="mode-card mode-card-primary" href="./app/?mode=easy">
-            <span class="mode-symbol" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l3 3V20.5H7z"/><path d="M14 3.5v3h3M10 12l1.5 1.5L14.5 10.5"/></svg>
-            </span>
-            <span class="mode-copy">
-              <small class="mode-label">01 / Schnellstart</small>
-              <strong>Mit Easy-Mode starten</strong>
-              <small class="mode-description">Nur EWH erstellen und drucken</small>
-            </span>
-            <span class="mode-arrow" aria-hidden="true">→</span>
-          </a>
-          <a class="mode-card" href="./app/?mode=expert">
-            <span class="mode-symbol mode-symbol-mint" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m7.5 10 2.5 2-2.5 2M13 15h3.5"/></svg>
-            </span>
-            <span class="mode-copy">
-              <small class="mode-label">02 / Arbeitsbereich</small>
-              <strong>Expert-Mode öffnen</strong>
-              <small class="mode-description">Klassenimport, Auswertung und Druck</small>
-            </span>
-            <span class="mode-arrow" aria-hidden="true">→</span>
-          </a>
         </div>
-
-        <p class="demo-link">Noch unsicher? <a href="./demo/">Demo mit fiktiven Daten ansehen <span aria-hidden="true">→</span></a></p>
       </section>
     </main>
 

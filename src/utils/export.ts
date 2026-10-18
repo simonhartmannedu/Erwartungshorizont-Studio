@@ -7,6 +7,19 @@ import { SecurityTokenCard } from "./securityTokens";
 
 type DocxModule = typeof import("docx");
 
+export interface GradeListEntry {
+  position: number;
+  alias: string;
+  fullName?: string | null;
+  participation: string;
+  hasGrade: boolean;
+  totalAchievedPoints: number;
+  totalMaxPoints: number;
+  percentage: number;
+  gradeLabel: string;
+  gradeVerbalLabel: string;
+}
+
 const DOCX_COLORS = {
   ink: "172033",
   muted: "526071",
@@ -254,6 +267,11 @@ export const getClassOverviewDocxFilename = (exam: Exam, context?: { className?:
   return `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Klassenuebersicht")}_${timestamp}.docx`;
 };
 
+export const getGradeListDocxFilename = (exam: Exam, context?: { className?: string }) => {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  return `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Notenliste")}_Notenliste_${timestamp}.docx`;
+};
+
 const createEditableExamDocxChildren = (
   docx: DocxModule,
   exam: Exam,
@@ -443,6 +461,48 @@ export const exportClassOverviewDocx = async (
   ];
   const blob = await Packer.toBlob(createDocxDocument(docx, {
     title: `${exam.meta.title || "Klassenübersicht"} – Klassenübersicht`,
+    subtitle: [context?.subject, context?.className].filter(Boolean).join(" · "),
+    children,
+  }));
+  return savePreparedBlob(saveTarget, blob);
+};
+
+export const exportGradeListDocx = async (
+  exam: Exam,
+  entries: GradeListEntry[],
+  context?: { subject?: string; className?: string },
+  options?: { saveTarget?: PreparedFileSavePromise },
+) => {
+  const filename = getGradeListDocxFilename(exam, context);
+  const saveTarget = options?.saveTarget ?? prepareDocxFileSave(filename);
+  const docx = await import("docx");
+  const { Packer, Paragraph, TableRow, TextRun } = docx;
+  const children = [
+    new Paragraph({ children: [new TextRun({ text: `${exam.meta.title || "Notenliste"} – Notenliste`, bold: true, size: 32, color: DOCX_COLORS.ink })], spacing: { after: 80 } }),
+    new Paragraph({ children: [new TextRun({ text: [context?.subject, context?.className, exam.meta.examDate].filter(Boolean).join(" · "), color: DOCX_COLORS.muted })], spacing: { after: 180 } }),
+    createDocxTable(docx, [
+      new TableRow({ tableHeader: true, children: [
+        createDocxCell(docx, "Nr.", { header: true, align: "center" }),
+        createDocxCell(docx, "Schüler:in", { header: true }),
+        createDocxCell(docx, "Code", { header: true }),
+        createDocxCell(docx, "Teilnahme", { header: true }),
+        createDocxCell(docx, "Punkte", { header: true, align: "right" }),
+        createDocxCell(docx, "%", { header: true, align: "right" }),
+        createDocxCell(docx, "Note", { header: true, align: "center" }),
+      ] }),
+      ...entries.map((entry) => new TableRow({ children: [
+        createDocxCell(docx, String(entry.position), { align: "center" }),
+        createDocxCell(docx, entry.fullName?.trim() || "—"),
+        createDocxCell(docx, entry.alias),
+        createDocxCell(docx, entry.participation),
+        createDocxCell(docx, entry.hasGrade ? `${formatNumber(entry.totalAchievedPoints)} / ${formatNumber(entry.totalMaxPoints)}` : "—", { align: "right" }),
+        createDocxCell(docx, entry.hasGrade ? `${formatNumber(entry.percentage)} %` : "—", { align: "right" }),
+        createDocxCell(docx, entry.hasGrade ? (entry.gradeVerbalLabel ? `${entry.gradeLabel} · ${entry.gradeVerbalLabel}` : entry.gradeLabel) : "—", { bold: true, align: "center" }),
+      ] })),
+    ]),
+  ];
+  const blob = await Packer.toBlob(createDocxDocument(docx, {
+    title: `${exam.meta.title || "Notenliste"} – Notenliste`,
     subtitle: [context?.subject, context?.className].filter(Boolean).join(" · "),
     children,
   }));
@@ -1233,6 +1293,80 @@ export const openClassOverviewPrintWindow = (
           <p class="muted" style="margin-top: 8px;">
             Hinweis: Die Aufgabenübersicht zeigt den durchschnittlichen Prozentwert je Aufgabe über alle anwesenden Schüler:innen.
           </p>
+        </section>
+        ${buildPrintActivationScript(false)}
+      </body>
+    </html>
+  `);
+  popup.document.close();
+  return true;
+};
+
+export const openGradeListPrintWindow = (
+  exam: Exam,
+  entries: GradeListEntry[],
+  context?: { subject?: string; className?: string },
+  preparedPopup?: Window | null,
+) => {
+  const popup = preparedPopup ?? openPopupHost(1040, 900, "Notenliste");
+  if (!popup) return false;
+
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+  const safePrefix = sanitizeFilenamePart(context?.className || exam.meta.title || "Notenliste");
+  const documentTitle = buildPrintDocumentTitle(`${safePrefix}_Notenliste_${timestamp}.pdf`);
+  const rows = entries
+    .map((entry) => `
+      <tr>
+        <td>${renderNumber(entry.position)}</td>
+        <td>${renderText(entry.fullName, "—")}</td>
+        <td>${renderText(entry.alias, "—")}</td>
+        <td>${renderText(entry.participation, "—")}</td>
+        <td class="number">${entry.hasGrade ? `${renderNumber(entry.totalAchievedPoints)} / ${renderNumber(entry.totalMaxPoints)}` : "—"}</td>
+        <td class="number">${entry.hasGrade ? `${renderNumber(entry.percentage)} %` : "—"}</td>
+        <td class="grade">${entry.hasGrade ? `${renderText(entry.gradeLabel, "—")}${entry.gradeVerbalLabel ? `<small>${renderText(entry.gradeVerbalLabel)}</small>` : ""}` : "—"}</td>
+      </tr>
+    `)
+    .join("");
+
+  popup.document.write(`
+    <!doctype html>
+    <html lang="de">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(documentTitle)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; margin: 0; padding: 12px; font-size: 10px; line-height: 1.3; }
+          h1, h2, p { margin: 0; }
+          h1 { font-size: 17px; }
+          h2 { margin-top: 2px; font-size: 10px; font-weight: 400; color: #444; }
+          .sheet { border: 1px solid #bbb; padding: 10px; }
+          .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 9px; color: #333; }
+          table { width: 100%; margin-top: 11px; border-collapse: collapse; }
+          th, td { border: 1px solid #aaa; padding: 5px 6px; vertical-align: top; text-align: left; }
+          th { background: #e9edf4; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
+          td:first-child, th:first-child { width: 28px; text-align: center; }
+          .number { text-align: right; white-space: nowrap; }
+          .grade { text-align: center; font-weight: 700; white-space: nowrap; }
+          .grade small { display: block; margin-top: 1px; color: #555; font-size: 8px; font-weight: 400; }
+          tbody tr { break-inside: avoid; }
+          thead { display: table-header-group; }
+          @page { size: A4 landscape; margin: 8mm; }
+        </style>
+      </head>
+      <body>
+        <section class="sheet">
+          <h1>${renderText(exam.meta.title, "Notenliste")}</h1>
+          <h2>${renderText(context?.className || exam.meta.course || "-", "-")}${context?.subject ? ` | ${renderText(context.subject)}` : ""}</h2>
+          <div class="meta">
+            <span><strong>Schuljahr:</strong> ${renderText(exam.meta.schoolYear, "-")}</span>
+            <span><strong>Lehrkraft:</strong> ${renderText(exam.meta.teacher, "-")}</span>
+            <span><strong>Datum:</strong> ${renderText(exam.meta.examDate, "-")}</span>
+            <span><strong>Erstellt:</strong> ${getGermanPrintDate()}</span>
+          </div>
+          <table>
+            <thead><tr><th>Nr.</th><th>Schüler:in</th><th>Code</th><th>Teilnahme</th><th>Punkte</th><th>Prozent</th><th>Note</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
         </section>
         ${buildPrintActivationScript(false)}
       </body>
