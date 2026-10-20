@@ -36,6 +36,14 @@ export interface BackupStatus {
   detail: string;
 }
 
+export type BackupVersionRelation = "backup-newer" | "backup-older" | "same" | "unknown";
+
+export interface BackupVersionComparison {
+  relation: BackupVersionRelation;
+  localVersionAt: string | null;
+  backupVersionAt: string | null;
+}
+
 export type BackupValidationErrorCode =
   | "BACKUP_ENVELOPE_INVALID"
   | "BACKUP_DECRYPT_FAILED"
@@ -426,6 +434,70 @@ const toTimestamp = (value: string | null) => {
   if (!value) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+/** Returns the newest valid timestamp without treating malformed legacy values as current. */
+export const getLatestVersionTimestamp = (timestamps: Array<string | null | undefined>) => {
+  let latest: string | null = null;
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+
+  timestamps.forEach((value) => {
+    if (!value) return;
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp) || timestamp <= latestTimestamp) return;
+    latest = value;
+    latestTimestamp = timestamp;
+  });
+
+  return latest;
+};
+
+export const getStudentDatabaseVersionTimestamp = (database: StudentDatabase) =>
+  getLatestVersionTimestamp([
+    database.updatedAt,
+    ...database.groups.flatMap((group) => [
+      group.createdAt,
+      group.updatedAt,
+      ...(group.students ?? []).map((student) => student.createdAt),
+    ]),
+    ...Object.values(database.assessments).flatMap((assessment) => [assessment.updatedAt, assessment.printedAt]),
+  ]);
+
+export const getApplicationVersionTimestamp = (
+  draftBundle: DraftBundle,
+  archiveEntries: ExpectationArchiveEntry[],
+  studentDatabase: StudentDatabase,
+) =>
+  getLatestVersionTimestamp([
+    getStudentDatabaseVersionTimestamp(studentDatabase),
+    ...draftBundle.workspaces.flatMap((workspace) => [
+      workspace.updatedAt,
+      workspace.setupCompletedAt,
+      ...workspace.versions.map((version) => version.savedAt),
+    ]),
+    ...archiveEntries.map((entry) => entry.createdAt),
+  ]);
+
+export const compareBackupVersions = (
+  localVersionAt: string | null,
+  backupVersionAt: string | null,
+): BackupVersionComparison => {
+  const localTimestamp = toTimestamp(localVersionAt);
+  const backupTimestamp = toTimestamp(backupVersionAt);
+
+  if (!localTimestamp || !backupTimestamp) {
+    return { relation: "unknown", localVersionAt, backupVersionAt };
+  }
+
+  return {
+    relation: backupTimestamp > localTimestamp
+      ? "backup-newer"
+      : backupTimestamp < localTimestamp
+        ? "backup-older"
+        : "same",
+    localVersionAt,
+    backupVersionAt,
+  };
 };
 
 export const loadLastBackupAt = () => window.localStorage.getItem(BACKUP_METADATA_KEY);

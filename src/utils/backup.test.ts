@@ -2,8 +2,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   BackupValidationError,
   clearBackupFailure,
+  compareBackupVersions,
   createEncryptedStudentDatabaseBackup,
   describeBackupStatus,
+  getLatestVersionTimestamp,
+  getStudentDatabaseVersionTimestamp,
   isEncryptedAppBackup,
   loadLastBackupFailure,
   markBackupComplete,
@@ -45,6 +48,32 @@ const databaseWithStudentData = {
 } as StudentDatabase;
 
 describe("Backup-Validierung", () => {
+  it("vergleicht den Datenstand eines Backups mit dem lokalen Stand", () => {
+    expect(compareBackupVersions("2026-08-06T12:00:00.000Z", "2026-08-07T12:00:00.000Z").relation).toBe("backup-newer");
+    expect(compareBackupVersions("2026-08-07T12:00:00.000Z", "2026-08-06T12:00:00.000Z").relation).toBe("backup-older");
+    expect(compareBackupVersions("2026-08-06T12:00:00.000Z", "2026-08-06T12:00:00.000Z").relation).toBe("same");
+    expect(compareBackupVersions("2026-08-06T12:00:00.000Z", null).relation).toBe("unknown");
+  });
+
+  it("ermittelt den neuesten gültigen Änderungszeitpunkt", () => {
+    expect(getLatestVersionTimestamp(["ungültig", "2026-08-05T12:00:00.000Z", "2026-08-06T12:00:00.000Z"])).toBe("2026-08-06T12:00:00.000Z");
+    expect(getStudentDatabaseVersionTimestamp({
+      ...databaseWithStudentData,
+      updatedAt: "2026-08-01T12:00:00.000Z",
+      assessments: {
+        "arbeit-1::schueler-1": {
+          workspaceId: "arbeit-1",
+          studentId: "schueler-1",
+          taskScores: {},
+          teacherComment: "",
+          signatureDataUrl: null,
+          updatedAt: "2026-08-07T12:00:00.000Z",
+          printedAt: null,
+        },
+      },
+    })).toBe("2026-08-07T12:00:00.000Z");
+  });
+
   it("akzeptiert nur den bekannten, vollständigen Backup-Umschlag", () => {
     expect(isEncryptedAppBackup(validBackupEnvelope)).toBe(true);
     expect(isEncryptedAppBackup({ ...validBackupEnvelope, version: 2 })).toBe(true);

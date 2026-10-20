@@ -144,6 +144,9 @@ export const ReportSummarySection = ({
                 </p>
                 {onSignatureChange ? (
                   <div className="mt-3 no-print">
+                    <p className="themed-muted mb-3 text-xs leading-5">
+                      Die gespeicherte Signatur wird für alle Schüler*innen dieser Klassenarbeit übernommen.
+                    </p>
                     <SignaturePad
                       value={signatureDataUrl}
                       onSave={onSignatureChange}

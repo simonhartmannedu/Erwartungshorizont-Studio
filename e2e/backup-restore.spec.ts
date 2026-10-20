@@ -45,6 +45,8 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
 
   const restoreDialog = page.locator(".dialog-panel");
   await expect(restoreDialog).toBeVisible();
+  await expect(restoreDialog.getByText("Versionsvergleich")).toBeVisible();
+  await expect(restoreDialog.getByText("Gleicher Datenstand")).toBeVisible();
   const restoreButton = restoreDialog.getByRole("button", { name: "Ersetzen und wiederherstellen" });
   await expect(restoreButton).toBeDisabled();
 

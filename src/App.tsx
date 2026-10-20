@@ -61,6 +61,8 @@ import {
   clearBackupFailure,
   createEncryptedAppBackup,
   createEncryptedSchoolYearWorkspaceArchive,
+  getApplicationVersionTimestamp,
+  getStudentDatabaseVersionTimestamp,
   describeBackupStatus,
   isEncryptedAppBackup,
   isEncryptedSchoolYearWorkspaceArchive,
@@ -112,11 +114,10 @@ import {
   scrubSensitiveAssessmentsForGroups,
   scaleTaskScoresForStudents,
   setStudentOrderInGroup,
-  updateGroupDefaultSignature,
+  updateClassworkSignatures,
   updateStudentScore,
   updateStudentParticipationStatus,
   updateStudentAnswerSheetCode,
-  updateStudentSignature,
   updateTeacherComment,
 } from "./utils/students";
 import { createAnswerSheetCode } from "./utils/answerSheets";
@@ -165,6 +166,7 @@ import { ReportSummarySection } from "./components/ReportSummarySection";
 import { ImportExportControls } from "./components/ImportExportControls";
 import { EwhWizard } from "./components/EwhWizard";
 import { BackupPanel } from "./components/BackupPanel";
+import { BackupVersionComparison } from "./components/BackupVersionComparison";
 import { HomeDashboard } from "./components/HomeDashboard";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { AppFooter, koFiUrl } from "./components/AppFooter";
@@ -305,6 +307,17 @@ const describeImportError = (error: unknown) =>
   error instanceof BackupValidationError
     ? `${error.message} Fehlercode: ${error.code}.`
     : "Die Sicherungsdatei konnte nicht verarbeitet werden. Fehlercode: BACKUP_UNEXPECTED.";
+
+const describeStudentData = (database: StudentDatabase) => {
+  const studentCount = database.groups.reduce((count, group) => count + group.students.length, 0);
+  return `${database.groups.length} Lerngruppen · ${studentCount} Schüler*innen · ${Object.keys(database.assessments).length} Bewertungen`;
+};
+
+const describeApplicationData = (
+  draftBundle: DraftBundle,
+  archiveEntries: ExpectationArchiveEntry[],
+  studentDatabase: StudentDatabase,
+) => `${draftBundle.workspaces.length} Klassenarbeiten · ${describeStudentData(studentDatabase)} · ${archiveEntries.length} Archiv-Einträge`;
 
 const UNLOCK_SESSION_TIMEOUT_MS = 1000 * 60 * 15;
 const DEMO_GROUP_ID = "demo-lerngruppe-8b";
@@ -1643,6 +1656,49 @@ function App() {
     () => describeBackupStatus(studentDatabase, lastBackupAt, lastBackupFailure),
     [studentDatabase, lastBackupAt, lastBackupFailure],
   );
+  const importVersionComparison = useMemo(() => {
+    if (!pendingImportPreview) return null;
+
+    if (pendingImportPreview.kind === "app-backup") {
+      return {
+        localVersionAt: getApplicationVersionTimestamp(draftBundle, archiveEntries, studentDatabase),
+        backupVersionAt: getApplicationVersionTimestamp(
+          pendingImportPreview.data.draftBundle,
+          pendingImportPreview.data.archiveEntries,
+          pendingImportPreview.data.studentDatabase,
+        ),
+        backupExportedAt: pendingImportPreview.data.exportedAt,
+        localSummary: describeApplicationData(draftBundle, archiveEntries, studentDatabase),
+        backupSummary: describeApplicationData(
+          pendingImportPreview.data.draftBundle,
+          pendingImportPreview.data.archiveEntries,
+          pendingImportPreview.data.studentDatabase,
+        ),
+      };
+    }
+
+    if (pendingImportPreview.kind === "student-database-backup") {
+      return {
+        localVersionAt: getStudentDatabaseVersionTimestamp(studentDatabase),
+        backupVersionAt: getStudentDatabaseVersionTimestamp(pendingImportPreview.data.studentDatabase),
+        backupExportedAt: pendingImportPreview.data.exportedAt,
+        localSummary: describeStudentData(studentDatabase),
+        backupSummary: describeStudentData(pendingImportPreview.data.studentDatabase),
+      };
+    }
+
+    return {
+      localVersionAt: getApplicationVersionTimestamp(draftBundle, [], studentDatabase),
+      backupVersionAt: getApplicationVersionTimestamp(
+        pendingImportPreview.data.draftBundle,
+        [],
+        pendingImportPreview.data.studentDatabase,
+      ),
+      backupExportedAt: pendingImportPreview.data.exportedAt,
+      localSummary: `${draftBundle.workspaces.length} Klassenarbeiten · ${describeStudentData(studentDatabase)}`,
+      backupSummary: `${pendingImportPreview.data.draftBundle.workspaces.length} Klassenarbeiten · ${describeStudentData(pendingImportPreview.data.studentDatabase)}`,
+    };
+  }, [archiveEntries, draftBundle, pendingImportPreview, studentDatabase]);
   const captureRestoreCheckpoint = (): RestoreCheckpoint => ({
     draftBundle,
     archiveEntries,
@@ -3018,10 +3074,12 @@ function App() {
     if (!activeGroup || !activeStudentId) return;
     if (activeGroup.passwordVerifier && !activeGroupPassword) return;
     setStudentDatabase((current) => {
-      let next = updateStudentSignature(current, activeWorkspace?.id ?? null, activeStudentId, value);
-      if (value === null && activeAssessment?.signatureDataUrl == null && activeGroup.defaultSignatureDataUrl) {
-        next = updateGroupDefaultSignature(next, activeGroup.id, null);
-      }
+      const next = updateClassworkSignatures(
+        current,
+        activeWorkspace?.id ?? null,
+        activeGroup.students.map((student) => student.id),
+        value,
+      );
       studentDatabaseRef.current = next;
       return next;
     });
@@ -5386,6 +5444,7 @@ function App() {
               Klassenarbeiten und Archiv bleiben erhalten. Die Schülerdatenbank wird ersetzt und ein lokaler Rollback-Punkt erstellt. Mit „Vorher speichern“ wird zusätzlich eine verschlüsselte Datei angelegt.
             </p>
           )}
+          {importVersionComparison ? <BackupVersionComparison {...importVersionComparison} /> : null}
           {pendingImportPreview?.kind === "app-backup" || pendingImportPreview?.kind === "student-database-backup" ? (
             <div className="mt-4 space-y-3">
               <label className="flex items-start gap-3 text-sm leading-5" htmlFor="restore-overwrite-confirmation">

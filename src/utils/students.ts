@@ -321,11 +321,41 @@ export const updateStudentSignature = (
         signatureDataUrl,
         encryptedTaskScores: assessment.encryptedTaskScores ?? null,
         encryptedTeacherComment: assessment.encryptedTeacherComment ?? null,
-        encryptedSignatureDataUrl: assessment.encryptedSignatureDataUrl ?? null,
+        encryptedSignatureDataUrl: signatureDataUrl ? assessment.encryptedSignatureDataUrl ?? null : null,
         updatedAt: new Date().toISOString(),
       },
     },
     updatedAt: new Date().toISOString(),
+  };
+};
+
+/** Saves one signature on every report belonging to the current classwork. */
+export const updateClassworkSignatures = (
+  database: StudentDatabase,
+  workspaceId: string | null,
+  studentIds: string[],
+  signatureDataUrl: string | null,
+): StudentDatabase => {
+  if (studentIds.length === 0) return database;
+
+  const updatedAt = new Date().toISOString();
+  const assessments = { ...database.assessments };
+
+  studentIds.forEach((studentId) => {
+    const assessment = getStudentAssessment(database, studentId, workspaceId);
+    assessments[getAssessmentKey(workspaceId, studentId)] = {
+      ...assessment,
+      workspaceId,
+      signatureDataUrl,
+      encryptedSignatureDataUrl: signatureDataUrl ? assessment.encryptedSignatureDataUrl ?? null : null,
+      updatedAt,
+    };
+  });
+
+  return {
+    ...database,
+    assessments,
+    updatedAt,
   };
 };
 

@@ -5,6 +5,7 @@ import {
   hydrateSensitiveAssessmentsForGroup,
   renameStudentGroup,
   serializeStudentDatabaseForStorage,
+  updateClassworkSignatures,
   updateStudentParticipationStatus,
 } from "./students";
 import type { StudentDatabase } from "../types";
@@ -56,6 +57,39 @@ describe("arbeitsbezogene Teilnahme", () => {
 
     const hydrated = await hydrateSensitiveAssessmentsForGroup(stored, groupId, password);
     expect(getStudentParticipationStatus(hydrated, studentId, "arbeit-1")).toBe("excused");
+  });
+});
+
+describe("Unterschriften", () => {
+  it("speichert eine handschriftliche Signatur für alle Schüler*innen derselben Klassenarbeit", () => {
+    const database: StudentDatabase = {
+      version: 1,
+      groups: [{
+        id: "gruppe-1",
+        subject: "Deutsch",
+        className: "8a",
+        passwordVerifier: null,
+        students: [
+          { id: "schueler-1", alias: "D8A-01", encryptedName: { ciphertext: "one", iv: "one", salt: "one" }, createdAt: "2026-08-18T08:00:00.000Z" },
+          { id: "schueler-2", alias: "D8A-02", encryptedName: { ciphertext: "two", iv: "two", salt: "two" }, createdAt: "2026-08-18T08:00:00.000Z" },
+        ],
+        createdAt: "2026-08-18T08:00:00.000Z",
+        updatedAt: "2026-08-18T08:00:00.000Z",
+      }],
+      assessments: {},
+      updatedAt: "2026-08-18T08:00:00.000Z",
+    };
+
+    const updated = updateClassworkSignatures(
+      database,
+      "arbeit-1",
+      database.groups[0]!.students.map((student) => student.id),
+      "data:image/png;base64,signatur",
+    );
+
+    expect(updated.assessments["arbeit-1::schueler-1"]?.signatureDataUrl).toBe("data:image/png;base64,signatur");
+    expect(updated.assessments["arbeit-1::schueler-2"]?.signatureDataUrl).toBe("data:image/png;base64,signatur");
+    expect(updated.assessments["arbeit-2::schueler-1"]).toBeUndefined();
   });
 });
 

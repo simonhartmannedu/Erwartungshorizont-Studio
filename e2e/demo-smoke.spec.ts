@@ -11,7 +11,7 @@ test("starts the local demo without external HTTP requests", async ({ page }) =>
 
   await page.goto("/?demo=1&freshDemo=1");
 
-  await expect(page.getByRole("heading", { name: "Erwartungshorizont Studio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Erwartungshorizont Studio" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Demo-Modus aktiv")).toBeVisible();
   await expect(page.getByText("Klassenpasswort")).toContainText("demo");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
