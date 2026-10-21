@@ -1,7 +1,13 @@
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { CloudUploadIcon, DownloadIcon, DuplicateIcon, UploadIcon } from "./icons";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { LocalBackupManager } from "./LocalBackupManager";
 import { Card, DismissibleCallout, Field } from "./ui";
+import {
+  getSelectedLocalBackupFolderName,
+  selectLocalBackupFolder,
+  supportsLocalBackupFolder,
+} from "../utils/localBackupFolder";
 
 interface Props {
   backupStatus: {
@@ -11,8 +17,8 @@ interface Props {
   };
   lastBackupAt: string | null;
   canRollbackImport: boolean;
-  onExportFullBackup: (passphrase: string) => Promise<boolean>;
-  onImportBackup: (file: File, passphrase: string) => void;
+  onExportFullBackup: (passphrase: string, destination?: "browser" | "managed-folder") => Promise<boolean>;
+  onImportBackup: (file: File, passphrase: string) => Promise<boolean>;
   onRollbackImport: () => void;
   nextcloudFolderName: string | null;
   nextcloudFolderSupported: boolean;
@@ -78,22 +84,49 @@ export const BackupPanel = ({
   const [selectedFullBackupFile, setSelectedFullBackupFile] = useState<File | null>(null);
   const [nextcloudBackupPassphrase, setNextcloudBackupPassphrase] = useState("");
   const [nextcloudAcknowledged, setNextcloudAcknowledged] = useState(false);
+  const [managedBackupFolderName, setManagedBackupFolderName] = useState<string | null>(null);
+  const [saveInManagedFolder, setSaveInManagedFolder] = useState(false);
+  const [folderSelectionError, setFolderSelectionError] = useState("");
+  const localFolderSupported = supportsLocalBackupFolder();
+  const browserUsesDownloadLocation = !localFolderSupported;
+
+  useEffect(() => {
+    if (!localFolderSupported) return;
+    void getSelectedLocalBackupFolderName().then((folderName) => {
+      setManagedBackupFolderName(folderName);
+      setSaveInManagedFolder(Boolean(folderName));
+    }).catch(() => {
+      // The regular browser save path remains available if IndexedDB cannot provide a handle.
+    });
+  }, [localFolderSupported]);
   const selectFullBackupFile = (event: ChangeEvent<HTMLInputElement>) => {
     setSelectedFullBackupFile(event.target.files?.[0] ?? null);
     event.target.value = "";
   };
 
   const saveFullBackup = async () => {
-    const saved = await onExportFullBackup(fullBackupPassphrase);
+    const saved = await onExportFullBackup(fullBackupPassphrase, saveInManagedFolder ? "managed-folder" : "browser");
     if (saved) {
       setBackupDialog(null);
       setFullBackupPassphrase("");
     }
   };
 
+  const selectManagedBackupFolder = async () => {
+    try {
+      setFolderSelectionError("");
+      const folderName = await selectLocalBackupFolder();
+      setManagedBackupFolderName(folderName);
+      setSaveInManagedFolder(true);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setFolderSelectionError("Der Ordner wurde nicht ausgewählt. Du kannst weiterhin den normalen Speicherort wählen.");
+    }
+  };
+
   const inspectFullBackup = () => {
     if (!selectedFullBackupFile || !fullBackupPassphrase.trim()) return;
-    onImportBackup(selectedFullBackupFile, fullBackupPassphrase);
+    void onImportBackup(selectedFullBackupFile, fullBackupPassphrase);
     setBackupDialog(null);
   };
 
@@ -215,17 +248,50 @@ export const BackupPanel = ({
         </div>
       </Card>
 
+      <LocalBackupManager
+        onCreateBackup={() => setBackupDialog("save")}
+        onValidateAndRestore={onImportBackup}
+        refreshToken={lastBackupAt}
+      />
+
       <ConfirmDialog
         open={backupDialog === "save"}
-        title="Verschlüsseltes Backup speichern"
-        description="Lege ein Passwort für diese Datei fest. Es wird nicht in der App gespeichert und ist für eine spätere Wiederherstellung erforderlich."
-        onCancel={() => setBackupDialog(null)}
+        title={browserUsesDownloadLocation ? "Verschlüsseltes Backup herunterladen" : "Verschlüsseltes Backup speichern"}
+        description={browserUsesDownloadLocation
+          ? "Lege ein Passwort für diese Datei fest. Firefox speichert Downloads im eingestellten Download-Ordner; eine Website kann dort keinen Ordnerdialog öffnen."
+          : "Lege ein Passwort für diese Datei fest. Es wird nicht in der App gespeichert und ist für eine spätere Wiederherstellung erforderlich."}
+        onCancel={() => {
+          setBackupDialog(null);
+          setFolderSelectionError("");
+        }}
         onConfirm={() => { void saveFullBackup(); }}
-        confirmLabel="Backup speichern"
+        confirmLabel={browserUsesDownloadLocation ? "Backup herunterladen" : "Backup speichern"}
         confirmDisabled={!fullBackupPassphrase.trim()}
       >
         <div className="space-y-3">
           <PasswordField label="Backup-Passwort" value={fullBackupPassphrase} onChange={setFullBackupPassphrase} placeholder="Passwort festlegen" />
+          {localFolderSupported ? (
+            <div className="surface-muted rounded-xl border p-4 text-sm leading-6">
+              {managedBackupFolderName ? (
+                <label className="flex items-start gap-3">
+                  <input type="checkbox" checked={saveInManagedFolder} onChange={(event) => setSaveInManagedFolder(event.target.checked)} />
+                  <span><strong>Im Sicherungsordner speichern:</strong> „{managedBackupFolderName}“<br /><span className="themed-muted text-xs">Beim Speichern fragt der Browser bei Bedarf nach Schreibzugriff. Die Übersicht selbst bleibt lesend.</span></span>
+                </label>
+              ) : (
+                <p className="themed-muted">Noch kein Sicherungsordner für die Verwaltung ausgewählt.</p>
+              )}
+              <button type="button" className="button-ghost mt-3 text-sm" onClick={() => { void selectManagedBackupFolder(); }}>
+                {managedBackupFolderName ? "Sicherungsordner ändern" : "Sicherungsordner auswählen"}
+              </button>
+              {folderSelectionError ? <p className="mt-2 text-xs text-rose-700 dark:text-rose-300" role="alert">{folderSelectionError}</p> : null}
+            </div>
+          ) : null}
+          {browserUsesDownloadLocation ? (
+            <div className="surface-muted rounded-xl border p-4 text-sm leading-6" role="note">
+              <p className="themed-strong font-semibold">Ordner in Firefox wählen</p>
+              <p className="themed-muted mt-1">Aktiviere in Firefox unter <strong>Einstellungen → Allgemein → Dateien und Anwendungen</strong> die Option, jedes Mal nach dem Speicherort zu fragen. Für den verwalteten Sicherungsordner mit direktem Schreibzugriff benötigst du einen Browser mit Ordnerzugriff, etwa Edge oder Chrome.</p>
+            </div>
+          ) : null}
           <p className="text-sm font-medium leading-6 text-amber-700 dark:text-amber-300" role="note">
             Wichtig: Ohne dieses Passwort kann die Backup-Datei nicht wiederhergestellt werden.
           </p>

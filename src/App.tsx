@@ -199,6 +199,7 @@ import {
   saveEncryptedBackupToNextcloudFolder,
   supportsNextcloudFolderConnection,
 } from "./utils/nextcloudFolder";
+import { prepareLocalBackupFolderSave } from "./utils/localBackupFolder";
 
 const GuidedExamBuilder = lazy(async () => {
   const module = await import("./components/GuidedExamBuilder");
@@ -3106,7 +3107,7 @@ function App() {
     return Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null));
   };
 
-  const handleExportDatabase = async (passphrase: string) => {
+  const handleExportDatabase = async (passphrase: string, destination: "browser" | "managed-folder" = "browser") => {
     if (!passphrase.trim()) {
       pushNotice("warning", "Backup-Passwort fehlt", "Bitte vergib ein Backup-Passwort für den Export.");
       return false;
@@ -3115,10 +3116,12 @@ function App() {
     const exportedAt = new Date().toISOString();
     try {
       const filename = buildAppBackupFilenameForClass(exportedAt, activeGroup?.className ?? null);
-      const saveTarget = await prepareFileSave(filename, {
-        description: "Verschlüsseltes EWH-Backup",
-        accept: { "application/json": [".json"] },
-      });
+      const saveTarget = destination === "managed-folder"
+        ? await prepareLocalBackupFolderSave(filename)
+        : await prepareFileSave(filename, {
+          description: "Verschlüsseltes EWH-Backup",
+          accept: { "application/json": [".json"] },
+        });
 
       if (!saveTarget) {
         pushNotice("info", "Backup-Speichern abgebrochen", "Es wurden keine Sicherungsdaten geschrieben.");
@@ -3380,86 +3383,81 @@ function App() {
     }
   };
 
-  const handleImportDatabase = (file: File, passphrase: string) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const content = reader.result;
-      if (typeof content !== "string") return;
-      void (async () => {
-        try {
-          const parsed = JSON.parse(content) as unknown;
-          if (isEncryptedAppBackup(parsed)) {
-            const importedAppState = await parseAppBackup(parsed, passphrase.trim());
-            setPendingImportPreview({
-              kind: "app-backup",
-              sourceLabel: file.name,
-              summary: `${importedAppState.draftBundle.workspaces.length} Klassenarbeiten, ${importedAppState.studentDatabase.groups.length} Lerngruppen, ${importedAppState.archiveEntries.length} Archiv-Einträge`,
-              data: {
-                draftBundle: importedAppState.draftBundle,
-                archiveEntries: importedAppState.archiveEntries,
-                studentDatabase: importedAppState.studentDatabase,
-                exportedAt: parsed.exportedAt,
-              },
-            });
-            return;
-          }
+  const handleImportDatabase = async (file: File, passphrase: string): Promise<boolean> => {
+    try {
+      const content = await file.text();
+      const parsed = JSON.parse(content) as unknown;
+      if (isEncryptedAppBackup(parsed)) {
+        const importedAppState = await parseAppBackup(parsed, passphrase.trim());
+        setPendingImportPreview({
+          kind: "app-backup",
+          sourceLabel: file.name,
+          summary: `${importedAppState.draftBundle.workspaces.length} Klassenarbeiten, ${importedAppState.studentDatabase.groups.length} Lerngruppen, ${importedAppState.archiveEntries.length} Archiv-Einträge`,
+          data: {
+            draftBundle: importedAppState.draftBundle,
+            archiveEntries: importedAppState.archiveEntries,
+            studentDatabase: importedAppState.studentDatabase,
+            exportedAt: parsed.exportedAt,
+          },
+        });
+        return true;
+      }
 
-          if (isEncryptedSchoolYearWorkspaceArchive(parsed)) {
-            const importedArchive = await parseSchoolYearWorkspaceArchive(parsed, passphrase.trim());
-            const snapshotCount = importedArchive.draftBundle.workspaces.reduce(
-              (sum, workspace) => sum + workspace.versions.length,
-              0,
-            );
-            setPendingImportPreview({
-              kind: "schoolyear-workspace-archive",
-              sourceLabel: file.name,
-              summary: `${importedArchive.draftBundle.workspaces.length} Klassenarbeiten und ${snapshotCount} EWH-Versionen aus ${importedArchive.schoolYear}. EWH-Archiv-Einträge sind nicht enthalten.`,
-              data: {
-                draftBundle: importedArchive.draftBundle,
-                studentDatabase: importedArchive.studentDatabase,
-                schoolYear: importedArchive.schoolYear,
-                exportedAt: importedArchive.exportedAt,
-              },
-            });
-            return;
-          }
+      if (isEncryptedSchoolYearWorkspaceArchive(parsed)) {
+        const importedArchive = await parseSchoolYearWorkspaceArchive(parsed, passphrase.trim());
+        const snapshotCount = importedArchive.draftBundle.workspaces.reduce(
+          (sum, workspace) => sum + workspace.versions.length,
+          0,
+        );
+        setPendingImportPreview({
+          kind: "schoolyear-workspace-archive",
+          sourceLabel: file.name,
+          summary: `${importedArchive.draftBundle.workspaces.length} Klassenarbeiten und ${snapshotCount} EWH-Versionen aus ${importedArchive.schoolYear}. EWH-Archiv-Einträge sind nicht enthalten.`,
+          data: {
+            draftBundle: importedArchive.draftBundle,
+            studentDatabase: importedArchive.studentDatabase,
+            schoolYear: importedArchive.schoolYear,
+            exportedAt: importedArchive.exportedAt,
+          },
+        });
+        return true;
+      }
 
-          if (isEncryptedStudentDatabaseBackup(parsed)) {
-            const importedDatabase = await parseStudentDatabaseBackup(parsed, passphrase.trim());
-            setPendingImportPreview({
-              kind: "student-database-backup",
-              sourceLabel: file.name,
-              summary: `${importedDatabase.groups.length} Lerngruppen und ${Object.keys(importedDatabase.assessments).length} Bewertungen`,
-              data: {
-                studentDatabase: importedDatabase,
-                exportedAt: parsed.exportedAt,
-              },
-            });
-            return;
-          }
+      if (isEncryptedStudentDatabaseBackup(parsed)) {
+        const importedDatabase = await parseStudentDatabaseBackup(parsed, passphrase.trim());
+        setPendingImportPreview({
+          kind: "student-database-backup",
+          sourceLabel: file.name,
+          summary: `${importedDatabase.groups.length} Lerngruppen und ${Object.keys(importedDatabase.assessments).length} Bewertungen`,
+          data: {
+            studentDatabase: importedDatabase,
+            exportedAt: parsed.exportedAt,
+          },
+        });
+        return true;
+      }
 
-          if (isStudentDatabase(parsed)) {
-            setPendingImportPreview({
-              kind: "student-database-backup",
-              sourceLabel: file.name,
-              summary: `${parsed.groups.length} Lerngruppen und ${Object.keys(parsed.assessments).length} Bewertungen`,
-              warning:
-                "Legacy-Import ohne Verschlüsselungscontainer. Nur verwenden, wenn du die Datei selbst geprüft hast.",
-              data: {
-                studentDatabase: parsed,
-                exportedAt: null,
-              },
-            });
-            return;
-          }
+      if (isStudentDatabase(parsed)) {
+        setPendingImportPreview({
+          kind: "student-database-backup",
+          sourceLabel: file.name,
+          summary: `${parsed.groups.length} Lerngruppen und ${Object.keys(parsed.assessments).length} Bewertungen`,
+          warning:
+            "Legacy-Import ohne Verschlüsselungscontainer. Nur verwenden, wenn du die Datei selbst geprüft hast.",
+          data: {
+            studentDatabase: parsed,
+            exportedAt: null,
+          },
+        });
+        return true;
+      }
 
-          pushNotice("danger", "Import fehlgeschlagen", "Die Sicherungsdatei ist ungültig.");
-        } catch (error) {
-          pushNotice("danger", "Import fehlgeschlagen", describeImportError(error));
-        }
-      })();
-    };
-    reader.readAsText(file);
+      pushNotice("danger", "Import fehlgeschlagen", "Die Sicherungsdatei ist ungültig.");
+      return false;
+    } catch (error) {
+      pushNotice("danger", "Import fehlgeschlagen", describeImportError(error));
+      return false;
+    }
   };
 
   const dismissImportPreview = () => {

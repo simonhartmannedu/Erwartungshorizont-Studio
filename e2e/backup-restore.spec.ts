@@ -19,7 +19,7 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
   const saveDialog = page.locator(".dialog-panel");
   await saveDialog.getByLabel("Backup-Passwort").fill(backupPassphrase);
   const downloadPromise = page.waitForEvent("download");
-  await saveDialog.getByRole("button", { name: "Backup speichern" }).click();
+  await saveDialog.getByRole("button", { name: /Backup (speichern|herunterladen)/ }).click();
   const download = await downloadPromise;
   const backupPath = await download.path();
 
