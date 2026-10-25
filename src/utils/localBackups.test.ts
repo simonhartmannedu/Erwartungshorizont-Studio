@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   groupLocalBackups,
+  isBackupOlderThanOneSchoolYear,
   inspectBackupEnvelopeHeader,
   LocalBackupDescriptor,
   resolveLocalBackupDate,
@@ -22,6 +23,13 @@ describe("lokale Sicherungsübersicht", () => {
   it("beginnt das Schuljahr am 1. August", () => {
     expect(schoolYearForBackupDate(new Date(2026, 6, 31, 23, 59))).toBe("2025/26");
     expect(schoolYearForBackupDate(new Date(2026, 7, 1, 0, 0))).toBe("2026/27");
+  });
+
+  it("markiert Sicherungen erst nach mehr als einem abgeschlossenen Schuljahr", () => {
+    const reference = new Date(2026, 9, 23); // Schuljahr 2026/27
+    expect(isBackupOlderThanOneSchoolYear(new Date(2024, 9, 1), reference)).toBe(true);
+    expect(isBackupOlderThanOneSchoolYear(new Date(2025, 9, 1), reference)).toBe(false);
+    expect(isBackupOlderThanOneSchoolYear(new Date(2026, 7, 1), reference)).toBe(false);
   });
 
   it("nutzt valide Metadaten vor Dateiname und Änderungsdatum", () => {

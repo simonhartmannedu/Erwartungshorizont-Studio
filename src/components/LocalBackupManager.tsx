@@ -4,6 +4,7 @@ import {
   formatLocalBackupSize,
   groupLocalBackups,
   inspectBackupEnvelopeHeader,
+  isBackupOlderThanOneSchoolYear,
   LocalBackupDescriptor,
   LocalBackupPreliminaryStatus,
   resolveLocalBackupDate,
@@ -202,6 +203,11 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
     if (valid) setChecked((current) => ({ ...current, [entry.id]: "restoration-checked" }));
   };
 
+  const retentionReviewCount = useMemo(
+    () => entries.filter((entry) => isBackupOlderThanOneSchoolYear(entry.date)).length,
+    [entries],
+  );
+
   return (
     <Card title="Lokale Sicherungen verwalten" subtitle="Nach Sicherungsdatum gruppiert. Eine Gesamtsicherung kann Daten aus mehreren Schuljahren enthalten.">
       <div className="space-y-4">
@@ -240,6 +246,8 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
         {state === "permission" || state === "error" || state === "unsupported" ? <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">{message || "Ordneransicht wird von diesem Browser nicht unterstützt. Wähle Sicherungsdateien für eine einmalige Übersicht aus."}</p> : null}
         {message && state === "idle" ? <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="status">{message}</p> : null}
 
+        {retentionReviewCount ? <p className="backup-retention-summary rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100" role="status">{retentionReviewCount} Sicherung(en) sind älter als ein Schuljahr. Löschfrist prüfen.</p> : null}
+
         {groups.map((schoolYear) => {
           const schoolYearOpen = openSchoolYears.includes(schoolYear.key);
           return (
@@ -262,8 +270,9 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
                           <ul className="divide-y" aria-label={`Sicherungen aus ${month.label}`}>
                             {month.entries.map((entry) => {
                               const status = checked[entry.id] ?? entry.preliminaryStatus;
+                              const needsRetentionReview = isBackupOlderThanOneSchoolYear(entry.date);
                               return (
-                                <li key={entry.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                                <li key={entry.id} className={`grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${needsRetentionReview ? "backup-retention-attention border-l-4 border-red-500 bg-red-50/70 dark:bg-red-950/20" : ""}`}>
                                   <div className="min-w-0">
                                     <p className="themed-strong truncate text-sm font-semibold" title={entry.file.name}>{entry.file.name}</p>
                                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -271,7 +280,7 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
                                       <span className="rounded-md bg-black/[0.05] px-2 py-1 font-semibold dark:bg-white/[0.08]">Letzte Bearbeitung: {formatDateTime(new Date(entry.file.lastModified))}</span>
                                       <span className="themed-muted">{formatLocalBackupSize(entry.file.size)}</span>
                                     </div>
-                                    <p className="themed-muted mt-1 text-xs">{dateSourceHint(entry.dateSource)} · Löschfrist prüfen</p>
+                                    <p className={`mt-1 text-xs ${needsRetentionReview ? "font-semibold text-red-800 dark:text-red-200" : "themed-muted"}`}>{dateSourceHint(entry.dateSource)}{needsRetentionReview ? " · Löschfrist prüfen" : ""}</p>
                                     <p className="mt-2 text-xs font-medium" role="status">Prüfstatus: {statusLabel[status]}</p>
                                   </div>
                                   {status !== "not-supported" && status !== "not-readable" ? (

@@ -90,6 +90,13 @@ export const schoolYearForBackupDate = (date: Date) => {
   return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")}`;
 };
 
+/** Marks only completed school years before the immediately preceding one. */
+export const isBackupOlderThanOneSchoolYear = (date: Date | null, reference = new Date()) => {
+  if (!date) return false;
+  const schoolYearStart = (value: Date) => value.getFullYear() - (value.getMonth() < 7 ? 1 : 0);
+  return schoolYearStart(date) < schoolYearStart(reference) - 1;
+};
+
 const monthLabel = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" });
 const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
