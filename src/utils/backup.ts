@@ -566,7 +566,10 @@ export const describeBackupStatus = (
     };
   }
 
-  if (lastBackupFailure) {
+  // A failed first attempt is reported directly in the export dialog/notice. Keeping it as
+  // the persistent top-level state would make a new installation look broken before a
+  // backup has ever been created.
+  if (lastBackupFailure && lastBackupAt) {
     return {
       kind: "last-attempt-failed",
       tone: "danger",
@@ -581,9 +584,9 @@ export const describeBackupStatus = (
   if (!backupTimestamp) {
     return {
       kind: "never-saved",
-      tone: "warning" as const,
-      summary: "Noch kein Backup exportiert.",
-      detail: "Die Schülerdaten liegen nur in diesem Browserprofil. Exportiere jetzt eine verschlüsselte Sicherung.",
+      tone: "info" as const,
+      summary: "Erstes Backup erstellen",
+      detail: "Sichere deine Schülerdaten mit einer verschlüsselten Backup-Datei, bevor du auf einem anderen Gerät weiterarbeitest.",
     };
   }
 

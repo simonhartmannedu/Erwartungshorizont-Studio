@@ -39,6 +39,15 @@ test("lists explicitly selected backup files without a persistent folder claim",
   await expect(backupPanel.getByText("Zum Prüfen entsperren")).toBeVisible();
   await expect(backupPanel.getByText(/^Letzte Bearbeitung:/)).toBeVisible();
   await expect(backupPanel.getByText("1 Sicherung(en) sind älter als ein Schuljahr. Löschfrist prüfen.")).toBeVisible();
+
+  await backupPanel.getByRole("button", { name: "Sicherung prüfen" }).first().click();
+  const checkDialog = page.locator(".dialog-panel");
+  await expect(checkDialog.getByRole("heading", { name: "Sicherung mit Passwort prüfen" })).toBeVisible();
+  await checkDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
+  await checkDialog.getByRole("button", { name: "Prüfen und Vorschau öffnen" }).click();
+  await expect(checkDialog.getByRole("alert").filter({ hasText: "Die Sicherung konnte nicht geprüft werden" })).toBeVisible();
+  await checkDialog.getByRole("button", { name: "Abbrechen" }).click();
+
   await backupPanel.getByRole("button", { name: /Schuljahr 2024\/25/ }).click();
   await backupPanel.getByRole("button", { name: /Oktober 2024/ }).click();
   await expect(backupPanel.locator(".backup-retention-attention")).toHaveCount(1);

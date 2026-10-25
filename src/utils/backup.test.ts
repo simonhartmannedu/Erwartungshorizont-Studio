@@ -103,6 +103,12 @@ describe("Backup-Validierung", () => {
     const now = Date.parse("2026-08-31T12:00:00.000Z");
 
     expect(describeBackupStatus(databaseWithStudentData, null, null, now).kind).toBe("never-saved");
+    expect(
+      describeBackupStatus(databaseWithStudentData, null, {
+        occurredAt: "2026-08-31T12:00:00.000Z",
+        code: "BACKUP_EXPORT_FAILED",
+      }, now).kind,
+    ).toBe("never-saved");
     expect(describeBackupStatus(databaseWithStudentData, "2026-08-31T12:00:00.000Z", null, now).kind).toBe("current");
     expect(describeBackupStatus(databaseWithStudentData, "2026-08-20T12:00:00.000Z", null, now).kind).toBe("recommended");
     expect(describeBackupStatus(databaseWithStudentData, "2026-07-01T12:00:00.000Z", null, now).kind).toBe("urgent");

@@ -93,6 +93,7 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
   const [selectedEntry, setSelectedEntry] = useState<LocalBackupDescriptor | null>(null);
   const [passphrase, setPassphrase] = useState("");
   const [validating, setValidating] = useState(false);
+  const [validationError, setValidationError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderSupported = supportsLocalBackupFolder();
 
@@ -190,17 +191,28 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
     }
     setSelectedEntry(entry);
     setPassphrase("");
+    setValidationError("");
   };
 
   const validate = async () => {
     if (!selectedEntry || !passphrase.trim()) return;
     setValidating(true);
     const entry = selectedEntry;
-    setSelectedEntry(null);
-    const valid = await onValidateAndRestore(entry.file, passphrase.trim());
-    setValidating(false);
-    setPassphrase("");
-    if (valid) setChecked((current) => ({ ...current, [entry.id]: "restoration-checked" }));
+    setValidationError("");
+    try {
+      const valid = await onValidateAndRestore(entry.file, passphrase.trim());
+      if (!valid) {
+        setValidationError("Die Sicherung konnte nicht geprüft werden. Prüfe Passwort und Datei und versuche es erneut.");
+        return;
+      }
+      setChecked((current) => ({ ...current, [entry.id]: "restoration-checked" }));
+      setSelectedEntry(null);
+      setPassphrase("");
+    } catch {
+      setValidationError("Die Sicherung konnte nicht geprüft werden. Prüfe Passwort und Datei und versuche es erneut.");
+    } finally {
+      setValidating(false);
+    }
   };
 
   const retentionReviewCount = useMemo(
@@ -285,7 +297,7 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
                                   </div>
                                   {status !== "not-supported" && status !== "not-readable" ? (
                                     <button type="button" className="button-secondary shrink-0 text-sm" onClick={() => beginValidation(entry)} disabled={validating}>
-                                      {status === "restoration-checked" ? "Erneut prüfen" : "Entsperren und prüfen"}
+                                      {status === "restoration-checked" ? "Erneut prüfen" : "Sicherung prüfen"}
                                     </button>
                                   ) : null}
                                 </li>
@@ -315,17 +327,34 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
 
       <ConfirmDialog
         open={Boolean(selectedEntry)}
-        title="Sicherung entsperren und prüfen"
-        description="Das Passwort wird nur für diese Prüfung verwendet. Die vorhandene Wiederherstellungsprüfung zeigt den Inhalt zuerst an und verändert aktive Daten nicht."
-        onCancel={() => { if (!validating) setSelectedEntry(null); }}
+        title="Sicherung mit Passwort prüfen"
+        description="EWH entschlüsselt die Datei nur zur Prüfung. Anschließend erscheint eine Vorschau, bevor Daten ersetzt oder übernommen werden. Der aktuelle Arbeitsstand bleibt bis zu deiner Bestätigung unverändert."
+        onCancel={() => {
+          if (validating) return;
+          setSelectedEntry(null);
+          setValidationError("");
+        }}
         onConfirm={() => { void validate(); }}
-        confirmLabel={validating ? "Prüfung läuft" : "Prüfen und Vorschau öffnen"}
+        confirmLabel={validating ? "Sicherung wird geprüft …" : "Prüfen und Vorschau öffnen"}
         confirmDisabled={!passphrase.trim() || validating}
         cancelDisabled={validating}
       >
         <Field label="Passwort dieser Backup-Datei" inputId="local-backup-check-passphrase">
-          <input id="local-backup-check-passphrase" className="field" type="password" value={passphrase} autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} />
+          <input
+            id="local-backup-check-passphrase"
+            className="field"
+            type="password"
+            value={passphrase}
+            autoComplete="current-password"
+            disabled={validating}
+            onChange={(event) => {
+              setPassphrase(event.target.value);
+              if (validationError) setValidationError("");
+            }}
+          />
         </Field>
+        {validating ? <p className="mt-3 text-sm" role="status">Datei wird entschlüsselt und auf Wiederherstellbarkeit geprüft …</p> : null}
+        {validationError ? <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">{validationError}</p> : null}
       </ConfirmDialog>
     </Card>
   );
