@@ -2,6 +2,11 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## 0.9.1 – 25.10.2026
+
+- Die lokale Sicherungsprüfung führt nun sichtbar durch Passwort, Entschlüsselung und Wiederherstellungsvorschau. Während der Prüfung bleibt der Dialog geöffnet; bei falschem Passwort oder einer beschädigten Datei kann direkt erneut versucht werden.
+- Neue Installationen erhalten im Backup-Bereich einen neutralen Hinweis zum ersten Backup. Ein fehlgeschlagener Sicherungsversuch wird erst dann dauerhaft als Status hervorgehoben, wenn bereits ein erfolgreiches Backup existiert.
+
 ## 0.9.0 – 13.10.2026
 
 - Der Korrektur-Tisch ergänzt die Einzelkorrektur: Eine Aufgabe wird für die ganze Lerngruppe zeilenweise bewertet. Mit Enter springt der Fokus zur nächsten Eingabe; Abwesenheiten bleiben gesperrt.

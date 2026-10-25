@@ -39,13 +39,13 @@
           </aside>
 
           <div class="start-actions">
-            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.0">
+            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.1">
               <div class="terminal-bar">
                 <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
                 <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-                <span class="terminal-version">v0.9.0</span>
+                <span class="terminal-version">v0.9.1</span>
               </div>
-              <pre aria-label="Aktuelle Änderungen in Version 0.9.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+              <pre aria-label="Aktuelle Änderungen in Version 0.9.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
               <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
             </section>
 
@@ -57,7 +57,7 @@
                 <span class="mode-copy">
                   <small class="mode-label">01 / Schnellstart</small>
                   <strong>Mit Easy-Mode starten</strong>
-                  <small class="mode-description">Nur EWH erstellen und drucken</small>
+                  <small class="mode-description">Nur EWH erstellen, drucken oder exportieren</small>
                 </span>
                 <span class="mode-arrow" aria-hidden="true">→</span>
               </a>
@@ -68,7 +68,7 @@
                 <span class="mode-copy">
                   <small class="mode-label">02 / Arbeitsbereich</small>
                   <strong>Expert-Mode öffnen</strong>
-                  <small class="mode-description">Klassenimport, Auswertung und Druck</small>
+                  <small class="mode-description">Klassenimport, EWH-Erstellung, Auswertung sowie Druck oder Export</small>
                 </span>
                 <span class="mode-arrow" aria-hidden="true">→</span>
               </a>
@@ -89,13 +89,11 @@
         const output = document.getElementById("release-terminal-output");
         if (!output) return;
         const lines = [
-          "$ release v0.9.0",
-          "★ Für Lehrkräfte: Korrektur-Tisch – eine Aufgabe zeilenweise für die ganze Lerngruppe bewerten",
-          "✓ Notenübersicht zusätzlich als einfache CSV-Datei exportierbar",
-          "✓ Sicherheitsupdate: Klassenlisten nur noch als CSV oder TXT importieren",
-          "✓ Easy-Mode: EWH ohne Lerngruppe überarbeiten und ausgeben",
-          "✓ Druck & Export im Easy-Mode bleiben vollständig anonym",
-          "✓ Druckansicht ist auch bei verzögerten Bildern sofort nutzbar"
+          "$ release v0.9.1",
+          "★ Sicherungen klarer prüfen: Passwort eingeben, Fortschritt sehen, dann Vorschau öffnen",
+          "✓ Falsches Passwort oder beschädigte Datei: verständlicher Hinweis und direkt erneut versuchen",
+          "✓ Erstes Backup: neutraler Einstieg statt einer abschreckenden Fehlermeldung",
+          "✓ Ein fehlgeschlagener Sicherungsversuch bleibt erst nach vorhandenem Backup als Status sichtbar"
         ];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const writeImmediately = () => { output.textContent = lines.join("\n"); };
