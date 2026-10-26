@@ -8,6 +8,7 @@ type Props = {
   database: StudentDatabase;
   workspaceId: string;
   students: StudentRecord[];
+  studentNames: Record<string, string>;
   activeStudentId: string;
   scoresLocked: boolean;
   onSelectStudent: (studentId: string) => void;
@@ -31,6 +32,7 @@ export const CorrectionDesk = ({
   database,
   workspaceId,
   students,
+  studentNames,
   activeStudentId,
   scoresLocked,
   onSelectStudent,
@@ -88,6 +90,7 @@ export const CorrectionDesk = ({
     const nextInput = inputs[inputs.indexOf(source) + 1];
     if (!nextInput) return;
     requestAnimationFrame(() => {
+      nextInput.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
       nextInput.focus();
       nextInput.select();
     });
@@ -136,33 +139,39 @@ export const CorrectionDesk = ({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border">
-        <table className="w-full min-w-[38rem] text-left text-sm">
+        <table className="w-full min-w-[32rem] text-left text-sm">
           <caption className="sr-only">Punkte für {selectedTask.label}: {selectedTask.title || "Unbenannte Aufgabe"}</caption>
+          <colgroup>
+            <col />
+            <col className="w-36" />
+            <col className="w-28" />
+          </colgroup>
           <thead className="surface-muted"><tr>
             <th scope="col" className="px-4 py-3 font-semibold">Schülercode</th>
-            <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-            <th scope="col" className="px-4 py-3 text-right font-semibold">Punkte / {formatPoints(selectedTask.maxPoints)}</th>
+            <th scope="col" className="correction-desk-score-heading whitespace-nowrap px-4 py-3 text-right font-semibold">Punkte / {formatPoints(selectedTask.maxPoints)}</th>
+            <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">Status</th>
           </tr></thead>
           <tbody>
             {rows.map(({ student, participationStatus, hasScore, score }) => {
               const participates = participationStatus === "present";
+              const fullName = studentNames[student.id]?.trim();
+              const studentLabel = fullName ? `${fullName} · ${student.alias}` : student.alias;
               return (
                 <tr key={student.id} className="border-t">
                   <th scope="row" className="px-4 py-3 font-medium">
-                    <button type="button" className="text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-pressed={activeStudentId === student.id} onClick={() => onSelectStudent(student.id)}>
-                      {student.alias}
+                    <button type="button" className="text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label={`${studentLabel} für die Einzelkorrektur auswählen`} aria-pressed={activeStudentId === student.id} onClick={() => onSelectStudent(student.id)}>
+                      {fullName ? <><span className="block">{fullName}</span><span className="themed-muted text-xs font-normal">{student.alias}</span></> : student.alias}
                     </button>
                   </th>
-                  <td className="themed-muted px-4 py-3">{participates ? (hasScore ? "erfasst" : "offen") : participationLabel(participationStatus)}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="correction-desk-score-cell px-4 py-2 text-right">
                     {participates ? (
                       <NumberInput
                         value={score ?? 0}
                         min={0}
                         step={0.5}
-                        ariaLabel={`${student.alias}: Punkte für Aufgabe ${selectedTask.label}`}
+                        ariaLabel={`${studentLabel}: Punkte für Aufgabe ${selectedTask.label}`}
                         inputId={`correction-desk-score-${student.id}`}
-                        className="field correction-desk-score ml-auto w-24 px-2 py-1.5 text-right font-semibold"
+                        className="field correction-desk-score ml-auto w-24 px-2 py-2 text-right font-semibold"
                         disabled={scoresLocked}
                         commitOnChange
                         onCommit={(nextScore) => onScoreChange(student.id, selectedTask.id, nextScore)}
@@ -170,6 +179,7 @@ export const CorrectionDesk = ({
                       />
                     ) : <span className="themed-muted text-xs">keine Eingabe</span>}
                   </td>
+                  <td className="themed-muted px-4 py-3">{participates ? (hasScore ? "erfasst" : "offen") : participationLabel(participationStatus)}</td>
                 </tr>
               );
             })}

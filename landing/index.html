@@ -46,7 +46,14 @@
                 <span class="terminal-version">v0.9.1</span>
               </div>
               <pre aria-label="Aktuelle Änderungen in Version 0.9.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
-              <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
+              <div class="release-terminal-footer">
+                <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
+                <nav class="release-terminal-navigation" aria-label="Versionshinweise wechseln">
+                  <button id="release-terminal-newer" type="button" aria-label="Neuere Versionshinweise anzeigen" title="Neuere Versionshinweise">←</button>
+                  <span id="release-terminal-position" aria-live="polite">1 / 6</span>
+                  <button id="release-terminal-older" type="button" aria-label="Ältere Versionshinweise anzeigen" title="Ältere Versionshinweise">→</button>
+                </nav>
+              </div>
             </section>
 
             <div class="mode-grid">
@@ -86,40 +93,127 @@
     </footer>
     <script>
       (() => {
+        const terminal = document.querySelector(".release-terminal");
         const output = document.getElementById("release-terminal-output");
-        if (!output) return;
-        const lines = [
-          "$ release v0.9.1",
-          "★ Sicherungen klarer prüfen: Passwort eingeben, Fortschritt sehen, dann Vorschau öffnen",
-          "✓ Falsches Passwort oder beschädigte Datei: verständlicher Hinweis und direkt erneut versuchen",
-          "✓ Erstes Backup: neutraler Einstieg statt einer abschreckenden Fehlermeldung",
-          "✓ Ein fehlgeschlagener Sicherungsversuch bleibt erst nach vorhandenem Backup als Status sichtbar"
+        const versionLabel = terminal?.querySelector(".terminal-version");
+        const position = document.getElementById("release-terminal-position");
+        const newerButton = document.getElementById("release-terminal-newer");
+        const olderButton = document.getElementById("release-terminal-older");
+        if (!terminal || !output || !versionLabel || !position || !newerButton || !olderButton) return;
+
+        const releases = [
+          {
+            version: "0.9.1",
+            lines: [
+              "$ release v0.9.1",
+              "★ Sicherungen klarer prüfen: Passwort eingeben, Fortschritt sehen, dann Vorschau öffnen",
+              "✓ Falsches Passwort oder beschädigte Datei: verständlicher Hinweis und direkt erneut versuchen",
+              "✓ Erstes Backup: neutraler Einstieg statt einer abschreckenden Fehlermeldung",
+              "✓ Ein fehlgeschlagener Sicherungsversuch bleibt erst nach vorhandenem Backup als Status sichtbar"
+            ]
+          },
+          {
+            version: "0.9.0",
+            lines: [
+              "$ release v0.9.0",
+              "★ Für Lehrkräfte: Korrektur-Tisch – eine Aufgabe zeilenweise für die ganze Lerngruppe bewerten",
+              "✓ Notenübersicht zusätzlich als einfache CSV-Datei exportierbar",
+              "✓ Sicherheitsupdate: Klassenlisten nur noch als CSV oder TXT importieren",
+              "✓ Easy-Mode: EWH ohne Lerngruppe überarbeiten und ausgeben",
+              "✓ Druck & Export im Easy-Mode bleiben vollständig anonym"
+            ]
+          },
+          {
+            version: "0.8.2",
+            lines: [
+              "$ release v0.8.2",
+              "★ Klassenlisten aus Sicherheitsgründen nur noch als CSV oder TXT importieren",
+              "✓ Excel- und ODS-Tabellenimporte sowie Tabellenexporte entfernt",
+              "✓ Notenübersicht weiterhin als schlanke CSV-Datei verfügbar",
+              "✓ Produktions-Audit sperrt nun bereits bei Sicherheitslücken der Stufe high"
+            ]
+          },
+          {
+            version: "0.8.1",
+            lines: [
+              "$ release v0.8.1",
+              "★ Easy-Mode trennt EWH-Überarbeitung klar von der individuellen Korrektur",
+              "✓ Druck und Export im Easy-Mode bleiben vollständig anonym",
+              "✓ Druckansichten sind auch bei verzögerten Bildern sofort nutzbar",
+              "✓ Rahmendaten werden zentral im EWH-Editor vorbereitet"
+            ]
+          },
+          {
+            version: "0.8.0",
+            lines: [
+              "$ release v0.8.0",
+              "★ Geführter Klausur-Builder bündelt Aufgabenbibliothek und Gliederung",
+              "✓ Aufgaben per Maus, Touch oder Tastatur sortieren",
+              "✓ Mobile Aufgabenbibliothek öffnet als Bottom Drawer",
+              "✓ EWH erstellen bleibt dauerhaft in der Hauptnavigation erreichbar"
+            ]
+          },
+          {
+            version: "0.7.0",
+            lines: [
+              "$ release v0.7.0",
+              "★ Arbeitsbereiche, Klassenarbeitskontext und Korrekturansicht klarer gegliedert",
+              "✓ Teilnahmestatus bündelt Korrektur, Klassendurchschnitt und Klassendruck",
+              "✓ Sperrstatus und Backup-Bereich vereinfacht",
+              "✓ Optionale Nextcloud-Ablage über lokal synchronisierten Schulordner"
+            ]
+          }
         ];
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const writeImmediately = () => { output.textContent = lines.join("\n"); };
-        if (reduceMotion) { writeImmediately(); return; }
+        let releaseIndex = 0;
+        let renderGeneration = 0;
 
-        // Keep the finished notes on screen. Replaying by clearing the element made
-        // the terminal intermittently look empty, especially after a background tab
-        // had delayed its timers. Frame-based updates also avoid one DOM write per
-        // character when release notes get longer.
-        const characters = Array.from(lines.join("\n"));
-        const duration = Math.min(3600, Math.max(800, characters.length * 18));
-        const startedAt = performance.now();
-        let rendered = 0;
+        const updateTerminal = (animate = false) => {
+          const generation = ++renderGeneration;
+          const release = releases[releaseIndex];
+          terminal.dataset.version = release.version;
+          versionLabel.textContent = `v${release.version}`;
+          output.parentElement?.setAttribute("aria-label", `Änderungen in Version ${release.version}`);
+          position.textContent = `${releaseIndex + 1} / ${releases.length}`;
+          newerButton.disabled = releaseIndex === 0;
+          olderButton.disabled = releaseIndex === releases.length - 1;
 
-        const type = (now) => {
-          const next = Math.min(
-            characters.length,
-            Math.floor((now - startedAt) / duration * characters.length)
-          );
-          if (next > rendered) {
-            output.textContent = characters.slice(0, next).join("");
-            rendered = next;
+          const text = release.lines.join("\n");
+          if (!animate || reduceMotion) {
+            output.textContent = text;
+            return;
           }
-          if (rendered < characters.length) window.requestAnimationFrame(type);
+
+          // Keep the finished notes on screen. Frame-based updates avoid one DOM
+          // write per character, while button-based navigation remains immediate.
+          const characters = Array.from(text);
+          const duration = Math.min(3600, Math.max(800, characters.length * 18));
+          const startedAt = performance.now();
+          let rendered = 0;
+          const type = (now) => {
+            if (generation !== renderGeneration) return;
+            const next = Math.min(characters.length, Math.floor((now - startedAt) / duration * characters.length));
+            if (next > rendered) {
+              output.textContent = characters.slice(0, next).join("");
+              rendered = next;
+            }
+            if (rendered < characters.length) window.requestAnimationFrame(type);
+          };
+          window.requestAnimationFrame(type);
         };
-        window.requestAnimationFrame(type);
+
+        newerButton.addEventListener("click", () => {
+          if (releaseIndex === 0) return;
+          releaseIndex -= 1;
+          updateTerminal();
+        });
+        olderButton.addEventListener("click", () => {
+          if (releaseIndex === releases.length - 1) return;
+          releaseIndex += 1;
+          updateTerminal();
+        });
+
+        updateTerminal(true);
       })();
     </script>
   </body>

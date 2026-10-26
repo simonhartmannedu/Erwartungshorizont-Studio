@@ -32,13 +32,14 @@ export const TaskTable = ({
     // immediate focus call can otherwise be overwritten by the controlled input's
     // re-render.
     window.requestAnimationFrame(() => {
-      const scoreFields = Array.from(document.querySelectorAll<HTMLInputElement>(".score-input:not(:disabled)"))
+      const scoreSequence = source.closest<HTMLElement>("[data-score-sequence]");
+      const scoreFields = Array.from(scoreSequence?.querySelectorAll<HTMLInputElement>(".score-input:not(:disabled)") ?? [])
         .filter((field) => field.offsetParent !== null);
       const currentIndex = scoreFields.indexOf(source);
       const nextField = scoreFields[currentIndex + 1];
       if (!nextField) return;
 
-      nextField.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      nextField.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
       nextField.focus();
       nextField.select();
     });
@@ -53,6 +54,7 @@ export const TaskTable = ({
         value={task.achievedPoints}
         disabled={scoresLocked}
         commitOnChange
+        ariaLabel={`Erreichte Punkte für ${task.title.trim() || "diese Aufgabe"}`}
         onAdvance={focusNextScoreField}
         onCommit={(value) => onChange(task.id, { achievedPoints: value })}
       />
@@ -71,7 +73,7 @@ export const TaskTable = ({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-score-sequence>
     <div className="space-y-3 md:hidden">
       {tasks.map((task, index) => (
         <div
@@ -180,7 +182,7 @@ export const TaskTable = ({
                       />
                     </div>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="correction-max-cell px-3 py-3">
                     <div className="space-y-2">
                       <p className="themed-muted text-[11px] font-semibold uppercase tracking-[0.16em]">
                         Inhalt
@@ -204,11 +206,11 @@ export const TaskTable = ({
                     />
                   </td>
                   {showScores ? (
-                    <td className="px-3 py-3">
+                    <td className="correction-score-cell px-3 py-3">
                       {renderScoreInput(
                         task,
-                        "field score-input w-16 !px-2 !py-2 text-center text-sm font-semibold",
-                        "mx-auto w-16",
+                        "field score-input w-20 !px-2 !py-2 text-center text-sm font-semibold",
+                        "mx-auto w-20",
                       )}
                     </td>
                   ) : null}

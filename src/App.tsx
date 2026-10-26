@@ -4960,6 +4960,7 @@ function App() {
                     database={studentDatabase}
                     workspaceId={activeWorkspace.id}
                     students={activeGroup.students}
+                    studentNames={assessmentLocked ? {} : globalSearchStudentNames}
                     activeStudentId={activeStudentId}
                     scoresLocked={assessmentLocked}
                     onSelectStudent={setActiveStudentId}

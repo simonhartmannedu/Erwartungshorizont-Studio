@@ -17,6 +17,7 @@ test("erfasst eine Aufgabe klassenweise und lässt zur Einzelkorrektur zurückke
   await page.getByRole("button", { name: "Entsperren", exact: true }).click();
 
   await expect(page.locator(".correction-desk-score").first()).toBeEnabled();
+  await expect(correctionDesk.getByRole("button", { name: /Mia Schneider.*Einzelkorrektur auswählen/ }).first()).toBeVisible();
   await page.getByRole("button", { name: "Nächste offene Eingabe", exact: true }).click();
   const activeScoreInput = page.locator(".correction-desk-score:focus");
   await expect(activeScoreInput).toHaveCount(1);

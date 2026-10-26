@@ -6247,6 +6247,30 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-field-focus) 24%, transparent);
   }
 
+  /* Keep scoring visually calm while the surrounding rubric stays editable.
+     The point fields are deliberately grouped together and stand out from
+     structural actions such as moving or deleting a task. */
+  .correction-max-cell {
+    border-left: 1px solid color-mix(in srgb, var(--app-secondary-border) 72%, transparent);
+  }
+
+  .correction-score-cell,
+  .correction-desk-score-cell {
+    background: color-mix(in srgb, var(--app-field-focus) 4%, var(--app-secondary-bg));
+  }
+
+  .correction-desk-score-heading {
+    background: color-mix(in srgb, var(--app-field-focus) 8%, var(--app-secondary-bg));
+  }
+
+  @media (min-width: 768px) {
+    .correction-desk-score-cell,
+    .correction-desk-score-heading {
+      border-left: 1px solid color-mix(in srgb, var(--app-field-focus) 24%, var(--app-secondary-border));
+      border-right: 1px solid color-mix(in srgb, var(--app-field-focus) 24%, var(--app-secondary-border));
+    }
+  }
+
   .guide-overlay,
   .dialog-backdrop {
     backdrop-filter: none;
