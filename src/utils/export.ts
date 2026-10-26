@@ -633,16 +633,17 @@ export const openPrintPopupHost = (options?: {
 
 const buildPrintActivationScript = (waitForImages = false) => `
   <script>
-    const triggerPrint = () => {
-      const run = () => {
-        window.focus();
-        window.print();
-      };
+    const printNow = () => {
+      window.focus();
+      window.print();
+    };
+
+    const triggerAutomaticPrint = () => {
       if (window.requestAnimationFrame) {
-        window.requestAnimationFrame(() => window.requestAnimationFrame(run));
+        window.requestAnimationFrame(() => window.requestAnimationFrame(printNow));
         return;
       }
-      window.setTimeout(run, 0);
+      window.setTimeout(printNow, 0);
     };
 
     const ensureToolbar = () => {
@@ -669,7 +670,9 @@ const buildPrintActivationScript = (waitForImages = false) => `
       button.style.padding = "10px 14px";
       button.style.font = "600 14px Arial, sans-serif";
       button.style.boxShadow = "0 4px 18px rgba(0,0,0,0.12)";
-      button.addEventListener("click", triggerPrint);
+      // Chromium only preserves the transient user activation for the current
+      // event. Do not move this call into a timer or animation frame.
+      button.addEventListener("click", printNow);
       document.body.appendChild(button);
     };
 
@@ -703,7 +706,7 @@ const buildPrintActivationScript = (waitForImages = false) => `
         }));
       }`
         : ""}
-      triggerPrint();
+      triggerAutomaticPrint();
     };
 
     if (document.readyState === "complete" || document.readyState === "interactive") {

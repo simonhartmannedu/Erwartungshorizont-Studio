@@ -18,6 +18,17 @@ const openDemoResult = async (page: import("@playwright/test").Page, unlock = tr
 };
 
 test("öffnet die Druckansicht für eine entsperrte Klasse direkt aus dem Klick", async ({ page }) => {
+  await page.context().addInitScript(() => {
+    let printCalls = 0;
+    Object.defineProperty(window, "print", {
+      configurable: true,
+      value: () => { printCalls += 1; },
+    });
+    Object.defineProperty(window, "__printDialogCalls", {
+      configurable: true,
+      get: () => printCalls,
+    });
+  });
   await openDemoResult(page);
 
   await page.getByRole("button", { name: /Klasse drucken/ }).click();
@@ -25,7 +36,18 @@ test("öffnet die Druckansicht für eine entsperrte Klasse direkt aus dem Klick"
   await page.getByRole("button", { name: "Druck-PDF" }).click();
   const popup = await popupPromise;
   await popup.waitForLoadState("domcontentloaded");
-  await expect(popup.getByRole("button", { name: "Druckdialog öffnen" })).toBeVisible({ timeout: 20_000 });
+  const printButton = popup.getByRole("button", { name: "Druckdialog öffnen" });
+  await expect(printButton).toBeVisible({ timeout: 20_000 });
+  await expect.poll(
+    () => popup.evaluate(() => (window as Window & { __printDialogCalls?: number }).__printDialogCalls ?? 0),
+  ).toBeGreaterThan(0);
+  const callsBeforeManualClick = await popup.evaluate(
+    () => (window as Window & { __printDialogCalls?: number }).__printDialogCalls ?? 0,
+  );
+  await printButton.click();
+  await expect.poll(
+    () => popup.evaluate(() => (window as Window & { __printDialogCalls?: number }).__printDialogCalls ?? 0),
+  ).toBe(callsBeforeManualClick + 1);
 });
 
 test("exportiert Word-Dokumente über den passenden Browser-Speicherweg", async ({ page, browserName }) => {
