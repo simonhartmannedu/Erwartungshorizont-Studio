@@ -22,6 +22,10 @@ Damit kannst du:
 
 Die Demo enthält ausschließlich fiktive Daten.
 
+## Projektstatus
+
+EWH-Studio ist ein unabhängiges Einzelprojekt. Hinweise und kleine Beiträge sind willkommen, es gibt aber keine zugesagte Reaktionszeit, keinen Supportvertrag und keine Garantie für bestimmte Schul- oder Browserumgebungen. Vor dem Einsatz mit Schülerdaten bleiben die Freigabe durch Schule bzw. Schulträger und die eigene Datenschutzprüfung erforderlich.
+
 ## Warum das für Lehrkräfte praktisch ist
 
 EWH-Studio soll keine zusätzliche Verwaltungsplattform sein. Es ist ein Werkzeug für die Zeit zwischen Aufgabenplanung, Korrektur und Rückgabe:
@@ -50,7 +54,7 @@ Wichtig: Das Löschen des Browserprofils, privates Surfen, Speicherbereinigung o
 
 ## Schnellstart
 
-Voraussetzung ist Node.js 24 oder eine mit Vite 6 kompatible Node-Version.
+Voraussetzung ist Node.js 24; diese Version verwendet auch die CI.
 
 ```bash
 npm install
@@ -61,20 +65,19 @@ Für die normale Nutzung genügt die gehostete Demo oder eine lokale Installatio
 
 ## Für die Wartung
 
-Das Projekt ist bewusst auch für eine einzelne wartende Person überschaubar gehalten. Vor einer Änderung reichen in der Regel diese Prüfungen:
+Das Projekt ist bewusst auch für eine einzelne wartende Person überschaubar gehalten. Vor einem Pull Request oder Release genügt in der Regel:
+
+```bash
+npm run check:release
+```
+
+Für einen schnellen lokalen Zwischenstand sind diese Prüfungen ausreichend:
 
 ```bash
 npm run lint
 npm run typecheck
 npm run test
 npm run build
-```
-
-Bei Änderungen an Berechnung, Speicher, Import, Export oder Backups zusätzlich:
-
-```bash
-npm run test:regression
-npm run test:e2e
 ```
 
 Die kompakte technische Orientierung steht in [Entwicklung und Wartung](docs/development.md). Bitte niemals echte Schülerdaten, Passwörter, Schlüssel oder Backups in Commits, Tests oder Screenshots verwenden.

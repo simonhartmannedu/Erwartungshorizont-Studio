@@ -1,11 +1,11 @@
 # Mitwirken
 
-Cool, dass du an Erwartungshorizont-Studio mitarbeiten willst. Beiträge sollen die lokale, datensparsame Nutzung stärken und bestehende Daten nicht gefährden.
+Cool, dass du an Erwartungshorizont-Studio mitarbeiten willst. Beiträge sollen die lokale, datensparsame Nutzung stärken und bestehende Daten nicht gefährden. Das Projekt wird im Wesentlichen von einer Person gepflegt: Für größere Ideen bitte zuerst ein Issue öffnen; Annahme und Reaktionszeit können nicht zugesagt werden.
 
 ## Vor einer Änderung
 
 1. Beschreibe Problem, betroffene Dateien, Risiko und erwartetes Verhalten.
-2. Führe mindestens `npm run lint`, `npm run typecheck`, `npm run test` und `npm run build` aus.
+2. Führe vor einem Pull Request möglichst `npm run check:release` aus. Für reine Textänderungen reicht eine sinnvolle Sichtprüfung.
 3. Ergänze für Fachlogik und Fehlerfälle passende Tests mit ausschließlich fiktiven Daten.
 4. Aktualisiere die Doku, wenn Daten, Sicherheitsgrenzen, Backup/Wiederherstellung, Import/Export oder Bedienung betroffen sind.
 
