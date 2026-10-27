@@ -912,6 +912,7 @@ export const renderPrintDocument = (reports: PrintPayload[]) =>
               <strong>Unterschrift / Datum</strong>
               <p style="margin-top:10px;">Datum: ${germanPrintDate}</p>
               <div style="margin-top:10px;"><img src="${signatureImageSource}" alt="Digitale Unterschrift" style="max-width:100%;height:72px;object-fit:contain;object-position:left;" /></div>
+              <p style="margin-top:6px;font-size:9px;color:#555;">Dieses Dokument ist auch ohne Originalunterschrift gültig.</p>
             </div>`
           : "",
       ].filter(Boolean).join("");

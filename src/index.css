@@ -6509,6 +6509,10 @@
     box-shadow: 0 0.6rem 1.8rem color-mix(in srgb, var(--app-text-strong) 4%, transparent);
   }
   .home-workflow-progress { color: var(--app-label); font-size: 0.72rem; font-weight: 750; white-space: nowrap; }
+  .home-next-step-description { max-width: 44rem; margin: 0.7rem 0 0; color: var(--app-text); font-size: 0.88rem; line-height: 1.55; }
+  .home-next-step-action { margin-top: 1rem; }
+  .home-workflow-details { margin-top: 1rem; border-top: 1px solid var(--app-secondary-border); padding-top: 0.8rem; }
+  .home-workflow-details summary { width: fit-content; cursor: pointer; color: var(--app-text-strong); font-size: 0.75rem; font-weight: 750; }
   .home-workflow-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.7rem; margin: 1rem 0 0; padding: 0; list-style: none; }
   .home-workflow-step { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0.55rem; min-height: 8.6rem; border: 1px solid var(--app-secondary-border); border-radius: 1rem; padding: 0.75rem; background: var(--app-secondary-bg); }
   .home-workflow-step.is-current { border-color: color-mix(in srgb, var(--home-accent) 55%, var(--app-secondary-border)); background: color-mix(in srgb, var(--home-accent) 9%, var(--app-secondary-bg)); }

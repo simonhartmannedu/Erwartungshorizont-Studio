@@ -142,6 +142,9 @@ export const ReportSummarySection = ({
                 <p className="mt-3 text-sm" style={{ color: "var(--app-text)" }}>
                   Datum: {germanPrintDate}
                 </p>
+                <p className="themed-muted mt-2 text-xs leading-5">
+                  Dieses Dokument ist auch ohne Originalunterschrift gültig.
+                </p>
                 {onSignatureChange ? (
                   <div className="mt-3 no-print">
                     <p className="themed-muted mb-3 text-xs leading-5">

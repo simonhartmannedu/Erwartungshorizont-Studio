@@ -4,7 +4,6 @@ import {
   ChevronRightIcon,
   DashboardIcon,
   GroupIcon,
-  PlusIcon,
   SaveIcon,
   TemplateIcon,
 } from "./icons";
@@ -144,8 +143,6 @@ export const HomeDashboard = ({
   ];
   const currentWorkflowIndex = workflowSteps.findIndex((step) => !step.complete);
   const currentWorkflowStep = currentWorkflowIndex >= 0 ? workflowSteps[currentWorkflowIndex] : null;
-  const nextStepDestination = currentWorkflowStep?.destination ?? "builder";
-  const nextStepLabel = currentWorkflowStep?.actionLabel ?? "EWH bearbeiten";
   const backupNeedsAttention = backupTone === "warning" || backupTone === "danger";
 
   return (
@@ -156,42 +153,41 @@ export const HomeDashboard = ({
           <h2>Übersicht</h2>
           <p>{today}</p>
         </div>
-        <button type="button" className="button-primary gap-2" onClick={() => onNavigate(nextStepDestination)}>
-          {nextStepDestination === "groups" ? <GroupIcon /> : <PlusIcon />} {nextStepLabel}
-        </button>
       </header>
 
-      <section className="home-workflow-panel" aria-labelledby="home-workflow-heading">
+      {currentWorkflowStep ? <section className="home-workflow-panel" aria-labelledby="home-workflow-heading">
         <div className="home-panel-header">
           <div>
-            <p className="home-eyebrow">Schritt für Schritt</p>
-            <h3 id="home-workflow-heading">So bleibt eine Klassenarbeit übersichtlich</h3>
+            <p className="home-eyebrow">Nächster Schritt</p>
+            <h3 id="home-workflow-heading">{currentWorkflowStep.title}</h3>
           </div>
           <span className="home-workflow-progress">
-            {currentWorkflowStep ? `Jetzt: Schritt ${currentWorkflowIndex + 1}` : "Alles vorbereitet"}
+            Schritt {currentWorkflowIndex + 1} von {workflowSteps.length}
           </span>
         </div>
-        <ol className="home-workflow-list">
-          {workflowSteps.map((step, index) => {
-            const isCurrent = index === currentWorkflowIndex;
-            return (
-              <li key={step.title} className={`home-workflow-step${step.complete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}>
-                <span className="home-workflow-marker" aria-hidden="true">
-                  {step.complete ? <CheckIcon className="h-3.5 w-3.5" /> : index + 1}
-                </span>
-                <div>
-                  <strong>{step.title}</strong>
-                  <p>{step.description}</p>
-                  {isCurrent ? (
-                    <button type="button" onClick={() => onNavigate(step.destination)}>
-                      {step.actionLabel}<ChevronRightIcon className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+        <p className="home-next-step-description">{currentWorkflowStep.description}</p>
+        <button type="button" className="button-primary home-next-step-action gap-2" onClick={() => onNavigate(currentWorkflowStep.destination)}>
+          {currentWorkflowStep.actionLabel}<ChevronRightIcon className="h-4 w-4" />
+        </button>
+        <details className="home-workflow-details">
+          <summary>Einrichtungsplan anzeigen</summary>
+          <ol className="home-workflow-list">
+            {workflowSteps.map((step, index) => {
+              const isCurrent = index === currentWorkflowIndex;
+              return (
+                <li key={step.title} className={`home-workflow-step${step.complete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}>
+                  <span className="home-workflow-marker" aria-hidden="true">
+                    {step.complete ? <CheckIcon className="h-3.5 w-3.5" /> : index + 1}
+                  </span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.description}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </details>
         <details className="home-data-guide">
           <summary>Was wird wo gespeichert?</summary>
           <div>
@@ -200,7 +196,7 @@ export const HomeDashboard = ({
             <p><strong>Vollbackup:</strong> sichert Arbeitsstände, Archiv und Schülerdaten als verschlüsselte Datei außerhalb des Browsers.</p>
           </div>
         </details>
-      </section>
+      </section> : null}
 
       <div className="home-primary-grid">
         <article className="home-work-card">
@@ -224,7 +220,7 @@ export const HomeDashboard = ({
             <div className="home-empty-state">
               <div className="home-empty-icon"><TemplateIcon className="h-5 w-5" /></div>
               <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage, nutze eine PDF oder lege die Struktur selbst an.</p></div>
-              <button type="button" onClick={() => onNavigate(nextStepDestination)}>{nextStepLabel} <ChevronRightIcon /></button>
+              <button type="button" onClick={() => onNavigate(currentWorkflowStep?.destination ?? "guidedBuilder")}>{currentWorkflowStep?.actionLabel ?? "EWH erstellen"} <ChevronRightIcon /></button>
             </div>
           )}
         </article>

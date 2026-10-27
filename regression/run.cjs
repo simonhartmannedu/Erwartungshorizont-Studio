@@ -270,6 +270,7 @@ const testPrintEscaping = async () => {
   assert.match(html, /Strong effort &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /javascript:alert\(1\)/);
   assert.match(html, /data:image\/png;base64,AA==/);
+  assert.match(html, /Dieses Dokument ist auch ohne Originalunterschrift gültig\./);
   assert.match(html, /Notenbereiche/);
 };
 

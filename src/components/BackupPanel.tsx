@@ -112,12 +112,17 @@ export const BackupPanel = ({
     }
   };
 
+  const chooseManagedBackupFolder = async () => {
+    const folderName = await selectLocalBackupFolder();
+    setManagedBackupFolderName(folderName);
+    setSaveInManagedFolder(true);
+    return folderName;
+  };
+
   const selectManagedBackupFolder = async () => {
     try {
       setFolderSelectionError("");
-      const folderName = await selectLocalBackupFolder();
-      setManagedBackupFolderName(folderName);
-      setSaveInManagedFolder(true);
+      await chooseManagedBackupFolder();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setFolderSelectionError("Der Ordner wurde nicht ausgewählt. Du kannst weiterhin den normalen Speicherort wählen.");
@@ -249,9 +254,10 @@ export const BackupPanel = ({
       </Card>
 
       <LocalBackupManager
-        onCreateBackup={() => setBackupDialog("save")}
         onValidateAndRestore={onImportBackup}
         refreshToken={lastBackupAt}
+        selectedFolderName={managedBackupFolderName}
+        onChooseFolder={chooseManagedBackupFolder}
       />
 
       <ConfirmDialog

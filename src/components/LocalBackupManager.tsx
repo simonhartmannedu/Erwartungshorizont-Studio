@@ -12,11 +12,10 @@ import {
 } from "../utils/localBackups";
 import {
   listFilesInLocalBackupFolder,
-  selectLocalBackupFolder,
   supportsLocalBackupFolder,
 } from "../utils/localBackupFolder";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { DownloadIcon, LoadingIcon, UploadIcon } from "./icons";
+import { LoadingIcon, UploadIcon } from "./icons";
 import { Card, Field } from "./ui";
 
 const HEADER_BYTES = 64 * 1024;
@@ -77,12 +76,18 @@ const toDescriptor = async (file: File): Promise<LocalBackupDescriptor> => {
 };
 
 interface Props {
-  onCreateBackup: () => void;
   onValidateAndRestore: (file: File, passphrase: string) => Promise<boolean>;
   refreshToken?: string | null;
+  selectedFolderName: string | null;
+  onChooseFolder: () => Promise<string>;
 }
 
-export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refreshToken }: Props) => {
+export const LocalBackupManager = ({
+  onValidateAndRestore,
+  refreshToken,
+  selectedFolderName,
+  onChooseFolder,
+}: Props) => {
   const [entries, setEntries] = useState<LocalBackupDescriptor[]>([]);
   const [source, setSource] = useState<Source>(null);
   const [state, setState] = useState<"idle" | "loading" | "empty" | "permission" | "unsupported" | "error">("idle");
@@ -94,6 +99,7 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
   const [passphrase, setPassphrase] = useState("");
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [collapsed, setCollapsed] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderSupported = supportsLocalBackupFolder();
 
@@ -143,6 +149,10 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
     if (folderSupported && source?.kind === "folder" && refreshToken) void refreshFolder();
   }, [refreshToken]);
 
+  useEffect(() => {
+    if (folderSupported && selectedFolderName) void refreshFolder();
+  }, [selectedFolderName]);
+
   const chooseFolder = async () => {
     if (!folderSupported) {
       fileInputRef.current?.click();
@@ -150,7 +160,7 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
     }
     try {
       setState("loading");
-      const folderName = await selectLocalBackupFolder();
+      const folderName = await onChooseFolder();
       await refreshFolder();
       setSource({ kind: "folder", name: folderName });
     } catch (error) {
@@ -221,7 +231,13 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
   );
 
   return (
-    <Card title="Lokale Sicherungen verwalten" subtitle="Nach Sicherungsdatum gruppiert. Eine Gesamtsicherung kann Daten aus mehreren Schuljahren enthalten.">
+    <Card
+      title="Vorhandene Sicherungen prüfen"
+      subtitle="Durchsuche einen Sicherungsordner oder ausgewählte Dateien. Eine Gesamtsicherung kann Daten aus mehreren Schuljahren enthalten."
+      collapsible
+      collapsed={collapsed}
+      onToggleCollapse={() => setCollapsed((current) => !current)}
+    >
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <button type="button" className="button-primary gap-2" onClick={() => { void chooseFolder(); }}>
@@ -234,10 +250,6 @@ export const LocalBackupManager = ({ onCreateBackup, onValidateAndRestore, refre
               Aktualisieren
             </button>
           ) : null}
-          <button type="button" className="button-secondary gap-2" onClick={onCreateBackup}>
-            <DownloadIcon />
-            Neue Sicherung erstellen
-          </button>
           <input ref={fileInputRef} type="file" accept="application/json,.json" multiple className="hidden" onChange={chooseFiles} />
         </div>
 
