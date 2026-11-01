@@ -1,26 +1,26 @@
 import { type KeyboardEvent, type MutableRefObject, useMemo, useState } from "react";
-import { ArchiveIcon, CheckIcon, DashboardIcon, GroupIcon, HomeIcon, LoadingIcon, LockIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, UnlockIcon, WizardIcon } from "../components/icons";
+import { ArchiveIcon, CheckIcon, GroupIcon, HomeIcon, LoadingIcon, LockIcon, PencilIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, UnlockIcon, WizardIcon } from "../components/icons";
 import type { GlobalSearchResult } from "./AppHeader";
 
 export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "bogencheck" | "archive" | "backup";
 
 /** Bogencheck remains implemented, but is not released in the primary navigation yet. */
 /**
- * These are the durable destinations of the workspace. Creating an EWH is
- * deliberately kept next to the classwork area as a permanent primary action.
- * The wizard remains contextual so it does not duplicate the same workflow.
+ * These are the durable destinations of the workspace. The first three items
+ * follow the natural workflow: define the learning group, create classwork,
+ * then edit the finished classwork.
  */
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
-  { id: "builder", label: "Klassenarbeiten" },
-  { id: "guidedBuilder", label: "EWH erstellen" },
-  { id: "groups", label: "Lerngruppen" },
+  { id: "groups", label: "1. Lerngruppen" },
+  { id: "guidedBuilder", label: "2. Klassenarbeit erstellen" },
+  { id: "builder", label: "3. Klassenarbeiten editieren" },
   { id: "archive", label: "Archiv" },
   { id: "backup", label: "Backup" },
 ];
 
 /** The compact workflow deliberately exposes only creating and finishing an EWH. */
-export const easyModeTabs = tabs.filter((tab) => tab.id === "builder" || tab.id === "guidedBuilder");
+export const easyModeTabs = tabs.filter((tab) => tab.id === "guidedBuilder" || tab.id === "builder");
 export const getVisibleTabs = (easyMode: boolean) => (easyMode ? easyModeTabs : tabs);
 
 /** Contextual views keep their old state IDs for compatibility with existing calls. */
@@ -39,7 +39,7 @@ export const TabIcon = ({ id }: { id: AppTabId }) => {
     case "guidedBuilder":
       return <PlusIcon />;
     case "builder":
-      return <DashboardIcon />;
+      return <PencilIcon />;
     case "groups":
       return <GroupIcon />;
     case "bogencheck":

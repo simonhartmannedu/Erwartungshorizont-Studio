@@ -7,7 +7,7 @@ const openDemoResult = async (page: import("@playwright/test").Page, unlock = tr
   const globalSearchResults = page.locator("#global-search-results");
   await globalSearch.fill("Unit 5");
   await globalSearchResults.getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ }).click();
-  await page.getByRole("tab", { name: "Klassenarbeiten" }).click();
+  await page.getByRole("tab", { name: "3. Klassenarbeiten editieren" }).click();
   await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
   if (unlock) {
     await page.locator(".app-navigation-security-button").click();

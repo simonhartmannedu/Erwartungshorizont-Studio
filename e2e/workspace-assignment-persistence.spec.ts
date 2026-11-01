@@ -9,12 +9,12 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.evaluate(() => window.history.replaceState({}, "", "/?demo=1"));
 
-  await page.getByRole("tab", { name: "Klassenarbeiten" }).click();
+  await page.getByRole("tab", { name: "3. Klassenarbeiten editieren" }).click();
   await page.getByRole("tab", { name: "Ergebnis & Druck", exact: true }).click();
   await page.getByRole("button", { name: "Vorlage im Archiv speichern" }).click();
   await expect(page.getByRole("heading", { name: "Erwartungshorizont-Archiv" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Lerngruppen" }).click();
+  await page.getByRole("tab", { name: "1. Lerngruppen" }).click();
   await page.getByRole("button", { name: "Keine Liste? Lerngruppe manuell anlegen", exact: true }).click();
   const manualGroupForm = page.getByRole("region", { name: "Keine Liste? Lerngruppe manuell anlegen" });
   await manualGroupForm.getByLabel("Fach").fill(subject);
@@ -28,7 +28,7 @@ test("persists a group assignment for an archived workspace copy after reload", 
   await page.getByTitle("Lerngruppe zuordnen").click();
   await page.getByLabel("Lerngruppe auswählen").selectOption({ label: groupLabel });
   await page.getByTitle("Ausgewählter Lerngruppe zuordnen").click();
-  await expect(page.getByRole("tab", { name: "Klassenarbeiten", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "3. Klassenarbeiten editieren", selected: true })).toBeVisible();
   await expect(page.locator(".local-save-status")).toHaveClass(/local-save-status-saved/);
 
   await page.reload();
