@@ -5802,6 +5802,7 @@
   .app-navigation-security-button {
     width: 2.35rem;
     min-width: 2.35rem;
+    border-radius: 0.45rem;
     padding-inline: 0;
     justify-content: center;
   }
@@ -5810,6 +5811,12 @@
     border-color: color-mix(in srgb, #dc2626 42%, var(--app-secondary-border));
     background: color-mix(in srgb, #ef4444 9%, var(--app-panel-bg));
     color: #b91c1c;
+  }
+
+  .app-navigation-security-button.is-unlocked {
+    border-color: color-mix(in srgb, #059669 42%, var(--app-secondary-border));
+    background: color-mix(in srgb, #10b981 9%, var(--app-panel-bg));
+    color: #047857;
   }
 
   .app-navigation-security-button:disabled {

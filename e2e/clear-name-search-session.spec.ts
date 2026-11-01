@@ -8,7 +8,7 @@ test("searches clear names only during an unlocked class session", async ({ page
 
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
-  await page.getByRole("tab", { name: "1. Lerngruppen" }).click();
+  await page.getByRole("tab", { name: "Lerngruppen" }).click();
   const manualGroupTrigger = page.getByRole("button", { name: "Keine Liste? Lerngruppe manuell anlegen", exact: true });
   await expect(manualGroupTrigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#manual-group-form")).toBeHidden();

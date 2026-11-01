@@ -12,9 +12,9 @@ export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups
  */
 export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
-  { id: "groups", label: "1. Lerngruppen" },
-  { id: "guidedBuilder", label: "2. Klassenarbeit erstellen" },
-  { id: "builder", label: "3. Klassenarbeiten editieren" },
+  { id: "groups", label: "Lerngruppen" },
+  { id: "guidedBuilder", label: "Klassenarbeit erstellen" },
+  { id: "builder", label: "Klassenarbeiten editieren" },
   { id: "archive", label: "Archiv" },
   { id: "backup", label: "Backup" },
 ];
@@ -181,7 +181,9 @@ export const AppNavigation = ({
       </div>
       <button
         type="button"
-        className={`button-secondary app-navigation-security-button shrink-0 ${isSecurityActionAvailable && !isActiveGroupUnlocked ? "is-locked" : ""}`}
+        className={`button-secondary app-navigation-security-button shrink-0 ${
+          isSecurityActionAvailable ? (isActiveGroupUnlocked ? "is-unlocked" : "is-locked") : ""
+        }`}
         onClick={onToggleSecurity}
         disabled={!isSecurityActionAvailable}
         aria-label={securityActionLabel}

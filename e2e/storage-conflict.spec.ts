@@ -6,7 +6,7 @@ const addManualGroup = async (
   className: string,
   expectSuccessfulSave = true,
 ) => {
-  await page.getByRole("tab", { name: "1. Lerngruppen" }).click();
+  await page.getByRole("tab", { name: "Lerngruppen" }).click();
   await page.getByRole("button", { name: "Keine Liste? Lerngruppe manuell anlegen", exact: true }).click();
   const form = page.getByRole("region", { name: "Keine Liste? Lerngruppe manuell anlegen" });
   await form.getByLabel("Fach").fill(subject);
@@ -37,7 +37,7 @@ test("stoppt einen veralteten zweiten Tab statt einen neueren Arbeitsstand zu ü
   await addManualGroup(firstPage, "Erstfach", "9a");
   await firstPage.waitForTimeout(500);
   await firstPage.reload();
-  await firstPage.getByRole("tab", { name: "1. Lerngruppen" }).click();
+  await firstPage.getByRole("tab", { name: "Lerngruppen" }).click();
   await expect(firstPage.getByRole("button", { name: "Erstfach · 9a", exact: true })).toBeVisible();
 
   // A stale tab must be stopped before its pending group can be persisted.
@@ -47,7 +47,7 @@ test("stoppt einen veralteten zweiten Tab statt einen neueren Arbeitsstand zu ü
   await expect(secondPage.getByRole("heading", { name: "Arbeitsstand wurde in einem anderen Tab geändert" })).toBeVisible();
 
   await secondPage.getByRole("button", { name: "Seite neu laden" }).click();
-  await secondPage.getByRole("tab", { name: "1. Lerngruppen" }).click();
+  await secondPage.getByRole("tab", { name: "Lerngruppen" }).click();
   await expect(secondPage.getByRole("button", { name: "Erstfach · 9a", exact: true })).toBeVisible();
   await expect(secondPage.getByRole("button", { name: "Zweitfach · 9b", exact: true })).toHaveCount(0);
 });

@@ -9,12 +9,12 @@ test("switches between Easy Mode and the full workflow without losing the normal
   await settings.locator("> summary").click();
   await easyModeToggle.check();
 
-  await expect(page.getByRole("tab", { name: "3. Klassenarbeiten editieren" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "1. Lerngruppen" })).toBeHidden();
+  await expect(page.getByRole("tab", { name: "Klassenarbeiten editieren" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeHidden();
   await expect(page.getByRole("tab", { name: "Archiv" })).toBeHidden();
-  await expect(page.getByRole("tab", { name: "2. Klassenarbeit erstellen", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Klassenarbeit erstellen", selected: true })).toBeVisible();
 
-  await page.getByRole("tab", { name: "3. Klassenarbeiten editieren" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeiten editieren" }).click();
   await expect(page.locator(".editor-section-tabs").getByRole("tab", { name: "Überarbeiten", exact: true })).toBeVisible();
   await page.locator(".editor-section-tabs").getByRole("tab", { name: "Überarbeiten", exact: true }).click();
   await expect(page.getByText("Erwartungshorizont überarbeiten", { exact: true })).toBeVisible();
@@ -22,7 +22,7 @@ test("switches between Easy Mode and the full workflow without losing the normal
   await expect(page.getByText("Erreicht", { exact: true })).toHaveCount(0);
 
   await easyModeToggle.uncheck();
-  await expect(page.getByRole("tab", { name: "1. Lerngruppen" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Archiv" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Backup" })).toBeVisible();
   await expect(page.locator(".editor-section-tabs").getByRole("tab", { name: "Korrigieren", exact: true })).toBeVisible();
@@ -30,12 +30,12 @@ test("switches between Easy Mode and the full workflow without losing the normal
 
 test("honours the Easy- and Expert-Mode links from the landing page", async ({ page }) => {
   await page.goto("/?mode=easy");
-  await expect(page.getByRole("tab", { name: "3. Klassenarbeiten editieren" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "2. Klassenarbeit erstellen", selected: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "1. Lerngruppen" })).toBeHidden();
+  await expect(page.getByRole("tab", { name: "Klassenarbeiten editieren" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Klassenarbeit erstellen", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeHidden();
 
   await page.goto("/?mode=expert");
-  await expect(page.getByRole("tab", { name: "1. Lerngruppen" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Lerngruppen" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Backup" })).toBeVisible();
 });
 
@@ -46,7 +46,7 @@ test("prints a generic EWH from Easy Mode without using a student record", async
   const settings = page.locator(".header-settings");
   await settings.locator("> summary").click();
   await settings.locator('input[type="checkbox"]').first().check();
-  await page.getByRole("tab", { name: "3. Klassenarbeiten editieren" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeiten editieren" }).click();
   await page.locator(".editor-section-tabs").getByRole("tab", { name: "Drucken & Exportieren", exact: true }).click();
   await expect(page.getByText("Gib den fertigen Erwartungshorizont ohne Schülerdaten als Druck-PDF oder Word-Datei aus.")).toBeVisible();
 

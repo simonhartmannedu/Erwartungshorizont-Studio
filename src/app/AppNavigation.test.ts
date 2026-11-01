@@ -6,9 +6,9 @@ describe("AppNavigation", () => {
     expect(tabs.map((tab) => tab.id)).toEqual(["home", "groups", "guidedBuilder", "builder", "archive", "backup"]);
     expect(tabs.map((tab) => tab.label)).toEqual([
       "Übersicht",
-      "1. Lerngruppen",
-      "2. Klassenarbeit erstellen",
-      "3. Klassenarbeiten editieren",
+      "Lerngruppen",
+      "Klassenarbeit erstellen",
+      "Klassenarbeiten editieren",
       "Archiv",
       "Backup",
     ]);
