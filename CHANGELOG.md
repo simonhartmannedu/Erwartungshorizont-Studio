@@ -4,6 +4,8 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
 ## Unveröffentlicht
 
+## 1.0.0 – 03.11.2026
+
 - Word-Exporte verwenden nun ein platzsparendes, drucknahes Tabellenlayout mit wiederholten Kopfzeilen und klaren Spaltenbreiten.
 - Word- und Druck-PDF respektieren gleichermaßen, ob Erwartungen und Lehrkraftkommentare ausgegeben werden.
 - Release-Tags prüfen nun Lint, Typen, Unit- und Regressionstests, Produktions- und Demo-Build sowie Browser-Tests vor dem Erzeugen eines Release-Artefakts.

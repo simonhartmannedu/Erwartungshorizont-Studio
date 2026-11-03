@@ -17,6 +17,7 @@
       </a>
 
       <section class="start" id="start" aria-labelledby="start-title">
+        <p class="release-badge"><span>Neu</span> Version 1.0 ist da</p>
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
         <div class="start-content">
@@ -39,13 +40,13 @@
           </aside>
 
           <div class="start-actions">
-            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="0.9.1">
+            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="1.0.0">
               <div class="terminal-bar">
                 <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
                 <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-                <span class="terminal-version">v0.9.1</span>
+                <span class="terminal-version">v1.0.0</span>
               </div>
-              <pre aria-label="Aktuelle Änderungen in Version 0.9.1"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+              <pre aria-label="Aktuelle Änderungen in Version 1.0.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
               <div class="release-terminal-footer">
                 <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
                 <nav class="release-terminal-navigation" aria-label="Versionshinweise wechseln">
@@ -102,6 +103,17 @@
         if (!terminal || !output || !versionLabel || !position || !newerButton || !olderButton) return;
 
         const releases = [
+          {
+            version: "1.0.0",
+            lines: [
+              "$ release v1.0.0",
+              "★ EWH Studio 1.0: Der stabile Start für Erwartungshorizont, Korrektur und Ausgabe",
+              "✓ Word-Exporte jetzt kompakter, drucknäher und mit wiederholten Tabellenkopfzeilen",
+              "✓ Word und Druck-PDF beachten die Auswahl für Erwartungen und Lehrkraftkommentare",
+              "✓ Release-Tags prüfen automatisch Qualität, Builds und Browser-Tests vor der Veröffentlichung",
+              "✓ Veraltete Hinweise auf entfernte PDF-Importe aus Oberfläche und Datenschutz entfernt"
+            ]
+          },
           {
             version: "0.9.1",
             lines: [
