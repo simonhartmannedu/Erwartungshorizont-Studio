@@ -31,7 +31,7 @@ const steps: WizardStep[] = [
     id: "choose",
     eyebrow: "Schritt 3 · Ausgangspunkt",
     title: "Neuen oder vorhandenen EWH wählen",
-    description: "Erstelle einen neuen Erwartungshorizont aus Vorlage, PDF oder leerer Struktur. Liegt er bereits im Archiv, kannst du ihn dort öffnen und für die aktuelle Klassenarbeit verwenden.",
+    description: "Erstelle einen neuen Erwartungshorizont aus einer Vorlage oder einer leeren Struktur. Liegt er bereits im Archiv, kannst du ihn dort öffnen und für die aktuelle Klassenarbeit verwenden.",
     tip: "Ein Archiv-Eintrag ist eine wiederverwendbare Vorlage; Bewertungen bleiben immer bei der Klassenarbeit.",
     icon: ArchiveIcon,
   },

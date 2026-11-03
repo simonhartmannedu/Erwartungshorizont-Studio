@@ -2,6 +2,13 @@
 
 Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
+## Unveröffentlicht
+
+- Word-Exporte verwenden nun ein platzsparendes, drucknahes Tabellenlayout mit wiederholten Kopfzeilen und klaren Spaltenbreiten.
+- Word- und Druck-PDF respektieren gleichermaßen, ob Erwartungen und Lehrkraftkommentare ausgegeben werden.
+- Release-Tags prüfen nun Lint, Typen, Unit- und Regressionstests, Produktions- und Demo-Build sowie Browser-Tests vor dem Erzeugen eines Release-Artefakts.
+- Nicht mehr vorhandene PDF-Importfunktionen werden nicht länger in Oberfläche und Datenschutzhinweisen angekündigt.
+
 ## 0.9.1 – 25.10.2026
 
 - Die lokale Sicherungsprüfung führt nun sichtbar durch Passwort, Entschlüsselung und Wiederherstellungsvorschau. Während der Prüfung bleibt der Dialog geöffnet; bei falschem Passwort oder einer beschädigten Datei kann direkt erneut versucht werden.

@@ -1,5 +1,6 @@
 dist
 /.pages/
+.demo-dist/
 .regression-dist
 node_modules
 .codex

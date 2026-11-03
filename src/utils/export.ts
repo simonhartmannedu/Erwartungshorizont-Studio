@@ -1,4 +1,4 @@
-import { ClassOverviewData, Exam, ExamSummary } from "../types";
+import { ClassOverviewData, Exam, ExamSummary, Task } from "../types";
 import { formatNumber } from "./format";
 import { getEffectiveGradeScaleMode } from "./gradeScaleGenerator";
 import { getGradeScaleRangeDigits, getGradeScaleRanges } from "./gradeScaleRanges";
@@ -31,7 +31,7 @@ const DOCX_COLORS = {
 const createDocxCell = (
   docx: DocxModule,
   text: string,
-  options: { bold?: boolean; header?: boolean; align?: "left" | "center" | "right"; plain?: boolean } = {},
+  options: { bold?: boolean; header?: boolean; align?: "left" | "center" | "right" } = {},
 ) => {
   const alignment =
     options.align === "center"
@@ -43,18 +43,20 @@ const createDocxCell = (
 
   return new docx.TableCell({
     verticalAlign: docx.VerticalAlign.CENTER,
-    shading: options.plain ? undefined : { fill: isHeader ? DOCX_COLORS.accent : DOCX_COLORS.surface },
-    margins: options.plain ? { top: 35, bottom: 35, left: 50, right: 50 } : { top: 90, bottom: 90, left: 120, right: 120 },
+    // Word expands shaded cells and generous margins noticeably more than the
+    // print layout. The compact export deliberately uses the same restrained,
+    // monochrome table language as the PDF printout.
+    margins: { top: 35, bottom: 35, left: 55, right: 55 },
     children: [
       new docx.Paragraph({
         alignment,
-        spacing: { after: 0, line: options.plain ? 200 : 240 },
+        spacing: { after: 0, line: 190 },
         children: [
           new docx.TextRun({
             text,
             bold: options.bold ?? isHeader,
-            size: 18,
-            color: options.plain || !isHeader ? DOCX_COLORS.ink : "FFFFFF",
+            size: isHeader ? 16 : 17,
+            color: DOCX_COLORS.ink,
           }),
         ],
       }),
@@ -62,13 +64,18 @@ const createDocxCell = (
   });
 };
 
-const createDocxTable = (docx: DocxModule, rows: InstanceType<DocxModule["TableRow"]>[], plain = false) =>
+const createDocxTable = (
+  docx: DocxModule,
+  rows: InstanceType<DocxModule["TableRow"]>[],
+  columnWidths?: number[],
+) =>
   new docx.Table({
     width: { size: 100, type: docx.WidthType.PERCENTAGE },
-    layout: docx.TableLayoutType.AUTOFIT,
+    columnWidths,
+    layout: columnWidths ? docx.TableLayoutType.FIXED : docx.TableLayoutType.AUTOFIT,
     borders: {
-      top: { style: docx.BorderStyle.SINGLE, size: 8, color: plain ? "111111" : DOCX_COLORS.rule },
-      bottom: { style: docx.BorderStyle.SINGLE, size: 8, color: plain ? "111111" : DOCX_COLORS.rule },
+      top: { style: docx.BorderStyle.SINGLE, size: 6, color: "111111" },
+      bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "111111" },
       insideHorizontal: { style: docx.BorderStyle.SINGLE, size: 4, color: DOCX_COLORS.rule },
     },
     rows,
@@ -91,7 +98,7 @@ const createDocxDocument = (
       {
         properties: {
           page: {
-            margin: { top: "16mm", right: "16mm", bottom: "16mm", left: "16mm" },
+            margin: { top: "14mm", right: "14mm", bottom: "14mm", left: "14mm" },
           },
         },
         ...(options.plain
@@ -102,10 +109,10 @@ const createDocxDocument = (
                   children: [
                     new docx.Paragraph({
                       border: { bottom: { style: docx.BorderStyle.SINGLE, size: 10, color: DOCX_COLORS.accent } },
-                      spacing: { after: 100 },
+                      spacing: { after: 60 },
                       children: [
-                        new docx.TextRun({ text: "ERWARTUNGSHORIZONT STUDIO", bold: true, size: 14, color: DOCX_COLORS.accent }),
-                        new docx.TextRun({ text: options.subtitle ? `  ·  ${options.subtitle}` : "", size: 14, color: DOCX_COLORS.muted }),
+                        new docx.TextRun({ text: "ERWARTUNGSHORIZONT STUDIO", bold: true, size: 13, color: DOCX_COLORS.accent }),
+                        new docx.TextRun({ text: options.subtitle ? `  ·  ${options.subtitle}` : "", size: 13, color: DOCX_COLORS.muted }),
                       ],
                     }),
                   ],
@@ -116,10 +123,10 @@ const createDocxDocument = (
                   children: [
                     new docx.Paragraph({
                       alignment: docx.AlignmentType.RIGHT,
-                      spacing: { before: 80 },
+                      spacing: { before: 45 },
                       children: [
-                        new docx.TextRun({ text: "Seite ", size: 16, color: DOCX_COLORS.muted }),
-                        new docx.TextRun({ children: [docx.PageNumber.CURRENT], size: 16, color: DOCX_COLORS.muted }),
+                        new docx.TextRun({ text: "Seite ", size: 14, color: DOCX_COLORS.muted }),
+                        new docx.TextRun({ children: [docx.PageNumber.CURRENT], size: 14, color: DOCX_COLORS.muted }),
                       ],
                     }),
                   ],
@@ -272,6 +279,21 @@ export const getGradeListDocxFilename = (exam: Exam, context?: { className?: str
   return `${sanitizeFilenamePart(context?.className || exam.meta.course || exam.meta.title || "Notenliste")}_Notenliste_${timestamp}.docx`;
 };
 
+/**
+ * Keeps Word and print-PDF semantics aligned: the task wording is always
+ * present, while the expectation is an explicit, configurable addition.
+ */
+export const getTaskDocumentText = (task: Task, showExpectations: boolean) => {
+  const description = task.description.trim();
+  const expectation = task.expectation.trim();
+
+  if (showExpectations && expectation) {
+    return description ? `${description}\nErwartung: ${expectation}` : `Erwartung: ${expectation}`;
+  }
+
+  return description || "—";
+};
+
 const createEditableExamDocxChildren = (
   docx: DocxModule,
   exam: Exam,
@@ -288,18 +310,24 @@ const createEditableExamDocxChildren = (
     ["Lehrkraft", exam.meta.teacher || "—"],
     ["Schüler:in", identity?.fullName || identity?.alias || "—"],
   ];
-  const children = [
+  const metadataLine = meta.map(([label, value]) => `${label}: ${value}`).join("  ·  ");
+  const showExpectations = exam.printSettings.showExpectations;
+  const answerColumnLabel = showExpectations ? "Aufgabe / Erwartung" : "Aufgabe";
+  const children: Array<InstanceType<DocxModule["Paragraph"]> | InstanceType<DocxModule["Table"]>> = [
     new Paragraph({
-      children: [new TextRun({ text: exam.meta.title || "Bewertungsbogen", bold: true, size: 32, color: DOCX_COLORS.ink })],
-      spacing: { after: 80 },
+      children: [new TextRun({ text: exam.meta.title || "Bewertungsbogen", bold: true, size: 28, color: DOCX_COLORS.ink })],
+      spacing: { after: 45 },
     }),
     ...(exam.meta.unit
-      ? [new Paragraph({ children: [new TextRun({ text: exam.meta.unit, italics: true, color: DOCX_COLORS.muted })], spacing: { after: 180 } })]
+      ? [new Paragraph({ children: [new TextRun({ text: exam.meta.unit, italics: true, size: 17, color: DOCX_COLORS.muted })], spacing: { after: 75 } })]
       : []),
-    createDocxTable(docx, meta.map(([label, value]) => new TableRow({ children: [createDocxCell(docx, label, { bold: true }), createDocxCell(docx, value)] }))),
     new Paragraph({
-      children: [new TextRun({ text: "Bewertung", bold: true, size: 24, color: DOCX_COLORS.accent })],
-      spacing: { before: 300, after: 120 },
+      children: [new TextRun({ text: metadataLine, size: 15, color: DOCX_COLORS.muted })],
+      spacing: { after: 130 },
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: "Bewertung", bold: true, size: 20, color: DOCX_COLORS.accent })],
+      spacing: { before: 80, after: 70 },
     }),
   ];
 
@@ -307,48 +335,53 @@ const createEditableExamDocxChildren = (
     const sectionPoints = section.tasks.reduce((total, task) => total + task.maxPoints, 0);
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `${sectionIndex + 1}. ${section.title || "Aufgabenteil"}`, bold: true, size: 22, color: DOCX_COLORS.accent })],
-        spacing: { before: 240, after: 70 },
+        children: [new TextRun({ text: `${sectionIndex + 1}. ${section.title || "Aufgabenteil"}`, bold: true, size: 18, color: DOCX_COLORS.accent })],
+        spacing: { before: 125, after: 35 },
         keepNext: true,
       }),
     );
     if (section.description.trim()) {
-      children.push(new Paragraph({ children: [new TextRun({ text: section.description, color: DOCX_COLORS.muted })], spacing: { after: 100 }, keepNext: true }));
+      children.push(new Paragraph({ children: [new TextRun({ text: section.description, size: 16, color: DOCX_COLORS.muted })], spacing: { after: 45 }, keepNext: true }));
     }
     children.push(
       createDocxTable(docx, [
           new TableRow({
             tableHeader: true,
-            children: [createDocxCell(docx, "Aufgabe", { header: true }), createDocxCell(docx, "Erwartung / mögliche Antwort", { header: true }), createDocxCell(docx, "Punkte", { header: true, align: "center" })],
+            cantSplit: true,
+            children: [createDocxCell(docx, "Aufgabe", { header: true }), createDocxCell(docx, answerColumnLabel, { header: true }), createDocxCell(docx, "Punkte", { header: true, align: "center" })],
           }),
           ...section.tasks.map((task, taskIndex) =>
             new TableRow({
+              cantSplit: true,
               children: [
                 createDocxCell(docx, `${taskIndex + 1}. ${task.title || "Aufgabe"}`),
-                createDocxCell(docx, task.expectation || task.description || "—"),
+                createDocxCell(docx, getTaskDocumentText(task, showExpectations)),
                 createDocxCell(docx, options?.hideResults ? `— / ${formatNumber(task.maxPoints)}` : `${formatNumber(task.achievedPoints)} / ${formatNumber(task.maxPoints)}`, { align: "center" }),
               ],
             }),
           ),
           new TableRow({
+            cantSplit: true,
             children: [createDocxCell(docx, "Summe", { bold: true }), createDocxCell(docx, ""), createDocxCell(docx, `${formatNumber(sectionPoints)} Punkte`, { bold: true, align: "center" })],
           }),
-        ]),
+        ], [1900, 6900, 1300]),
     );
   });
 
   if (!options?.hideResults) {
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "Ergebnis", bold: true, size: 24, color: DOCX_COLORS.accent })],
-        spacing: { before: 300, after: 120 },
+        children: [new TextRun({ text: "Ergebnis", bold: true, size: 20, color: DOCX_COLORS.accent })],
+        spacing: { before: 125, after: 70 },
       }),
       createDocxTable(docx, [
           new TableRow({ children: [createDocxCell(docx, "Gesamtpunkte", { bold: true }), createDocxCell(docx, `${formatNumber(summary.totalAchievedPoints)} / ${formatNumber(summary.totalMaxPoints)}`)] }),
           new TableRow({ children: [createDocxCell(docx, "Prozent", { bold: true }), createDocxCell(docx, `${formatNumber(summary.finalPercentage)} %`)] }),
           new TableRow({ children: [createDocxCell(docx, "Note", { bold: true }), createDocxCell(docx, `${summary.grade.label} · ${summary.grade.verbalLabel}`)] }),
-          new TableRow({ children: [createDocxCell(docx, "Kommentar", { bold: true }), createDocxCell(docx, identity?.teacherComment || "") ] }),
-        ]),
+          ...(exam.printSettings.showTeacherComment
+            ? [new TableRow({ children: [createDocxCell(docx, "Kommentar", { bold: true }), createDocxCell(docx, identity?.teacherComment || "")] })]
+            : []),
+        ], [2600, 7500]),
     );
   }
 
@@ -883,7 +916,7 @@ export const downloadCsvFile = async (
 export const renderPrintDocument = (reports: PrintPayload[]) =>
   reports
     .map(({ exam, summary, identity, options }, reportIndex) => {
-      const teacherComment = options?.hideTeacherComment
+      const teacherComment = options?.hideTeacherComment || !exam.printSettings.showTeacherComment
         ? ""
         : resolveCommentTemplate(identity?.teacherComment?.trim() ?? "", {
             alias: identity?.alias,
@@ -930,8 +963,8 @@ export const renderPrintDocument = (reports: PrintPayload[]) =>
               <strong>${renderText(task.title, "-")}</strong>
             </td>
             <td class="task-answer-cell">
-              <span class="cell-label">Mögliche Schülerantwort</span>
-              <span>${renderText(task.description, "-")}</span>
+              <span class="cell-label">${exam.printSettings.showExpectations ? "Aufgabe / Erwartung" : "Aufgabe"}</span>
+              <span>${renderText(getTaskDocumentText(task, exam.printSettings.showExpectations), "-")}</span>
             </td>
             <td class="score-cell">${renderNumber(task.maxPoints)}</td>
             <td class="score-cell">${renderNumber(task.achievedPoints)}</td>

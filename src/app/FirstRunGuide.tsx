@@ -25,7 +25,7 @@ export const firstRunGuideSteps: FirstRunGuideStep[] = [
     eyebrow: "2. Startpunkt",
     title: "Erstelle deinen Erwartungshorizont",
     body:
-      "Nutze eine Vorlage, einen PDF-Import oder eine leere Struktur. Dabei wird eine Klassenarbeit angelegt, an der später die Schülerergebnisse hängen.",
+      "Nutze eine Vorlage oder eine leere Struktur. Dabei wird eine Klassenarbeit angelegt, an der später die Schülerergebnisse hängen.",
     actionLabel: "EWH erstellen",
   },
   {

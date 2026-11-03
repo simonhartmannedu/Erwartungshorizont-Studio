@@ -1397,7 +1397,7 @@ export const GuidedExamBuilder = ({
           <p className="label">Schnellentscheidung</p>
           <h2 className="themed-strong mt-2 text-2xl font-semibold">Erwartungshorizont erstellen</h2>
           <p className="themed-muted mt-2 max-w-3xl text-sm leading-6">
-            Starte mit einer Vorlage, einer PDF oder einer leeren Struktur. Die passende Grundlage landet sofort im
+            Starte mit einer Vorlage oder einer leeren Struktur. Die passende Grundlage landet sofort im
             EWH-Editor und kann dort weiter angepasst werden. Vor dem Einsatz bitte mit den aktuellen Vorgaben der
             Standardsicherung NRW abgleichen.
           </p>
@@ -1516,7 +1516,7 @@ export const GuidedExamBuilder = ({
                 <div>
                   <h3 className="themed-strong text-base font-semibold">Keine passende Vorlage gefunden</h3>
                   <p className="themed-muted mt-1 text-sm leading-6">
-                    Suche breiter oder starte mit PDF-Import beziehungsweise einer leeren Struktur.
+                    Suche breiter oder starte mit einer leeren Struktur.
                   </p>
                 </div>
               </div>

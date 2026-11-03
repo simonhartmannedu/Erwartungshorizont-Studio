@@ -13,7 +13,7 @@ npm run test
 npm run build
 ```
 
-Vor einem Release führst du zusätzlich `npm run test:regression` und `npm run build:demo` aus. `npm run check:release` bündelt alle Qualitätsprüfungen: Es baut die Produktionsversion und führt die E2E-Tests anschließend gegen diese Build-Ausgabe aus. Für einen einzelnen Lauf nach einem vorhandenen Build verwendest du `npm run test:e2e:preview`.
+Vor einem Release führst du zusätzlich `npm run test:regression` und `npm run build:demo` aus. `npm run check:release` bündelt Lint, Typprüfung, Unit- und Regressionstests sowie Produktionsbuild und E2E-Tests gegen diese Build-Ausgabe. Für einen einzelnen Lauf nach einem vorhandenen Build verwendest du `npm run test:e2e:preview`. Der Release-Workflow prüft zusätzlich den Demo-Build, bevor er ein Tag-Artefakt erstellt.
 
 ## Größere Updates abschließen
 
@@ -43,10 +43,6 @@ Bei Storage, Migrationen, Backups, Wiederherstellung, Importen, Exporten oder Kr
 4. Verwende nur fiktive Testdaten.
 
 Die Daten liegen als sql.js-Datenbank in IndexedDB. Jede Speicherung prüft eine Revision, damit ein zweiter Tab keinen neueren Arbeitsstand überschreibt. Bei einem Konflikt muss die Seite neu geladen werden.
-
-## PDF-Import
-
-PDFs dürfen erst nach Einwilligung verarbeitet werden. Browser und lokaler Dienst begrenzen Dateien auf 8 MB; der Dienst begrenzt auch parallele Aufträge und Laufzeiten. Die PDF-Verarbeitung läuft im lokalen Entwicklungsdienst. Wenn du anders bereitstellst, dokumentiere klar, wo PDFs verarbeitet werden und ob Daten das Gerät verlassen.
 
 ## Kleine Regeln, die viel Ärger sparen
 

@@ -45,7 +45,6 @@ Die Anwendung ist **local-first**: Arbeitsstände und Schülerdaten liegen im Br
 - Namen werden für geschützte Lerngruppen verschlüsselt gespeichert.
 - Punkte, Kommentare, Signaturen und Teilnahmestatus pro Klassenarbeit können mit dem Gruppenpasswort geschützt werden.
 - Backup-Dateien werden mit einem von dir gewählten Passwort verschlüsselt; dieses Passwort speichert die Anwendung nicht.
-- Eine PDF wird erst nach einer ausdrücklichen Einwilligung verarbeitet. Die Anwendung weist vor der Übernahme auf mögliche sensible Inhalte hin.
 - Bei mehreren geöffneten Tabs stoppt die Anwendung das Speichern, bevor ein neuerer Datenstand überschrieben werden könnte.
 
 Das ersetzt keine schulische Datenschutzprüfung: Besonders auf gemeinsam genutzten Geräten solltest du geschützte Gruppen sperren, den Browser nach der Arbeit schließen und regelmäßig ein verschlüsseltes Backup außerhalb des Browserprofils ablegen.

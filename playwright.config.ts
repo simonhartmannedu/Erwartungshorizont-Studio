@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // Password derivation is intentionally expensive. Two workers keep browser
+  // interactions responsive on ordinary teacher laptops and CI runners.
+  workers: 2,
+  timeout: 60_000,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",

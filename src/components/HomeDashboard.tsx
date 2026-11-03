@@ -219,7 +219,7 @@ export const HomeDashboard = ({
           ) : (
             <div className="home-empty-state">
               <div className="home-empty-icon"><TemplateIcon className="h-5 w-5" /></div>
-              <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage, nutze eine PDF oder lege die Struktur selbst an.</p></div>
+              <div><strong>Dein nächster Erwartungshorizont beginnt hier.</strong><p>Wähle eine Vorlage oder lege die Struktur selbst an.</p></div>
               <button type="button" onClick={() => onNavigate(currentWorkflowStep?.destination ?? "guidedBuilder")}>{currentWorkflowStep?.actionLabel ?? "EWH erstellen"} <ChevronRightIcon /></button>
             </div>
           )}
