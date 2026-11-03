@@ -1,6 +1,6 @@
 import { Task } from "../types";
-import { DuplicateIcon, PlusIcon, TrashIcon } from "./icons";
-import { Field, IconButton, NumberInput, TextAreaField } from "./ui";
+import { DuplicateIcon, ListIcon, PlusIcon, TrashIcon } from "./icons";
+import { canTransformToBulletList, Field, IconButton, NumberInput, TextAreaField, toBulletList } from "./ui";
 
 interface Props {
   tasks: Task[];
@@ -86,16 +86,26 @@ export const TaskTable = ({
               <p className="label !mb-1">Unteraufgabe</p>
               <p className="themed-strong text-sm font-semibold">{index + 1}. Aufgabe</p>
             </div>
-            <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1">
-              <IconButton onClick={() => onMove(task.id, "up")} title="Nach oben" className="px-2.5 py-2 text-xs">
+            <div className="control-cluster inline-flex flex-col items-center gap-1 rounded-2xl border p-1" role="group" aria-label={`Unteraufgabenaktionen für ${task.title.trim() || `Unteraufgabe ${index + 1}`}`}>
+              <IconButton onClick={() => onMove(task.id, "up")} title="Nach oben" className="px-2.5 py-2 text-xs" disabled={index === 0}>
                 ↑
               </IconButton>
-              <IconButton onClick={() => onMove(task.id, "down")} title="Nach unten" className="px-2.5 py-2 text-xs">
+              <IconButton onClick={() => onMove(task.id, "down")} title="Nach unten" className="px-2.5 py-2 text-xs" disabled={index === tasks.length - 1}>
                 ↓
+              </IconButton>
+              <IconButton
+                onClick={() => onChange(task.id, { description: toBulletList(task.description) })}
+                title="In Liste umwandeln"
+                variant="soft"
+                className="px-2.5 py-2 text-xs"
+                disabled={!canTransformToBulletList(task.description)}
+              >
+                <ListIcon />
               </IconButton>
               <IconButton onClick={() => onDuplicate(task.id)} title="Duplizieren" className="px-2.5 py-2 text-xs">
                 <DuplicateIcon />
               </IconButton>
+              <span aria-hidden="true" className="my-0.5 h-px w-6 bg-current opacity-20" />
               <IconButton onClick={() => onDelete(task.id)} title="Löschen" variant="soft" className="px-2.5 py-2 text-xs">
                 <TrashIcon />
               </IconButton>
@@ -113,7 +123,6 @@ export const TaskTable = ({
               <TextAreaField
                 className="min-h-28 !px-3 !py-2.5 text-sm leading-6"
                 value={task.description}
-                showListTransform
                 onValueChange={(value) => onChange(task.id, { description: value })}
                 placeholder="Stichpunkte oder mögliche Schülerantwort"
               />
@@ -149,10 +158,10 @@ export const TaskTable = ({
           <table className="min-w-full text-xs">
             <colgroup>
               <col className="w-[20%]" />
-              <col className="w-[52%]" />
+              <col className="w-[58%]" />
               <col className="w-[7%]" />
               {showScores ? <col className="w-[7%]" /> : null}
-              <col className="w-[14%]" />
+              <col className="w-[8%]" />
             </colgroup>
             <thead className="themed-table-head">
               <tr className="text-left text-xs uppercase tracking-[0.16em]">
@@ -164,7 +173,7 @@ export const TaskTable = ({
               </tr>
             </thead>
             <tbody className="themed-table-body">
-              {tasks.map((task) => (
+              {tasks.map((task, index) => (
                 <tr
                   key={task.id}
                   data-editor-anchor={getTaskAnchorId?.(task)}
@@ -190,7 +199,6 @@ export const TaskTable = ({
                       <TextAreaField
                         className="min-h-28 min-w-[18rem] !px-3 !py-2.5 text-sm leading-6"
                         value={task.description}
-                        showListTransform
                         onValueChange={(value) => onChange(task.id, { description: value })}
                         placeholder="Stichpunkte oder mögliche Schülerantwort"
                       />
@@ -216,16 +224,26 @@ export const TaskTable = ({
                   ) : null}
                   <td className="px-3 py-3">
                     <div className="flex justify-end">
-                      <div className="control-cluster inline-flex items-center gap-1 rounded-full border p-1">
-                        <IconButton onClick={() => onMove(task.id, "up")} title="Nach oben" className="px-2.5 py-2 text-xs">
+                      <div className="control-cluster inline-flex flex-col items-center gap-1 rounded-2xl border p-1" role="group" aria-label={`Unteraufgabenaktionen für ${task.title.trim() || `Unteraufgabe ${index + 1}`}`}>
+                        <IconButton onClick={() => onMove(task.id, "up")} title="Nach oben" className="px-2.5 py-2 text-xs" disabled={index === 0}>
                           ↑
                         </IconButton>
-                        <IconButton onClick={() => onMove(task.id, "down")} title="Nach unten" className="px-2.5 py-2 text-xs">
+                        <IconButton onClick={() => onMove(task.id, "down")} title="Nach unten" className="px-2.5 py-2 text-xs" disabled={index === tasks.length - 1}>
                           ↓
+                        </IconButton>
+                        <IconButton
+                          onClick={() => onChange(task.id, { description: toBulletList(task.description) })}
+                          title="In Liste umwandeln"
+                          variant="soft"
+                          className="px-2.5 py-2 text-xs"
+                          disabled={!canTransformToBulletList(task.description)}
+                        >
+                          <ListIcon />
                         </IconButton>
                         <IconButton onClick={() => onDuplicate(task.id)} title="Duplizieren" className="px-2.5 py-2 text-xs">
                           <DuplicateIcon />
                         </IconButton>
+                        <span aria-hidden="true" className="my-0.5 h-px w-6 bg-current opacity-20" />
                         <IconButton onClick={() => onDelete(task.id)} title="Löschen" variant="soft" className="px-2.5 py-2 text-xs">
                           <TrashIcon />
                         </IconButton>

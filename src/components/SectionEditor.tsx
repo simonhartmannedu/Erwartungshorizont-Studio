@@ -143,14 +143,14 @@ export const SectionEditor = ({
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
         actions={
-          <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1 shadow-sm sm:flex-nowrap">
-            <IconButton onClick={() => onMove("up")} title="Aufgabenteil nach oben" className="px-2.5 py-2 text-xs">
+          <div className="inline-flex items-center gap-1" role="group" aria-label={`Aktionen für ${section.title || `Aufgabenteil ${index + 1}`}`}>
+            <IconButton onClick={() => onMove("up")} title="Aufgabenteil nach oben" className="px-2 py-1.5 text-xs">
               ↑
             </IconButton>
-            <IconButton onClick={() => onMove("down")} title="Aufgabenteil nach unten" className="px-2.5 py-2 text-xs">
+            <IconButton onClick={() => onMove("down")} title="Aufgabenteil nach unten" className="px-2 py-1.5 text-xs">
               ↓
             </IconButton>
-            <IconButton onClick={onDuplicate} title="Aufgabenteil duplizieren" className="px-2.5 py-2 text-xs">
+            <IconButton onClick={onDuplicate} title="Aufgabenteil duplizieren" className="px-2 py-1.5 text-xs">
               <DuplicateIcon />
             </IconButton>
             {(linkedSectionTitle || linkTargetTitle) && (
@@ -161,12 +161,12 @@ export const SectionEditor = ({
                     ? `Verknüpfung mit ${linkedSectionTitle} lösen`
                     : `Mit ${linkTargetTitle} verknüpfen`
                 }
-                className="px-2.5 py-2 text-xs"
+                className="px-2 py-1.5 text-xs"
               >
                 {linkedSectionTitle ? <UnlinkIcon /> : <LinkIcon />}
               </IconButton>
             )}
-            <IconButton onClick={onDelete} title="Aufgabenteil löschen" variant="soft" className="px-2.5 py-2 text-xs">
+            <IconButton onClick={onDelete} title="Aufgabenteil löschen" variant="soft" className="px-2 py-1.5 text-xs">
               <TrashIcon />
             </IconButton>
           </div>
@@ -231,7 +231,6 @@ export const SectionEditor = ({
             <TextAreaField
               className="min-h-24 !px-3 !py-2.5 text-sm"
               value={section.note}
-              showListTransform
               onValueChange={(value) => onChange({ note: value })}
               placeholder="Hinweise, Bewertungsraster, Erwartungshorizont"
             />

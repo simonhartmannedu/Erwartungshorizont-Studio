@@ -890,12 +890,9 @@ const escapeCsvCell = (value: string | number | boolean | null | undefined) => {
   return `"${normalized.replace(/"/g, "\"\"")}"`;
 };
 
-export const downloadCsvFile = async (
-  filename: string,
+export const buildCsvContent = (
   rows: Array<Record<string, string | number | boolean | null | undefined>>,
 ) => {
-  if (rows.length === 0) return "cancelled" as const;
-
   const headers = Array.from(
     rows.reduce((set, row) => {
       Object.keys(row).forEach((key) => set.add(key));
@@ -907,7 +904,17 @@ export const downloadCsvFile = async (
     ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(";")),
   ].join("\r\n");
 
-  return saveBlobWithDialog(`${filename}.csv`, new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" }), {
+  // The BOM makes UTF-8 reliably recognisable for Excel on Windows.
+  return `\uFEFF${csv}`;
+};
+
+export const downloadCsvFile = async (
+  filename: string,
+  rows: Array<Record<string, string | number | boolean | null | undefined>>,
+) => {
+  if (rows.length === 0) return "cancelled" as const;
+
+  return saveBlobWithDialog(`${filename}.csv`, new Blob([buildCsvContent(rows)], { type: "text/csv;charset=utf-8;" }), {
     description: "CSV-Notenübersicht",
     accept: { "text/csv": [".csv"] },
   });

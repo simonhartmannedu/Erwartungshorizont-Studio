@@ -456,7 +456,12 @@ const createDraftBundle = (exam: Exam, label = "Klassenarbeit 1"): DraftBundle =
 };
 
 const reorder = <T,>(items: T[], currentIndex: number, nextIndex: number) => {
-  if (nextIndex < 0 || nextIndex >= items.length) return items;
+  if (
+    currentIndex < 0 ||
+    currentIndex >= items.length ||
+    nextIndex < 0 ||
+    nextIndex >= items.length
+  ) return items;
   const cloned = [...items];
   const [item] = cloned.splice(currentIndex, 1);
   cloned.splice(nextIndex, 0, item);

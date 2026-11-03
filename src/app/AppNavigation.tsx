@@ -14,7 +14,7 @@ export const tabs: { id: AppTabId; label: string }[] = [
   { id: "home", label: "Übersicht" },
   { id: "groups", label: "Lerngruppen" },
   { id: "guidedBuilder", label: "Klassenarbeit erstellen" },
-  { id: "builder", label: "Klassenarbeiten editieren" },
+  { id: "builder", label: "Klassenarbeit korrigieren" },
   { id: "archive", label: "Archiv" },
   { id: "backup", label: "Backup" },
 ];

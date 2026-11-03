@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("organisiert die Klassenarbeit in Vorbereitung, Korrektur und Ausgabe", async ({ page }) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
-  await page.getByRole("tab", { name: "Klassenarbeiten editieren" }).click();
+  await page.getByRole("tab", { name: "Klassenarbeit korrigieren" }).click();
 
   const setupTab = page.getByRole("tab", { name: "Vorbereiten", exact: true });
   const tasksTab = page.getByRole("tab", { name: "Korrigieren", exact: true });
@@ -17,6 +17,11 @@ test("organisiert die Klassenarbeit in Vorbereitung, Korrektur und Ausgabe", asy
   await expect(page.getByText("Geteilte Rubrik, individuelle Punkte", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Titel der Klassenarbeit")).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Drucken und exportieren" })).not.toBeVisible();
+  await page.locator(".section-editor").first().getByRole("button").first().click();
+  const taskActions = page.getByRole("group", { name: /Unteraufgabenaktionen für/ }).first();
+  await expect(taskActions).toHaveCSS("flex-direction", "column");
+  await expect(taskActions.getByRole("button", { name: "Nach oben" })).toBeDisabled();
+  await expect(taskActions.getByRole("button", { name: "In Liste umwandeln" })).toBeVisible();
 
   await resultTab.click();
   await expect(resultTab).toHaveAttribute("aria-selected", "true");

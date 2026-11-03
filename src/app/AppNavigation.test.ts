@@ -8,7 +8,7 @@ describe("AppNavigation", () => {
       "Übersicht",
       "Lerngruppen",
       "Klassenarbeit erstellen",
-      "Klassenarbeiten editieren",
+      "Klassenarbeit korrigieren",
       "Archiv",
       "Backup",
     ]);

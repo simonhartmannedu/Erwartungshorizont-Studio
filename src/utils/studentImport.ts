@@ -47,6 +47,27 @@ const repairMojibake = (value: string) => {
 
 const cleanCell = (value: string) => repairMojibake(value).trim();
 
+const detectUtf16EncodingWithoutBom = (bytes: Uint8Array) => {
+  const sample = bytes.subarray(0, Math.min(bytes.length, 200));
+  const pairCount = Math.floor(sample.length / 2);
+  if (pairCount < 2) return null;
+
+  let evenNullBytes = 0;
+  let oddNullBytes = 0;
+  for (let index = 0; index < pairCount * 2; index += 2) {
+    if (sample[index] === 0) evenNullBytes += 1;
+    if (sample[index + 1] === 0) oddNullBytes += 1;
+  }
+
+  // UTF-16 text created by spreadsheet software occasionally lacks its BOM.
+  // ASCII-based CSV headers still reveal the byte order through the recurring
+  // zero bytes, while regular UTF-8/Windows-1252 files do not.
+  const nullByteThreshold = pairCount * 0.35;
+  if (oddNullBytes >= nullByteThreshold) return "utf-16le";
+  if (evenNullBytes >= nullByteThreshold) return "utf-16be";
+  return null;
+};
+
 const decodeCsvFile = async (file: File) => {
   const bytes = new Uint8Array(await file.arrayBuffer());
 
@@ -58,6 +79,11 @@ const decodeCsvFile = async (file: File) => {
   }
   if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return new TextDecoder("utf-8").decode(bytes.subarray(3));
+  }
+
+  const utf16Encoding = detectUtf16EncodingWithoutBom(bytes);
+  if (utf16Encoding) {
+    return new TextDecoder(utf16Encoding).decode(bytes);
   }
 
   try {

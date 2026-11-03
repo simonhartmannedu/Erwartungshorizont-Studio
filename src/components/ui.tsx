@@ -242,6 +242,20 @@ export const NumberInput = ({
   );
 };
 
+export const toBulletList = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => `- ${item}`)
+    .join("\n");
+
+export const canTransformToBulletList = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean).length >= 2;
+
 export const TextAreaField = ({
   className = "",
   spellCheck = true,
@@ -258,14 +272,6 @@ export const TextAreaField = ({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [previousCompactValue, setPreviousCompactValue] = useState<string | null>(null);
   const currentValue = typeof props.value === "string" ? props.value : typeof props.defaultValue === "string" ? props.defaultValue : "";
-
-  const toBulletList = (value: string) =>
-    value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .map((item) => `- ${item}`)
-      .join("\n");
 
   const syncHeight = () => {
     const element = textareaRef.current;
@@ -293,12 +299,7 @@ export const TextAreaField = ({
     onChange?.(event);
   };
 
-  const commaSeparatedItems = currentValue
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  const canTransformToList = showListTransform && commaSeparatedItems.length >= 2 && Boolean(onValueChange);
+  const canTransformToList = showListTransform && canTransformToBulletList(currentValue) && Boolean(onValueChange);
   const canRestoreCompact = showListTransform && Boolean(onValueChange && previousCompactValue);
 
   const handleListTransform = () => {

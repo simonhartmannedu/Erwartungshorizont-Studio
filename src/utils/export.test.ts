@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sampleExam } from "../data/sampleExam";
 import { calculateExamSummary } from "./calculations";
-import { getTaskDocumentText, renderPrintDocument } from "./export";
+import { buildCsvContent, getTaskDocumentText, renderPrintDocument } from "./export";
 
 describe("Dokumentausgabe", () => {
   const task = {
@@ -47,5 +47,16 @@ describe("Dokumentausgabe", () => {
     expect(document).toContain("Begründe deine Entscheidung mit einer Textstelle.");
     expect(document).not.toContain("Die Textstelle passt zur gewählten Entscheidung.");
     expect(document).not.toContain("Individuelle Rückmeldung");
+  });
+});
+
+describe("CSV-Export", () => {
+  it("schreibt Namen mit deutschen Umlauten als UTF-8 mit BOM", () => {
+    expect(buildCsvContent([
+      { Schuelername: "Änne Özdemir", Klasse: "10a" },
+      { Schuelername: "Ümit Müller", Klasse: "10a" },
+    ])).toBe(
+      "\uFEFF\"Schuelername\";\"Klasse\"\r\n\"Änne Özdemir\";\"10a\"\r\n\"Ümit Müller\";\"10a\"",
+    );
   });
 });
