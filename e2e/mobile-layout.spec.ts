@@ -6,7 +6,7 @@ test("nutzt auf kleinen Displays die verfügbare Breite ohne horizontalen Seiten
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await page.getByRole("tab", { name: "Klassenarbeit korrigieren" }).click();
-  await page.getByRole("tab", { name: "Korrigieren" }).click();
+  await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
 
   await expect(page.locator(".local-save-status")).toContainText(/Speichert lokal|Lokal gespeichert/);
   await expect(page.getByRole("button", { name: /Arbeitskontext/ })).toBeVisible();
@@ -33,7 +33,7 @@ test("richtet die Auswahl ab Tabletbreite bündig zum Inhaltsbereich aus", async
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await page.getByRole("tab", { name: "Klassenarbeit korrigieren" }).click();
-  await page.getByRole("tab", { name: "Korrigieren" }).click();
+  await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
 
   const positions = await page.evaluate(() => {
     const selectionCard = Array.from(document.querySelectorAll("h2"))
