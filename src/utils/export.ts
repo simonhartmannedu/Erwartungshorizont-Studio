@@ -446,12 +446,12 @@ export const exportGradeScaleDocx = async (
     new Paragraph({ children: [new TextRun({ text: exam.meta.title || "Notenbereiche", bold: true, size: 32, color: DOCX_COLORS.ink })], spacing: { after: 80 } }),
     new Paragraph({ children: [new TextRun({ text: `${exam.gradeScale.title || "Notenschlüssel"} · ${formatNumber(summary.totalMaxPoints)} Gesamtpunkte`, color: DOCX_COLORS.muted })], spacing: { after: 180 } }),
     createDocxTable(docx, [
-        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Note", { header: true, align: "center" }), createDocxCell(docx, "Von", { header: true, align: "center" }), createDocxCell(docx, "Bis", { header: true, align: "center" })] }),
+        new TableRow({ tableHeader: true, children: [createDocxCell(docx, "Note", { header: true, align: "center" }), createDocxCell(docx, "Bis", { header: true, align: "center" }), createDocxCell(docx, "Von", { header: true, align: "center" })] }),
         ...ranges.map((range) => new TableRow({
           children: [
             createDocxCell(docx, range.label, { bold: true, align: "center" }),
-            createDocxCell(docx, formatNumber(Number(range.lowerBound.toFixed(digits))), { align: "center" }),
             createDocxCell(docx, formatNumber(Number(range.upperBound.toFixed(digits))), { align: "center" }),
+            createDocxCell(docx, formatNumber(Number(range.lowerBound.toFixed(digits))), { align: "center" }),
           ],
         })),
       ]),
@@ -840,7 +840,7 @@ const renderCompactGradeScaleBlock = (exam: Exam, totalMaxPoints: number) => {
             ${ranges
               .map(
                 (range) =>
-                  `<td>${renderNumber(Number(range.lowerBound.toFixed(rangeDigits)))} - ${renderNumber(Number(range.upperBound.toFixed(rangeDigits)))}</td>`,
+                  `<td>${renderNumber(Number(range.upperBound.toFixed(rangeDigits)))} - ${renderNumber(Number(range.lowerBound.toFixed(rangeDigits)))}</td>`,
               )
               .join("")}
           </tr>
@@ -1206,7 +1206,7 @@ export const openGradeScalePrintWindow = (
                 ${ranges
                   .map(
                     (range) =>
-                      `<td>${renderNumber(Number(range.lowerBound.toFixed(rangeDigits)))} - ${renderNumber(Number(range.upperBound.toFixed(rangeDigits)))}</td>`,
+                      `<td>${renderNumber(Number(range.upperBound.toFixed(rangeDigits)))} - ${renderNumber(Number(range.lowerBound.toFixed(rangeDigits)))}</td>`,
                   )
                   .join("")}
               </tr>
@@ -1449,7 +1449,7 @@ export const openSecurityTokenPrintWindow = (entries: SecurityTokenCard[]) => {
           .token-meta { margin-top: 6px; font-size: 13px; color: #333; }
           .token-value-wrap { margin-top: 16px; border: 1px dashed #666; border-radius: 14px; padding: 14px 16px; }
           .token-value-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: #555; font-weight: 700; }
-          .token-value { margin-top: 10px; font-size: 24px; font-weight: 700; letter-spacing: 0.16em; font-family: "Courier New", monospace; }
+          .token-value { margin-top: 10px; font-size: 24px; font-weight: 700; font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-variant-numeric: tabular-nums; letter-spacing: normal; word-spacing: normal; white-space: nowrap; }
           .token-note { margin-top: 12px; font-size: 11px; color: #444; }
           @page { size: A4 portrait; margin: 14mm; }
         </style>

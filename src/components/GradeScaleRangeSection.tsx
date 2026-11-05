@@ -47,7 +47,7 @@ export const GradeScaleRangeSection = ({
             <tr className="themed-table-row">
               {gradeRanges.map((band) => (
                 <td key={band.id} className="themed-strong px-4 py-3 text-center text-[10px] font-semibold">
-                  {formatNumber(band.lowerBound, rangeDigits)} - {formatNumber(band.upperBound, rangeDigits)} P.
+                  {formatNumber(band.upperBound, rangeDigits)} - {formatNumber(band.lowerBound, rangeDigits)} P.
                 </td>
               ))}
             </tr>

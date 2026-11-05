@@ -5496,7 +5496,15 @@ function App() {
               <p className="themed-muted mt-1 text-xs">Gruppen-ID: {entry.groupId}</p>
               <div className="surface-elevated mt-3 rounded-2xl border p-4">
                 <p className="label">Security-Token</p>
-                <p className="themed-strong text-lg font-semibold tracking-[0.18em]" style={{ fontFamily: "\"Courier New\", monospace" }}>
+                <p
+                  className="themed-strong text-lg font-semibold whitespace-nowrap"
+                  style={{
+                    fontFamily: "ui-monospace, \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace",
+                    fontVariantNumeric: "tabular-nums",
+                    letterSpacing: "normal",
+                    wordSpacing: "normal",
+                  }}
+                >
                   {entry.token}
                 </p>
               </div>
