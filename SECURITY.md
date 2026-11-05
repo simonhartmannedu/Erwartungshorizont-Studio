@@ -16,8 +16,10 @@ Besonders kritisch sind Änderungen an Browser-Storage, Migrationen, Backup-/Res
 
 ## Kryptografie und sensible Daten
 
-Die App verwendet Browser-Kryptografie für geschützte Gruppen und verschlüsselte Backups. Passwörter und ableitbare Klartextschlüssel werden nicht dauerhaft gespeichert. Entschlüsselte Daten können während einer aktiven Sitzung im JavaScript-Arbeitsspeicher liegen; eine vollständige sichere Bereinigung durch JavaScript ist nicht zusicherbar. Ergänzende Bedien- und Speichergrenzen stehen in [Datenschutz und Datenhaltung](docs/data-and-privacy.md).
+Die App verwendet Web Crypto für geschützte Gruppen und verschlüsselte Backups: PBKDF2-HMAC-SHA-256 mit 250.000 Iterationen und zufälligem 16-Byte-Salt leitet einen AES-256-GCM-Schlüssel ab; jede Verschlüsselung erhält einen zufälligen 12-Byte-Initialisierungsvektor. Passwörter und ableitbare Klartextschlüssel werden nicht dauerhaft gespeichert.
+
+Namen sowie die bewertungsbezogenen Daten geschützter Gruppen (Punkte, Kommentare, Signaturen, Teilnahmestatus und Antwortbogencodes) werden verschlüsselt gespeichert. Entschlüsselte Daten und das Gruppenpasswort können während einer aktiven Entsperrsitzung im JavaScript-Arbeitsspeicher liegen. Nach 15 Minuten ohne Aktivität sperrt die Anwendung entsperrte Gruppen; eine vollständige sichere Bereinigung durch JavaScript ist dennoch nicht zusicherbar. Ergänzende Bedien-, Speicher- und Backupgrenzen stehen in [Datenschutz und Datenhaltung](docs/data-and-privacy.md).
 
 ## Bekannte Grenzen
 
-Die Anwendung verarbeitet Daten lokal im Browser; das ist keine Zusicherung vollständiger Sicherheit, eine Sicherheitsprüfung oder automatische DSGVO-Konformität. Entschlüsselte Daten können während einer aktiven Sitzung im Arbeitsspeicher liegen. Browserprofil-Löschung und verlorene Backup-Passwörter können eine Wiederherstellung unmöglich machen.
+Die Anwendung verarbeitet Daten lokal im Browser; das ist keine Zusicherung vollständiger Sicherheit, eine Sicherheitsprüfung oder automatische DSGVO-Konformität. Ein entsperrtes oder kompromittiertes Gerät, Schadsoftware, Browser-Erweiterungen mit weitreichenden Rechten und eine offene Sitzung liegen außerhalb des Schutzes der gespeicherten Verschlüsselung. Browserprofil-Löschung und verlorene Backup-Passwörter können eine Wiederherstellung unmöglich machen. Backup-Dateiname sowie Format, Version und Erstellzeit bleiben unverschlüsselt.

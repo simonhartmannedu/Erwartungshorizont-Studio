@@ -13,7 +13,7 @@ npm run test
 npm run build
 ```
 
-Vor einem Release führst du zusätzlich `npm run test:regression` und `npm run build:demo` aus. `npm run check:release` bündelt Lint, Typprüfung, Unit- und Regressionstests sowie Produktionsbuild und E2E-Tests gegen diese Build-Ausgabe. Für einen einzelnen Lauf nach einem vorhandenen Build verwendest du `npm run test:e2e:preview`. Der Release-Workflow prüft zusätzlich den Demo-Build, bevor er ein Tag-Artefakt erstellt.
+Vor einem Release führst du zusätzlich `npm run build:demo` aus; die Regressionstests sind bereits in `npm run check:release` enthalten. Dieser Befehl bündelt Lint, Typprüfung, Unit- und Regressionstests sowie Produktionsbuild und E2E-Tests gegen diese Build-Ausgabe. Für einen einzelnen Lauf nach einem vorhandenen Build verwendest du `npm run test:e2e:preview`. Der Release-Workflow prüft zusätzlich den Demo-Build, bevor er ein Tag-Artefakt erstellt.
 
 ## Größere Updates abschließen
 
@@ -22,7 +22,7 @@ Bei jeder größeren, sichtbaren Änderung gehört die Releasepflege zum Abschlu
 1. Versionsnummer nach Semantic Versioning in `package.json` und `package-lock.json` erhöhen.
 2. Den neuen Abschnitt in `CHANGELOG.md` mit Datum und den sichtbaren Änderungen ergänzen.
 3. Die Release-Informationen im Terminal auf `landing/index.html` (Versionsnummer, ARIA-Label und Meldungen) auf dieselbe Version bringen.
-4. `npm run check:release` ausführen. Wenn der vollständige Lauf lokal nicht praktikabel ist, mindestens die betroffenen E2E-Spezifikationen sowie Lint, Typprüfung, Unit-Tests und Build dokumentieren.
+4. `npm run check:release` und `npm run build:demo` ausführen. Wenn der vollständige Lauf lokal nicht praktikabel ist, mindestens die betroffenen E2E-Spezifikationen sowie Lint, Typprüfung, Unit-Tests und Build dokumentieren.
 
 ## Wo Änderungen hingehören
 

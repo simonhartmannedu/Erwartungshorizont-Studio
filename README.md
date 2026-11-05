@@ -13,10 +13,10 @@ Der Schulalltag rund um Klassenarbeiten besteht oft aus vielen kleinen, fehleran
 Damit kannst du:
 
 - Erwartungshorizonte, Aufgaben, Punkte und Notenschlüssel erstellen und wiederverwenden;
-- Lerngruppen aus CSV-, XLSX- oder ODS-Dateien übernehmen;
+- Lerngruppen aus CSV- oder TXT-Dateien übernehmen;
 - Punkte, Kommentare und Unterschriften pro Schüler*in erfassen;
 - Teilnahme je Klassenarbeit als anwesend, abwesend, entschuldigt oder „schreibt nach“ dokumentieren;
-- Korrekturübersichten, Bewertungsbögen sowie CSV-, XLSX-, ODS- und DOCX-Dateien erzeugen;
+- Bewertungsbögen, Klassenübersichten und Notenlisten als Druck-PDF, Word-Datei und – für Notenlisten – CSV ausgeben;
 - abgeschlossene Arbeiten archivieren und für das nächste Schuljahr wiederverwenden;
 - verschlüsselte Sicherungen deines Arbeitsstands anlegen.
 
@@ -51,6 +51,26 @@ Das ersetzt keine schulische Datenschutzprüfung: Besonders auf gemeinsam genutz
 
 Wichtig: Das Löschen des Browserprofils, privates Surfen, Speicherbereinigung oder ein Gerätewechsel können lokale Daten entfernen. Ein verlorenes Backup-Passwort kann nicht wiederhergestellt werden. Mehr dazu steht in [Datenschutz und Datenhaltung](docs/data-and-privacy.md).
 
+```mermaid
+flowchart TB
+  Teacher[Lehrkraft] --> App[EWH-Studio im Browser]
+  App -->|Arbeitsstände, Archive, Lerngruppen| Storage[(sql.js in IndexedDB)]
+  App -->|Darstellung, Backup-Status| Settings[localStorage]
+
+  subgraph Protected[Geschützte Lerngruppe]
+    Sensitive[Namen, Punkte, Kommentare,<br/>Signaturen, Teilnahme] --> Crypto[Web Crypto<br/>Passwortbasierte Verschlüsselung]
+    Crypto --> Storage
+  end
+
+  App -->|Backup-Passwort| Backup[Verschlüsselte Backup-Datei]
+  Backup --> Local[Download oder ausdrücklich gewählter lokaler Ordner]
+  Local -. optional .-> Nextcloud[Lokaler Nextcloud-Sync-Ordner]
+  Nextcloud -. synchronisiert durch .-> Client[Nextcloud-Desktop-Client]
+  App -. keine Arbeits- oder Schülerdaten .-> NoServer[Kein EWH-Backend,<br/>keine Telemetrie]
+```
+
+Die Verschlüsselung schützt gespeicherte Daten und Sicherungen, nicht jedoch ein bereits entsperrtes Gerät oder eine offene Sitzung. Die technischen Details und Grenzen stehen in [Datenschutz und Datenhaltung](docs/data-and-privacy.md) und [SECURITY.md](SECURITY.md).
+
 ## Schnellstart
 
 Voraussetzung ist Node.js 24; diese Version verwendet auch die CI.
@@ -64,11 +84,13 @@ Für die normale Nutzung genügt die gehostete Demo oder eine lokale Installatio
 
 ## Für die Wartung
 
-Das Projekt ist bewusst auch für eine einzelne wartende Person überschaubar gehalten. Vor einem Pull Request oder Release genügt in der Regel:
+Das Projekt ist bewusst auch für eine einzelne wartende Person überschaubar gehalten. Vor einem Pull Request genügt in der Regel:
 
 ```bash
 npm run check:release
 ```
+
+Vor einem Release kommt zusätzlich `npm run build:demo` dazu.
 
 Für einen schnellen lokalen Zwischenstand sind diese Prüfungen ausreichend:
 
