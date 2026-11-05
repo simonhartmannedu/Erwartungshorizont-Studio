@@ -1,28 +1,27 @@
 import { expect, test } from "@playwright/test";
 
-test("rejects malformed and unsupported backup files without opening a restore dialog", async ({ page }) => {
+test("shows malformed and unsupported backup files in the unified restore flow", async ({ page }) => {
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Nicht mehr anzeigen" }).click();
   await page.getByRole("tab", { name: "Backup" }).click();
 
   const backupPanel = page.getByRole("tabpanel", { name: "Backup" });
   await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
-  const restoreDialog = page.locator(".dialog-panel");
-  const backupFileInput = restoreDialog.locator('input[type="file"]');
-  await restoreDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
+  const restoreFlow = backupPanel.getByRole("region", { name: "Lokales Backup wiederherstellen" });
+  const backupFileInput = restoreFlow.locator('input[type="file"][multiple]');
 
   await backupFileInput.setInputFiles({
     name: "beschaedigtes-e2e-backup.json",
     mimeType: "application/json",
     buffer: Buffer.from("kein JSON", "utf8"),
   });
-  await restoreDialog.getByRole("button", { name: "Inhalt prüfen" }).click();
+  await restoreFlow.getByRole("button", { name: "Sicherung prüfen" }).click();
+  const checkDialog = page.locator(".dialog-panel");
+  await checkDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
+  await checkDialog.getByRole("button", { name: "Prüfen und Vorschau öffnen" }).click();
   await expect(page.getByText("BACKUP_UNEXPECTED")).toBeVisible();
-  await expect(page.locator(".dialog-panel")).toHaveCount(0);
+  await checkDialog.getByRole("button", { name: "Abbrechen" }).click();
 
-  await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
-  const secondRestoreDialog = page.locator(".dialog-panel");
-  await secondRestoreDialog.getByLabel("Passwort dieser Backup-Datei").fill("e2e-passwort");
   await backupFileInput.setInputFiles({
     name: "unbekanntes-e2e-backup.json",
     mimeType: "application/json",
@@ -36,7 +35,6 @@ test("rejects malformed and unsupported backup files without opening a restore d
       "utf8",
     ),
   });
-  await secondRestoreDialog.getByRole("button", { name: "Inhalt prüfen" }).click();
-  await expect(page.getByText("Die Sicherungsdatei ist ungültig.")).toBeVisible();
-  await expect(page.locator(".dialog-panel")).toHaveCount(0);
+  await expect(restoreFlow.getByText("Prüfstatus: Nicht unterstützt")).toBeVisible();
+  await expect(restoreFlow.getByRole("button", { name: "Sicherung prüfen" })).toHaveCount(0);
 });

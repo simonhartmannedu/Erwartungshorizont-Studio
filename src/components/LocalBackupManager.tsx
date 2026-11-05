@@ -16,7 +16,7 @@ import {
 } from "../utils/localBackupFolder";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LoadingIcon, UploadIcon } from "./icons";
-import { Card, Field } from "./ui";
+import { Field } from "./ui";
 
 const HEADER_BYTES = 64 * 1024;
 const MAX_VALIDATION_BYTES = 50 * 1024 * 1024;
@@ -80,6 +80,9 @@ interface Props {
   refreshToken?: string | null;
   selectedFolderName: string | null;
   onChooseFolder: () => Promise<string>;
+  open: boolean;
+  onClose: () => void;
+  fileToRestore?: File | null;
 }
 
 export const LocalBackupManager = ({
@@ -87,6 +90,9 @@ export const LocalBackupManager = ({
   refreshToken,
   selectedFolderName,
   onChooseFolder,
+  open,
+  onClose,
+  fileToRestore,
 }: Props) => {
   const [entries, setEntries] = useState<LocalBackupDescriptor[]>([]);
   const [source, setSource] = useState<Source>(null);
@@ -99,7 +105,6 @@ export const LocalBackupManager = ({
   const [passphrase, setPassphrase] = useState("");
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState("");
-  const [collapsed, setCollapsed] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderSupported = supportsLocalBackupFolder();
 
@@ -141,17 +146,17 @@ export const LocalBackupManager = ({
   };
 
   useEffect(() => {
-    if (folderSupported) void refreshFolder();
+    if (open && folderSupported && source?.kind === "folder" && refreshToken) void refreshFolder();
+  }, [open, refreshToken]);
+
+  useEffect(() => {
+    if (open && folderSupported && selectedFolderName && source?.kind !== "files") void refreshFolder();
     // Only a handle from an earlier explicit directory selection is used here.
-  }, []);
+  }, [open, selectedFolderName, source?.kind]);
 
   useEffect(() => {
-    if (folderSupported && source?.kind === "folder" && refreshToken) void refreshFolder();
-  }, [refreshToken]);
-
-  useEffect(() => {
-    if (folderSupported && selectedFolderName) void refreshFolder();
-  }, [selectedFolderName]);
+    if (open && fileToRestore) void inspectFiles([fileToRestore], { kind: "files" });
+  }, [fileToRestore, open]);
 
   const chooseFolder = async () => {
     if (!folderSupported) {
@@ -230,15 +235,19 @@ export const LocalBackupManager = ({
     [entries],
   );
 
+  if (!open) return null;
+
   return (
-    <Card
-      title="Vorhandene Sicherungen prüfen"
-      subtitle="Durchsuche einen Sicherungsordner oder ausgewählte Dateien. Eine Gesamtsicherung kann Daten aus mehreren Schuljahren enthalten."
-      collapsible
-      collapsed={collapsed}
-      onToggleCollapse={() => setCollapsed((current) => !current)}
-    >
-      <div className="space-y-4">
+    <section className="backup-restore-flow mt-5 border-t pt-5" aria-labelledby="local-backup-restore-title">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h4 id="local-backup-restore-title" className="themed-strong text-base font-semibold">Lokales Backup wiederherstellen</h4>
+          <p className="themed-muted mt-1 text-sm leading-5">Durchsuche einen Sicherungsordner oder ausgewählte Dateien. Eine Gesamtsicherung kann Daten aus mehreren Schuljahren enthalten.</p>
+        </div>
+        <button type="button" className="button-ghost text-sm" onClick={onClose}>Schließen</button>
+      </div>
+
+      <div className="mt-4 space-y-4">
         <div className="flex flex-wrap gap-2">
           <button type="button" className="button-primary gap-2" onClick={() => { void chooseFolder(); }}>
             <UploadIcon />
@@ -368,6 +377,6 @@ export const LocalBackupManager = ({
         {validating ? <p className="mt-3 text-sm" role="status">Datei wird entschlüsselt und auf Wiederherstellbarkeit geprüft …</p> : null}
         {validationError ? <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">{validationError}</p> : null}
       </ConfirmDialog>
-    </Card>
+    </section>
   );
 };

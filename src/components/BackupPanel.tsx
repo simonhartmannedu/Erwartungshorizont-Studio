@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { CloudUploadIcon, DownloadIcon, DuplicateIcon, UploadIcon } from "./icons";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LocalBackupManager } from "./LocalBackupManager";
@@ -79,14 +79,15 @@ export const BackupPanel = ({
   onSyncNextcloud,
   onLoadLatestNextcloudBackup,
 }: Props) => {
-  const [backupDialog, setBackupDialog] = useState<"save" | "restore" | "nextcloud" | "nextcloud-connect" | null>(null);
+  const [backupDialog, setBackupDialog] = useState<"save" | "nextcloud" | "nextcloud-connect" | null>(null);
   const [fullBackupPassphrase, setFullBackupPassphrase] = useState("");
-  const [selectedFullBackupFile, setSelectedFullBackupFile] = useState<File | null>(null);
   const [nextcloudBackupPassphrase, setNextcloudBackupPassphrase] = useState("");
   const [nextcloudAcknowledged, setNextcloudAcknowledged] = useState(false);
   const [managedBackupFolderName, setManagedBackupFolderName] = useState<string | null>(null);
   const [saveInManagedFolder, setSaveInManagedFolder] = useState(false);
   const [folderSelectionError, setFolderSelectionError] = useState("");
+  const [localRestoreOpen, setLocalRestoreOpen] = useState(false);
+  const [nextcloudBackupToRestore, setNextcloudBackupToRestore] = useState<File | null>(null);
   const localFolderSupported = supportsLocalBackupFolder();
   const browserUsesDownloadLocation = !localFolderSupported;
 
@@ -99,11 +100,6 @@ export const BackupPanel = ({
       // The regular browser save path remains available if IndexedDB cannot provide a handle.
     });
   }, [localFolderSupported]);
-  const selectFullBackupFile = (event: ChangeEvent<HTMLInputElement>) => {
-    setSelectedFullBackupFile(event.target.files?.[0] ?? null);
-    event.target.value = "";
-  };
-
   const saveFullBackup = async () => {
     const saved = await onExportFullBackup(fullBackupPassphrase, saveInManagedFolder ? "managed-folder" : "browser");
     if (saved) {
@@ -129,12 +125,6 @@ export const BackupPanel = ({
     }
   };
 
-  const inspectFullBackup = () => {
-    if (!selectedFullBackupFile || !fullBackupPassphrase.trim()) return;
-    void onImportBackup(selectedFullBackupFile, fullBackupPassphrase);
-    setBackupDialog(null);
-  };
-
   const syncNextcloud = async () => {
     const synced = await onSyncNextcloud(nextcloudBackupPassphrase);
     if (synced) {
@@ -151,9 +141,8 @@ export const BackupPanel = ({
   const loadLatestNextcloudBackup = async () => {
     const backup = await onLoadLatestNextcloudBackup();
     if (!backup) return;
-    setSelectedFullBackupFile(backup);
-    setFullBackupPassphrase("");
-    setBackupDialog("restore");
+    setNextcloudBackupToRestore(backup);
+    setLocalRestoreOpen(true);
   };
 
   return (
@@ -189,7 +178,7 @@ export const BackupPanel = ({
                   <DownloadIcon />
                   Backup speichern
                 </button>
-                <button type="button" className="button-secondary backup-choice-button w-full" onClick={() => setBackupDialog("restore")}>
+                <button type="button" className="button-secondary backup-choice-button w-full" onClick={() => setLocalRestoreOpen(true)}>
                   <UploadIcon />
                   Wiederherstellen
                 </button>
@@ -197,6 +186,18 @@ export const BackupPanel = ({
               <p className="backup-last-saved status-note mt-4 text-xs leading-5">
                 {lastBackupAt ? `Letzte erfolgreiche Sicherung: ${new Date(lastBackupAt).toLocaleString("de-DE")}` : "Noch keine lokale Backup-Datei gespeichert."}
               </p>
+              <LocalBackupManager
+                onValidateAndRestore={onImportBackup}
+                refreshToken={lastBackupAt}
+                selectedFolderName={managedBackupFolderName}
+                onChooseFolder={chooseManagedBackupFolder}
+                open={localRestoreOpen}
+                onClose={() => {
+                  setLocalRestoreOpen(false);
+                  setNextcloudBackupToRestore(null);
+                }}
+                fileToRestore={nextcloudBackupToRestore}
+              />
             </section>
 
             <section className="backup-sync-card rounded-2xl border p-4" aria-labelledby="remote-backup-title">
@@ -252,13 +253,6 @@ export const BackupPanel = ({
 
         </div>
       </Card>
-
-      <LocalBackupManager
-        onValidateAndRestore={onImportBackup}
-        refreshToken={lastBackupAt}
-        selectedFolderName={managedBackupFolderName}
-        onChooseFolder={chooseManagedBackupFolder}
-      />
 
       <ConfirmDialog
         open={backupDialog === "save"}
@@ -344,29 +338,6 @@ export const BackupPanel = ({
           </div>
           <PasswordField label="Backup-Passwort" value={nextcloudBackupPassphrase} onChange={setNextcloudBackupPassphrase} placeholder="Passwort für diese Sicherung" />
           <p className="themed-muted text-xs leading-5">Die Datei enthält keine Namen im Dateinamen und Zugangsdaten werden nicht abgefragt oder gespeichert.</p>
-        </div>
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={backupDialog === "restore"}
-        title="Backup wiederherstellen"
-        description="Wähle die Backup-Datei und gib ihr Passwort ein. Danach prüfst du den Inhalt, bevor Daten wiederhergestellt werden."
-        onCancel={() => setBackupDialog(null)}
-        onConfirm={inspectFullBackup}
-        confirmLabel="Inhalt prüfen"
-        confirmDisabled={!selectedFullBackupFile || !fullBackupPassphrase.trim()}
-      >
-        <div className="space-y-4">
-          <div>
-            <p className="label">Backup-Datei</p>
-            <label className="button-secondary w-full cursor-pointer justify-start gap-2">
-              <UploadIcon />
-              {selectedFullBackupFile ? selectedFullBackupFile.name : "Backup-Datei auswählen"}
-              <input type="file" accept="application/json" className="hidden" onChange={selectFullBackupFile} />
-            </label>
-          </div>
-          <PasswordField label="Passwort dieser Backup-Datei" value={fullBackupPassphrase} onChange={setFullBackupPassphrase} placeholder="Passwort eingeben" />
-          <p className="text-sm leading-6" role="note">Das Passwort muss mit dem beim Speichern verwendeten Passwort übereinstimmen.</p>
         </div>
       </ConfirmDialog>
 

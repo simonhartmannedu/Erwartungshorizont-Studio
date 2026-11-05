@@ -30,18 +30,21 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
   await page.getByRole("button", { name: "Schließen" }).click();
 
   await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
-  const wrongPasswordDialog = page.locator(".dialog-panel");
-  const backupFileInput = wrongPasswordDialog.locator('input[type="file"]');
-  await wrongPasswordDialog.getByLabel("Passwort dieser Backup-Datei").fill("falsches-e2e-passwort");
+  const restoreFlow = backupPanel.getByRole("region", { name: "Lokales Backup wiederherstellen" });
+  const backupFileInput = restoreFlow.locator('input[type="file"][multiple]');
   await backupFileInput.setInputFiles(backupPath!);
-  await wrongPasswordDialog.getByRole("button", { name: "Inhalt prüfen" }).click();
+  await restoreFlow.getByRole("button", { name: "Sicherung prüfen" }).click();
+  const wrongPasswordDialog = page.locator(".dialog-panel");
+  await wrongPasswordDialog.getByLabel("Passwort dieser Backup-Datei").fill("falsches-e2e-passwort");
+  await wrongPasswordDialog.getByRole("button", { name: "Prüfen und Vorschau öffnen" }).click();
   await expect(page.getByText("BACKUP_DECRYPT_FAILED")).toBeVisible();
+  await wrongPasswordDialog.getByRole("button", { name: "Abbrechen" }).click();
 
-  await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
+  await backupFileInput.setInputFiles(backupPath!);
+  await restoreFlow.getByRole("button", { name: "Sicherung prüfen" }).click();
   const restorePreparationDialog = page.locator(".dialog-panel");
   await restorePreparationDialog.getByLabel("Passwort dieser Backup-Datei").fill(backupPassphrase);
-  await restorePreparationDialog.locator('input[type="file"]').setInputFiles(backupPath!);
-  await restorePreparationDialog.getByRole("button", { name: "Inhalt prüfen" }).click();
+  await restorePreparationDialog.getByRole("button", { name: "Prüfen und Vorschau öffnen" }).click();
 
   const restoreDialog = page.locator(".dialog-panel");
   await expect(restoreDialog).toBeVisible();
