@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("creates an encrypted backup, rejects a wrong password and restores only after confirmation", async ({ page }) => {
+test("creates an encrypted backup, rejects a wrong password and restores only after confirmation", async ({ page }, testInfo) => {
   const backupPassphrase = "e2e-backup-passphrase";
 
   // Chromium exposes the native picker API in automation but cannot complete its OS dialog.
@@ -21,9 +21,11 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
   const downloadPromise = page.waitForEvent("download");
   await saveDialog.getByRole("button", { name: /Backup (speichern|herunterladen)/ }).click();
   const download = await downloadPromise;
-  const backupPath = await download.path();
-
-  expect(backupPath).not.toBeNull();
+  // Playwright's internal download path has no .json extension. Preserve the
+  // real filename so the restore overview recognizes this as a backup file.
+  const backupFilename = download.suggestedFilename();
+  const backupPath = testInfo.outputPath(backupFilename);
+  await download.saveAs(backupPath);
   await expect(page.getByText("Backup exportiert")).toBeVisible();
   const supportDialog = page.getByRole("heading", { name: "Export/Backup fertig. Kaffee verdient. ☕" });
   await expect(supportDialog).toBeVisible();
@@ -32,7 +34,8 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
   await backupPanel.getByRole("button", { name: "Wiederherstellen" }).click();
   const restoreFlow = backupPanel.getByRole("region", { name: "Lokales Backup wiederherstellen" });
   const backupFileInput = restoreFlow.locator('input[type="file"][multiple]');
-  await backupFileInput.setInputFiles(backupPath!);
+  await backupFileInput.setInputFiles(backupPath);
+  await expect(restoreFlow.getByText(backupFilename, { exact: true })).toBeVisible();
   await restoreFlow.getByRole("button", { name: "Sicherung prüfen" }).click();
   const wrongPasswordDialog = page.locator(".dialog-panel");
   await wrongPasswordDialog.getByLabel("Passwort dieser Backup-Datei").fill("falsches-e2e-passwort");
@@ -40,7 +43,7 @@ test("creates an encrypted backup, rejects a wrong password and restores only af
   await expect(page.getByText("BACKUP_DECRYPT_FAILED")).toBeVisible();
   await wrongPasswordDialog.getByRole("button", { name: "Abbrechen" }).click();
 
-  await backupFileInput.setInputFiles(backupPath!);
+  await backupFileInput.setInputFiles(backupPath);
   await restoreFlow.getByRole("button", { name: "Sicherung prüfen" }).click();
   const restorePreparationDialog = page.locator(".dialog-panel");
   await restorePreparationDialog.getByLabel("Passwort dieser Backup-Datei").fill(backupPassphrase);
