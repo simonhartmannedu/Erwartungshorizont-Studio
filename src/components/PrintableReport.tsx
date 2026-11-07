@@ -179,6 +179,10 @@ export const PrintableReport = ({
           <p>Note: {summary.grade.label}</p>
           <p>Stufe: {summary.grade.verbalLabel}</p>
         </div>
+        <div className="mt-6 break-inside-avoid text-sm">
+          <p className="font-semibold">Unterschrift der Eltern</p>
+          <p className="mt-4">Datum: _________________ &nbsp; Unterschrift: ______________________________</p>
+        </div>
       </section>
 
       <GradeScaleRangeSection

@@ -1687,16 +1687,71 @@
     align-items: flex-end;
     gap: 0.35rem;
     overflow-x: auto;
+    overflow-y: hidden;
     border-bottom: 1px solid var(--app-border);
     padding: 0.75rem 0.75rem 0;
     scrollbar-width: thin;
+  }
+
+  .editor-toolbar {
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .editor-toolbar .editor-section-tabs {
+    border-bottom: 0;
+    padding-top: 0;
+  }
+
+  .editor-correction-modes {
+    display: inline-flex;
+    max-width: 100%;
+    margin-inline-start: auto;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .editor-correction-mode {
+    min-height: 2.1rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    background: transparent;
+    color: var(--app-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+
+  .editor-correction-mode[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--app-field-focus) 28%, var(--app-border));
+    background: color-mix(in srgb, var(--app-field-focus) 8%, var(--app-panel-bg));
+    color: var(--app-text-strong);
+  }
+
+  .editor-correction-mode:hover:not(:disabled) {
+    border-color: var(--app-border);
+    background: var(--app-secondary-hover);
+    color: var(--app-text-strong);
+  }
+
+  .editor-correction-mode:focus-visible {
+    outline: 2px solid var(--app-field-focus);
+    outline-offset: 2px;
+  }
+
+  .editor-correction-mode:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .editor-section-tabs > button {
     position: relative;
     z-index: 0;
     min-height: 2.9rem;
-    margin-bottom: -1px;
     border-color: var(--app-secondary-border);
     border-bottom-color: var(--app-border);
     border-radius: 1rem 1rem 0.18rem 0.18rem;
@@ -1707,7 +1762,8 @@
 
   .editor-section-tabs > button.button-secondary:hover {
     border-bottom-color: var(--app-border);
-    transform: translateY(-2px);
+    box-shadow: inset 0 2px 0 color-mix(in srgb, var(--app-field-focus) 25%, transparent);
+    transform: none;
   }
 
   .editor-section-tabs > button[aria-selected="true"] {
@@ -1719,13 +1775,13 @@
     box-shadow:
       0 -8px 20px color-mix(in srgb, var(--app-text-strong) 7%, transparent),
       inset 0 3px 0 color-mix(in srgb, var(--app-field-focus) 65%, transparent);
-    transform: translateY(1px);
+    transform: none;
   }
 
   .editor-section-tabs > button[aria-selected="true"]:hover {
     border-color: color-mix(in srgb, var(--app-field-focus) 56%, var(--app-border));
     background: var(--app-panel-bg);
-    transform: translateY(1px);
+    transform: none;
   }
 
   .editor-section-tabs > button:focus-visible {
@@ -6217,7 +6273,43 @@
   }
 
   .section-editor {
+    min-width: 0;
     border-left: 3px solid var(--section-accent, var(--app-field-focus));
+  }
+
+  /* Transparent, absolutely positioned tooltips still contribute to Firefox's
+     scroll area. Anchor them inward at the right edge of the action buttons. */
+  .section-editor .app-tooltip {
+    left: auto;
+    right: 0;
+    transform: translateY(0.2rem);
+  }
+
+  .section-editor .tooltip-anchor:hover .app-tooltip,
+  .section-editor .tooltip-anchor:focus-within .app-tooltip {
+    transform: translateY(0);
+  }
+
+  .section-editor .app-tooltip::after {
+    left: auto;
+    right: 0.75rem;
+    transform: rotate(45deg);
+  }
+
+  /* The editor can be narrow even on a desktop with both sidebars open.
+     Choose the task layout from its available space, not the viewport. */
+  .task-table {
+    container: task-table / inline-size;
+    min-width: 0;
+  }
+
+  .task-table-grid {
+    display: none;
+  }
+
+  @container task-table (min-width: 48rem) {
+    .task-table-cards { display: none; }
+    .task-table-grid { display: block; }
   }
 
   .section-editor--a { --section-accent: #2f6f9f; }

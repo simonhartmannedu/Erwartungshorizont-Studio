@@ -387,6 +387,7 @@ const writeStoredValue = (database: SqliteDatabase, key: string, value: string) 
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeQueue = Promise.resolve();
+let latestStudentSaveRequest = 0;
 let persistedRevision: number | null = null;
 
 const getDatabase = () => {
@@ -464,13 +465,18 @@ export const loadStudentDatabase = async (): Promise<StudentDatabase> => {
 export const saveStudentDatabase = (
   databaseState: StudentDatabase,
   getUnlockedPassword?: (groupId: string) => string | null,
-) =>
-  enqueueWrite(async (database) => {
+) => {
+  const request = ++latestStudentSaveRequest;
+  return enqueueWrite(async (database) => {
+    // Each request is a complete immutable snapshot. Superseded requests that
+    // have not started can skip expensive encryption; the latest stays queued.
+    if (request !== latestStudentSaveRequest) return;
     const serializedState = getUnlockedPassword
       ? await serializeStudentDatabaseForStorage(databaseState, getUnlockedPassword)
       : databaseState;
     writeStoredValue(database, STUDENT_DATABASE_KEY, JSON.stringify(createStoredApplicationData(serializedState)));
   });
+};
 
 export const loadTheme = (): ThemeMode => {
   const raw = window.localStorage.getItem(THEME_KEY);

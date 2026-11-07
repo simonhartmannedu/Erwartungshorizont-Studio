@@ -385,6 +385,11 @@ const createEditableExamDocxChildren = (
     );
   }
 
+  children.push(
+    new Paragraph({ children: [new TextRun({ text: "Unterschrift der Eltern", bold: true, size: 18 })], spacing: { before: 220, after: 120 }, keepNext: true }),
+    new Paragraph({ children: [new TextRun({ text: "Datum: _________________    Unterschrift: __________________________________", size: 18 })], spacing: { after: 80 } }),
+  );
+
   return children;
 };
 
@@ -955,6 +960,7 @@ export const renderPrintDocument = (reports: PrintPayload[]) =>
               <p style="margin-top:6px;font-size:9px;color:#555;">Dieses Dokument ist auch ohne Originalunterschrift gültig.</p>
             </div>`
           : "",
+        `<div class="parent-signature"><strong>Unterschrift der Eltern</strong><p>Datum: __________________ &nbsp;&nbsp; Unterschrift: __________________________________</p></div>`,
       ].filter(Boolean).join("");
       const renderSection = (section: Exam["sections"][number], index: number) => {
         const maxPoints = section.maxPointsOverride && section.maxPointsOverride > 0
@@ -1110,6 +1116,8 @@ const openPrintPopup = (reports: PrintPayload[], filename?: string, popup?: Prin
           .footer-grid { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 4px; }
           .footer-grid-halves { grid-template-columns: 1fr 1fr; }
           .footer-box { border: 1px solid #bbb; min-height: 38px; padding: 4px; margin-top: 0; }
+          .parent-signature { grid-column: 1 / -1; margin-top: 10px; padding: 6px 0; break-inside: avoid; }
+          .parent-signature p { margin-top: 18px; font-size: 10px; }
           @page {
             size: A4;
             margin-top: 20mm;

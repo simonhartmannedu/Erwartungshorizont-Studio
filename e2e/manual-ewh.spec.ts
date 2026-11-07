@@ -1,0 +1,90 @@
+import { expect, test } from "@playwright/test";
+
+test("öffnet mit einem Klick einen leeren EWH und lässt ihn ohne Lerngruppe manuell aufbauen", async ({ page }) => {
+  await page.goto("/?mode=easy");
+  await expect(page.getByRole("heading", { name: "Erwartungshorizont erstellen", exact: true })).toBeVisible();
+  const guide = page.getByRole("button", { name: "Einführung schließen" });
+  if (await guide.isVisible()) await guide.click();
+  await page.getByRole("button", { name: "Leerer EWH", exact: false }).click();
+  await expect(page.getByText("Erwartungshorizont überarbeiten", { exact: true })).toBeVisible();
+  await expect(page.locator(".section-editor")).toHaveCount(0);
+  await page.getByRole("button", { name: "Abschnitt manuell ergänzen", exact: true }).click();
+  const section = page.locator(".section-editor").first();
+  await expect(section).toBeVisible();
+  const answer = section.locator('textarea[placeholder="Stichpunkte oder mögliche Schülerantwort"]:visible').first();
+  await expect(answer).toHaveValue("");
+  await answer.fill("Meine eigene Musterlösung.");
+  await section.locator("summary:visible", { hasText: "Eigene Bewertungskriterien" }).first().click();
+  await section.getByRole("textbox", { name: /Eigene Bewertungskriterien für/ }).fill("Ein Punkt je nachvollziehbarem Schritt.");
+  await page.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).click();
+  await expect(section.locator('textarea[placeholder="Stichpunkte oder mögliche Schülerantwort"]:visible')).toHaveCount(2);
+  await expect(page.getByText("Erwartung: Die Mitteilung erfüllt die kommunikative Aufgabe.", { exact: false })).toHaveCount(0);
+});
+
+test("bearbeitet Bausteine vor dem Erstellen und übernimmt eigene Texte in Editor und Druck", async ({ page }, testInfo) => {
+  await page.goto("/?mode=easy");
+  await expect(page.locator(".template-result-card").first()).toBeVisible();
+  const guide = page.getByRole("button", { name: "Einführung schließen" });
+  if (await guide.isVisible()) await guide.click();
+  await page.locator(".template-result-card").first().click();
+  const row = page.locator(".composer-task-row").first();
+  await row.getByRole("button", { name: "Baustein bearbeiten", exact: true }).click();
+  await expect(row.getByRole("textbox", { name: "Mögliche Schülerantwort / Lösung", exact: true })).toHaveValue("");
+  await expect(row.getByRole("textbox", { name: "Eigene Bewertungskriterien", exact: true })).toHaveValue("");
+  await row.getByRole("textbox", { name: "Aufgabentyp", exact: true }).fill("Eigene Analyse");
+  await row.getByRole("textbox", { name: "Mögliche Schülerantwort / Lösung", exact: true }).fill("Die Figur entscheidet sich für den gemeinsamen Weg.");
+  await row.getByRole("textbox", { name: "Eigene Bewertungskriterien", exact: true }).fill("Zwei passende Textbelege mit Erklärung.");
+  await row.getByRole("textbox", { name: /Maximalpunkte für/ }).fill("7");
+  await row.getByRole("textbox", { name: /Maximalpunkte für/ }).press("Tab");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await row.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("baustein-bearbeiten-mobil.png") });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("button", { name: "Vorschau & erstellen", exact: true }).click();
+  await page.getByRole("dialog", { name: "Vorschau & erstellen" }).getByRole("button", { name: "EWH erstellen", exact: true }).click();
+  await page.getByRole("tab", { name: "Überarbeiten", exact: true }).click();
+  const section = page.locator(".section-editor").first();
+  await section.getByRole("button", { name: "Aufklappen", exact: true }).click();
+  await expect(section.locator('input[value="Eigene Analyse"]:visible')).toBeVisible();
+  await expect(section.locator('textarea[placeholder="Stichpunkte oder mögliche Schülerantwort"]:visible').first()).toHaveValue("Die Figur entscheidet sich für den gemeinsamen Weg.");
+  await section.locator("summary:visible", { hasText: "Eigene Bewertungskriterien" }).first().click();
+  await expect(section.getByRole("textbox", { name: "Eigene Bewertungskriterien für Eigene Analyse", exact: true })).toHaveValue("Zwei passende Textbelege mit Erklärung.");
+  await page.getByRole("tab", { name: "Drucken & Exportieren", exact: true }).click();
+  await page.getByRole("button", { name: "Fertiger EWH", exact: true }).click();
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Druck-PDF", exact: true }).click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState("domcontentloaded");
+  await expect(popup.getByText("Eigene Analyse", { exact: true })).toBeVisible();
+  await expect(popup.getByText(/Die Figur entscheidet sich für den gemeinsamen Weg/)).toBeVisible();
+  await expect(popup.getByText(/Zwei passende Textbelege mit Erklärung/)).toBeVisible();
+  await expect(popup.getByText("Unterschrift der Eltern", { exact: true })).toBeVisible();
+  await expect(popup.getByText("Die Mitteilung erfüllt die kommunikative Aufgabe.", { exact: false })).toHaveCount(0);
+});
+
+test("legt aus der Übersicht einen zusätzlichen leeren EWH an und erhält die bisherige Klassenarbeit", async ({ page }) => {
+  await page.goto("/?demo=1&freshDemo=1");
+  await page.getByRole("button", { name: "Einführung schließen" }).click();
+  await page.getByRole("tabpanel", { name: "Übersicht", exact: true }).getByRole("button", { name: "Leerer EWH", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Rubrik bearbeiten", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Einzelkorrektur", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".section-editor")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abschnitt manuell ergänzen", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Englisch-Klassenarbeit Unit 5", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Abschnitt manuell ergänzen", exact: true }).click();
+  await expect(page.locator(".section-editor")).toHaveCount(1);
+  await expect(page.locator(".score-input:visible")).toHaveCount(0);
+});
+
+test("öffnet auch im Easy-Mode mit bereits vorhandener Lerngruppe einen wirklich leeren EWH", async ({ page }) => {
+  await page.goto("/?demo=1&freshDemo=1");
+  await page.getByRole("button", { name: "Einführung schließen" }).click();
+  const settings = page.locator(".header-settings");
+  await settings.locator("> summary").click();
+  await settings.locator('input[type="checkbox"]').first().check();
+  await settings.locator("> summary").click();
+  await page.getByRole("button", { name: "Leerer EWH", exact: false }).click();
+  await expect(page.locator(".section-editor")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abschnitt manuell ergänzen", exact: true })).toBeVisible();
+});

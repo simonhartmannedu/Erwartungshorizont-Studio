@@ -169,6 +169,7 @@ export const NumberInput = ({
   inputId?: string;
 }) => {
   const [draft, setDraft] = useState(() => formatEditableNumber(value));
+  const editedRef = useRef(false);
 
   useEffect(() => {
     setDraft(formatEditableNumber(value));
@@ -206,6 +207,7 @@ export const NumberInput = ({
   };
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    editedRef.current = true;
     const nextDraft = event.target.value;
     setDraft(nextDraft);
 
@@ -236,7 +238,11 @@ export const NumberInput = ({
       placeholder={placeholder}
       disabled={disabled}
       onChange={handleChange}
-      onBlur={commit}
+      onBlur={() => {
+        // Merely tabbing through an untouched score must not record a zero.
+        if (!commitOnChange || editedRef.current) commit();
+        editedRef.current = false;
+      }}
       onKeyDown={handleKeyDown}
     />
   );

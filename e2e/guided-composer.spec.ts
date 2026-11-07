@@ -15,15 +15,16 @@ test("keeps the composer focused and leaves metadata for the editor", async ({ p
   await expect(page.locator(".composer-task-row")).toHaveCount(initialTaskCount + 1);
 
   const firstSection = page.locator(".composer-section").first();
-  const taskTitles = firstSection.locator(".composer-task-row strong");
-  const firstTaskBeforeKeyboardMove = await taskTitles.first().innerText();
+  const taskRows = firstSection.locator(".composer-task-row");
+  const firstTaskBeforeKeyboardMove = await taskRows.first().getAttribute("data-task-id");
   await firstSection.locator(".composer-drag-handle").first().focus();
   await page.keyboard.press("Space");
-  await page.waitForTimeout(100);
+  await expect(firstSection.locator(".composer-task-row-dragging")).toHaveCount(1);
+  await expect(page.locator(".composer-drag-overlay")).toBeVisible();
   await page.keyboard.press("ArrowDown");
-  await page.waitForTimeout(100);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await page.keyboard.press("Space");
-  await expect(taskTitles.first()).not.toHaveText(firstTaskBeforeKeyboardMove);
+  await expect(taskRows.first()).not.toHaveAttribute("data-task-id", firstTaskBeforeKeyboardMove!);
 
   await page.locator(".composer-task-move").first().selectOption({ index: 1 });
   await expect(page.locator(".composer-task-row")).toHaveCount(initialTaskCount + 1);

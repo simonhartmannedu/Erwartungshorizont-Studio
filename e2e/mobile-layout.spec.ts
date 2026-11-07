@@ -28,25 +28,26 @@ test("nutzt auf kleinen Displays die verfügbare Breite ohne horizontalen Seiten
   expect(layout).toEqual({ documentFits: true, mainFits: true, asideFits: true });
 });
 
-test("richtet die Auswahl ab Tabletbreite bündig zum Inhaltsbereich aus", async ({ page }) => {
+test("richtet alle drei Korrekturspalten oben bündig aus", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/?demo=1&freshDemo=1");
   await page.getByRole("button", { name: "Einführung schließen" }).click();
   await page.getByRole("tab", { name: "Klassenarbeit korrigieren" }).click();
   await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
 
-  const positions = await page.evaluate(() => {
-    const selectionCard = Array.from(document.querySelectorAll("h2"))
-      .find((heading) => heading.textContent === "Auswahl")
-      ?.closest("section");
-    const activePanel = Array.from(document.querySelectorAll<HTMLElement>("main [role=tabpanel]"))
-      .find((panel) => panel.getClientRects().length > 0);
+  for (const width of [1280, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const mode of ["Einzelkorrektur", "Korrektur-Tisch"]) {
+      await page.getByRole("group", { name: "Korrekturmodus wählen", exact: true })
+        .getByRole("button", { name: mode, exact: true }).click();
+      const selection = page.locator("section.panel").filter({ has: page.getByRole("heading", { name: "Auswahl", exact: true }) });
+      const summary = page.locator("section.panel").filter({ has: page.getByRole("heading", { name: "Individuelle Auswertung", exact: true }) });
+      const content = page.getByRole("tabpanel", { name: "Korrigieren", exact: true });
+      const boxes = await Promise.all([selection.boundingBox(), content.boundingBox(), summary.boundingBox()]);
 
-    return {
-      selectionTop: selectionCard?.getBoundingClientRect().top,
-      contentTop: activePanel?.getBoundingClientRect().top,
-    };
-  });
-
-  expect(positions.selectionTop).toBe(positions.contentTop);
+      expect(boxes.every(Boolean)).toBe(true);
+      expect(Math.abs(boxes[0]!.y - boxes[1]!.y), `${mode} bei ${width}px: Mitte`).toBeLessThanOrEqual(1);
+      expect(Math.abs(boxes[0]!.y - boxes[2]!.y), `${mode} bei ${width}px: rechts`).toBeLessThanOrEqual(1);
+    }
+  }
 });

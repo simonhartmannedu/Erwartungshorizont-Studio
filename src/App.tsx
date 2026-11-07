@@ -116,6 +116,7 @@ import {
   setStudentOrderInGroup,
   updateClassworkSignatures,
   updateStudentScore,
+  updateStudentCorrectionReview,
   updateStudentParticipationStatus,
   updateStudentAnswerSheetCode,
   updateTeacherComment,
@@ -160,6 +161,7 @@ import {
   EDITOR_RESULT_ANCHOR_ID,
   EditorToc,
   getEditorSectionAnchorId,
+  getEditorTaskAnchorId,
 } from "./components/EditorToc";
 import { EditorSectionTabs, getEditorSectionPanelId, type EditorSectionTabId } from "./components/EditorSectionTabs";
 import { ReportSummarySection } from "./components/ReportSummarySection";
@@ -178,6 +180,8 @@ import { StudentRosterPanel } from "./components/StudentRosterPanel";
 import { StudentSelectionPanel } from "./components/StudentSelectionPanel";
 import { SectionAllocationOverview } from "./components/SectionAllocationOverview";
 import { CorrectionDesk } from "./components/CorrectionDesk";
+import { CorrectionChecklist } from "./components/CorrectionChecklist";
+import { confirmCorrectionReview, getTaskRubricSignatures } from "./utils/correctionReview";
 import type { GuidedBuilderTarget, GuidedSectionDraft } from "./components/GuidedExamBuilder";
 import {
   ArchiveIcon,
@@ -984,6 +988,7 @@ function App() {
   const hasLocalSaveFailureRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>(() => (userPreferences.easyMode ? "guidedBuilder" : "home"));
   const [correctionMode, setCorrectionMode] = useState<"individual" | "desk">("individual");
+  const [manualExamId, setManualExamId] = useState<string | null>(null);
   const [activeSchoolYearFilter, setActiveSchoolYearFilter] = useState<string>("all");
   const [pendingSchoolYearCreation, setPendingSchoolYearCreation] = useState<PendingSchoolYearCreation | null>(null);
   const tabButtonRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -1648,6 +1653,28 @@ function App() {
   const activeSignatureDataUrl = getEffectiveSignatureDataUrl(activeGroup, activeAssessment);
   const activeGroupPassword = activeGroupId ? unlockedGroupPasswordsRef.current[activeGroupId] ?? "" : "";
   const assessmentLocked = Boolean(activeGroup?.passwordVerifier) && !activeGroupPassword;
+  const rubricOnly = easyMode || manualExamId === exam.id || !activeGroup;
+  const taskRubricSignatures = useMemo(() => getTaskRubricSignatures(exam), [exam]);
+  const [correctionFocusTarget, setCorrectionFocusTarget] = useState<{ studentId: string; taskId?: string } | null>(null);
+
+  useEffect(() => {
+    if (!correctionFocusTarget || correctionFocusTarget.studentId !== activeStudentId || assessmentLocked) return;
+    const frame = requestAnimationFrame(() => {
+      const anchor = correctionFocusTarget.taskId
+        ? exam.sections.flatMap((section) => section.tasks.map((task) => ({ section, task }))).find(({ task }) => task.id === correctionFocusTarget.taskId)
+        : null;
+      const target = anchor
+        ? Array.from(document.querySelectorAll<HTMLElement>("[data-editor-anchor]"))
+          .find((element) => element.dataset.editorAnchor === getEditorTaskAnchorId(anchor.section.id, anchor.task.id) && element.offsetParent !== null)
+        : document.querySelector<HTMLElement>('section[aria-label="Teilnahme an dieser Klassenarbeit"]');
+      target?.scrollIntoView({ block: "center", inline: "nearest" });
+      const input = target?.querySelector<HTMLInputElement>(anchor ? ".score-input" : "input");
+      input?.focus();
+      if (anchor) input?.select();
+      setCorrectionFocusTarget(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeStudentId, assessmentLocked, correctionFocusTarget, exam]);
   const activeGroupIsProtected = Boolean(activeGroup?.passwordVerifier);
   const activeUnlockButtonLabel = !activeGroup
     ? "Keine Klasse aktiv"
@@ -1895,8 +1922,8 @@ function App() {
   }, [activeGroupId, draftBundle.activeWorkspaceId, preferredWorkspaceForActiveGroup, storageReady]);
 
   const displayExam = useMemo(
-    () => (storageReady && !easyMode ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
-    [activeWorkspace?.id, easyMode, exam, storageReady, studentDatabase, selectedStudent],
+    () => (storageReady && !rubricOnly ? buildExamForStudent(exam, studentDatabase, selectedStudent, activeWorkspace?.id ?? null) : exam),
+    [activeWorkspace?.id, rubricOnly, exam, storageReady, studentDatabase, selectedStudent],
   );
   const summary = useMemo(
     () => (storageReady ? calculateExamSummary(displayExam) : calculateExamSummary(exam)),
@@ -2134,6 +2161,8 @@ function App() {
   }, [activeWorkspace, storageReady]);
 
   const openStudentInBuilder = (studentId: string, options?: { groupId?: string; workspaceId?: string }) => {
+    setManualExamId(null);
+    setCorrectionMode("individual");
     if (options?.groupId !== undefined) {
       setActiveGroupId(options.groupId);
     }
@@ -2244,11 +2273,25 @@ function App() {
   };
 
   const triggerExamCelebration = () => {
-    pushNotice("success", "Korrektur abgeschlossen", "Alle ausgewählten Bewertungsbögen sind als korrigiert markiert.");
+    pushNotice("success", "Punkte vollständig erfasst", "Alle teilnehmenden Arbeiten haben Punkte für jede Aufgabe. Prüfe vor der Ausgabe noch die Abschlussprüfung.");
   };
 
   const updateExam = (patch: Partial<Exam>) =>
     setActiveWorkspaceExam((current) => normalizeExamStructure({ ...current, ...patch }));
+
+  const openEmptyExam = () => {
+    const emptyExam = createEmptyExam();
+    emptyExam.sections = [];
+    addWorkspace(emptyExam, { assignedGroupId: activeGroupId });
+    setActiveSchoolYearFilter("all");
+    setPendingSchoolYearCreation(null);
+    setActiveTab("builder");
+    setActiveEditorTab("tasks");
+    setManualExamId(emptyExam.id);
+    setCorrectionMode("individual");
+    setActiveStudentId("");
+    setCollapsedSectionIds([]);
+  };
 
   const commitBuiltExam = (
     nextExam: Exam,
@@ -2350,7 +2393,7 @@ function App() {
         return;
       }
       setStudentDatabase((current) =>
-        updateStudentScore(current, activeWorkspace?.id ?? null, selectedStudent.studentId, taskId, Number(patch.achievedPoints)),
+        updateStudentScore(current, activeWorkspace?.id ?? null, selectedStudent.studentId, taskId, Number(patch.achievedPoints), taskRubricSignatures[taskId]),
       );
     }
 
@@ -2424,7 +2467,7 @@ function App() {
     if (!task || !Number.isFinite(score)) return;
 
     setStudentDatabase((current) =>
-      updateStudentScore(current, activeWorkspace.id, studentId, taskId, Math.min(task.maxPoints, Math.max(0, score))),
+      updateStudentScore(current, activeWorkspace.id, studentId, taskId, Math.min(task.maxPoints, Math.max(0, score)), taskRubricSignatures[taskId]),
     );
   };
 
@@ -2693,7 +2736,7 @@ function App() {
           {
             id: crypto.randomUUID(),
             title: `${section.title.trim()} · Aufgabe 1`,
-            description: section.description.trim() || `Grundstruktur für ${section.title.trim()}`,
+            description: "",
             category: section.title.trim(),
             maxPoints: section.points,
             achievedPoints: 0,
@@ -3000,6 +3043,36 @@ function App() {
     );
   };
 
+  const openCorrectionIssue = (studentId: string, taskId?: string) => {
+    setManualExamId(null);
+    setActiveStudentId(studentId);
+    setCorrectionMode("individual");
+    setActiveEditorTab("tasks");
+    if (taskId) {
+      const section = exam.sections.find((entry) => entry.tasks.some((task) => task.id === taskId));
+      if (section) setCollapsedSectionIds((current) => current.filter((id) => id !== section.id));
+    }
+    setCorrectionFocusTarget({ studentId, taskId });
+  };
+
+  const handleConfirmCorrection = (studentId: string) => {
+    if (!activeWorkspace || !activeGroup?.students.some((student) => student.id === studentId) || assessmentLocked) return;
+    setStudentDatabase((current) => {
+      const review = confirmCorrectionReview(exam, getStudentAssessment(current, studentId, activeWorkspace.id));
+      return review ? updateStudentCorrectionReview(current, activeWorkspace.id, studentId, review) : current;
+    });
+  };
+
+  const handleReopenCorrection = (studentId: string) => {
+    if (!activeWorkspace || !activeGroup?.students.some((student) => student.id === studentId) || assessmentLocked) return;
+    setStudentDatabase((current) => {
+      const assessment = getStudentAssessment(current, studentId, activeWorkspace.id);
+      return updateStudentCorrectionReview(current, activeWorkspace.id, studentId, {
+        taskSignatures: assessment.correctionReview?.taskSignatures ?? {}, confirmedAt: null, confirmedSignature: null,
+      });
+    });
+  };
+
   const handleCreateAnswerSheetCodes = () => {
     if (!activeWorkspace || !activeGroup) return;
     if (activeGroupIsProtected && !activeGroupPassword) {
@@ -3022,7 +3095,7 @@ function App() {
     setStudentDatabase((current) => Object.entries(scoresByTaskId).reduce((next, [taskId, score]) => {
       const maximum = taskMaximums.get(taskId);
       if (maximum === undefined) return next;
-      return updateStudentScore(next, activeWorkspace.id, studentId, taskId, Math.min(maximum, Math.max(0, score)));
+      return updateStudentScore(next, activeWorkspace.id, studentId, taskId, Math.min(maximum, Math.max(0, score)), taskRubricSignatures[taskId]);
     }, current));
     setActiveStudentId(studentId);
     pushNotice("success", "Bogencheck übernommen", "Die Multiple-Choice-Punkte wurden in die Punktetabelle übertragen.");
@@ -4430,6 +4503,13 @@ function App() {
               ) : null}
               <button
                 type="button"
+                className="button-secondary px-3 py-2 text-xs"
+                onClick={openEmptyExam}
+              >
+                Leerer EWH
+              </button>
+              <button
+                type="button"
                 className="workspace-icon-button"
                 onClick={() => setActiveTab("guidedBuilder")}
                 aria-label="Neuen Erwartungshorizont anlegen"
@@ -4471,6 +4551,43 @@ function App() {
             />
           ) : null}
         </section>
+        ) : null}
+
+        {activeTab === "builder" ? (
+          <div className="editor-toolbar no-print mb-5 flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-[1_1_32rem]">
+              <EditorSectionTabs
+                  activeTab={activeEditorTab}
+                  easyMode={easyMode}
+                  onSelectTab={(tabId) => {
+                    if (tabId === "tasks") setCollapsedSectionIds(displayExam.sections.map((section) => section.id));
+                    setActiveEditorTab(tabId);
+                  }}
+              />
+            </div>
+            {!easyMode && activeWorkspace && activeEditorTab === "tasks" ? (
+              <div className="editor-correction-modes" role="group" aria-label="Korrekturmodus wählen">
+                <button
+                  type="button"
+                  className="editor-correction-mode"
+                  aria-pressed={correctionMode === "individual"}
+                  disabled={!activeGroup}
+                  onClick={() => { setManualExamId(null); setCorrectionMode("individual"); }}
+                >
+                  Einzelkorrektur
+                </button>
+                <button
+                  type="button"
+                  className="editor-correction-mode"
+                  aria-pressed={correctionMode === "desk"}
+                  disabled={!activeGroup}
+                  onClick={() => { setManualExamId(null); setCorrectionMode("desk"); }}
+                >
+                  Korrektur-Tisch
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         <div
@@ -4555,6 +4672,7 @@ function App() {
                     })}
                   onNavigate={activateTab}
                   onQuickBackup={openQuickBackupDialog}
+                  onCreateEmptyExam={openEmptyExam}
                   onOpenWorkspace={(workspaceId) => {
                     const workspace = draftBundle.workspaces.find((entry) => entry.id === workspaceId);
                     if (workspace?.assignedGroupId) setActiveGroupId(workspace.assignedGroupId);
@@ -4668,20 +4786,13 @@ function App() {
               id={getTabPanelId("builder")}
               role="tabpanel"
               aria-labelledby={getTabButtonId("builder")}
-              hidden={activeTab !== "builder"}
+              hidden={activeTab !== "builder" || activeEditorTab !== "setup"}
               tabIndex={0}
               className="space-y-6"
             >
             {activeTab === "builder" && (
               <>
-                <EditorSectionTabs
-                  activeTab={activeEditorTab}
-                  easyMode={easyMode}
-                  onSelectTab={(tabId) => {
-                    if (tabId === "tasks") setCollapsedSectionIds(displayExam.sections.map((section) => section.id));
-                    setActiveEditorTab(tabId);
-                  }}
-                />
+
                 <div hidden={activeEditorTab !== "setup"}>
                   <div id={EDITOR_METADATA_ANCHOR_ID} className="scroll-mt-24">
                     <Card
@@ -4777,6 +4888,7 @@ function App() {
                     easyMode={easyMode}
                     onApplyManualStructure={applyGuidedBuilderStructure}
                     onApplyComposedTemplate={applyComposedTemplate}
+                    onCreateEmptyExam={openEmptyExam}
                   />
                 ) : (
                   <Card title="EWH-Erstellung lädt" subtitle="Vorlagen und Werkzeuge werden bei Bedarf nachgeladen.">
@@ -4931,35 +5043,7 @@ function App() {
                   hidden={activeEditorTab !== "tasks"}
                   className="space-y-6"
                 >
-                {!easyMode && activeWorkspace && activeGroup ? (
-                  <section className="no-print rounded-2xl border p-3 surface-muted" aria-label="Korrekturmodus">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="label">Korrekturmodus</p>
-                        <p className="themed-muted text-sm">Wähle zwischen der vertrauten Einzelansicht und der aufgabenweisen Tischansicht.</p>
-                      </div>
-                      <div className="control-cluster inline-flex rounded-full border p-1" role="group" aria-label="Korrekturmodus wählen">
-                        <button
-                          type="button"
-                          className={correctionMode === "individual" ? "button-primary px-3 py-2 text-xs" : "button-secondary px-3 py-2 text-xs"}
-                          aria-pressed={correctionMode === "individual"}
-                          onClick={() => setCorrectionMode("individual")}
-                        >
-                          Einzelkorrektur
-                        </button>
-                        <button
-                          type="button"
-                          className={correctionMode === "desk" ? "button-primary px-3 py-2 text-xs" : "button-secondary px-3 py-2 text-xs"}
-                          aria-pressed={correctionMode === "desk"}
-                          onClick={() => setCorrectionMode("desk")}
-                        >
-                          Korrektur-Tisch
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                ) : null}
-                {!easyMode && activeWorkspace && activeGroup && correctionMode === "desk" ? (
+                {!rubricOnly && activeWorkspace && activeGroup && correctionMode === "desk" ? (
                   <CorrectionDesk
                     exam={exam}
                     database={studentDatabase}
@@ -4972,7 +5056,7 @@ function App() {
                     onScoreChange={updateDeskScore}
                     onLockedScoreAttempt={() => openHeaderUnlockDialog("scores")}
                   />
-                ) : !easyMode && activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
+                ) : !rubricOnly && activeWorkspace && (!selectedStudent || !isStudentParticipating(studentDatabase, activeStudentId, activeWorkspace.id)) ? (
                   <Card title="Korrektur starten" subtitle="Die Rubrik bleibt unverändert; Punkte gehören immer zu einer ausgewählten Schüler:in.">
                     <div className="surface-muted rounded-2xl p-5">
                       <p className="themed-strong font-semibold">{selectedStudent ? "Schüler:in nimmt nicht teil" : "Noch keine Schüler:in ausgewählt"}</p>
@@ -4993,15 +5077,9 @@ function App() {
                   </Card>
                 ) : (
                   <>
-                {!easyMode && activeWorkspace ? (
-                  <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 surface-muted">
-                    <div>
-                      <p className="label">Individuelle Korrektur</p>
-                      <p className="themed-muted text-sm">
-                        {activeStudentLiveLabel ?? "Schülercode"} · {displayExam.sections.reduce((sum, section) => sum + section.tasks.length, 0)} Punkteingaben
-                      </p>
-                    </div>
-                    <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1">
+                {!rubricOnly && activeWorkspace ? (
+                  <div className="no-print flex justify-end">
+                    <div className="inline-flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         className="button-secondary gap-2 px-3 py-2 text-xs"
@@ -5022,7 +5100,7 @@ function App() {
                   </div>
                 ) : null}
 
-                {!easyMode && activeWorkspace && selectedStudent ? (
+                {!rubricOnly && activeWorkspace && selectedStudent ? (
                   <section className="rounded-xl border p-4 surface-muted" aria-label="Teilnahme an dieser Klassenarbeit">
                     <label className="flex cursor-pointer items-start gap-3 text-sm leading-5">
                       <input
@@ -5042,16 +5120,7 @@ function App() {
                   </section>
                 ) : null}
 
-                {activeWorkspace ? (
-                  <div className="rounded-xl border p-4 surface-muted">
-                    <p className="themed-strong text-sm font-semibold">{easyMode ? "Erwartungshorizont überarbeiten" : "Geteilte Rubrik, individuelle Punkte"}</p>
-                    <p className="themed-muted mt-1 text-sm leading-6">
-                      {easyMode
-                        ? "Aufgabentitel, erwartete Antworten und Maximalpunkte kannst du direkt bearbeiten. Anschließend steht der fertige Erwartungshorizont zum Drucken oder Exportieren bereit."
-                        : `Aufgabentitel, erwartete Antworten und Maximalpunkte gehören zur gemeinsamen Rubrik. Nur die Spalte „Erreicht“ wird für ${activeStudentLiveLabel ?? "die ausgewählte Schüler:in"} gespeichert. Änderungen an der Rubrik wirken sich auf alle Korrekturen aus.`}
-                    </p>
-                  </div>
-                ) : null}
+                {activeWorkspace && rubricOnly ? <h2 className="themed-strong text-sm font-semibold">Erwartungshorizont überarbeiten</h2> : null}
 
                 {activeWorkspace && displayExam.sections.map((section, index) => {
                   const nextSection = displayExam.sections[index + 1];
@@ -5096,9 +5165,9 @@ function App() {
                           )
                         }
                         onTaskChange={(taskId, patch) => updateTask(entry.id, taskId, patch)}
-                        scoresLocked={easyMode ? false : assessmentLocked}
-                        showScores={!easyMode}
-                        onLockedScoreAttempt={easyMode ? undefined : () => openHeaderUnlockDialog("scores")}
+                        scoresLocked={rubricOnly ? false : assessmentLocked}
+                        showScores={!rubricOnly}
+                        onLockedScoreAttempt={rubricOnly ? undefined : () => openHeaderUnlockDialog("scores")}
                         onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
                         onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
                         onDuplicate={() => duplicateSection(entry.id)}
@@ -5188,7 +5257,24 @@ function App() {
                   role="tabpanel"
                   aria-labelledby="ewh-editor-tab-result"
                   hidden={activeEditorTab !== "result"}
+                  className="space-y-6"
                 >
+                {!rubricOnly && activeWorkspace && activeGroup ? (
+                  <CorrectionChecklist
+                    key={`${activeWorkspace.id}:${assessmentLocked}`}
+                    exam={exam}
+                    database={studentDatabase}
+                    workspaceId={activeWorkspace.id}
+                    students={activeGroup.students}
+                    activeStudentId={activeStudentId}
+                    locked={assessmentLocked}
+                    onUnlock={() => openHeaderUnlockDialog("scores")}
+                    onOpen={openCorrectionIssue}
+                    onConfirm={handleConfirmCorrection}
+                    onReopen={handleReopenCorrection}
+                  />
+                ) : null}
+
                   {activeWorkspace ? (
                     <div id={EDITOR_RESULT_ANCHOR_ID} className="scroll-mt-24">
                       <Card
@@ -5330,12 +5416,12 @@ function App() {
             <aside className="space-y-6 xl:sticky xl:top-6 self-start">
               <SummaryPanel
                 summary={summary}
-                studentLabel={activeStudentLiveLabel}
+                studentLabel={rubricOnly ? null : activeStudentLiveLabel}
                 studentLabelTitle={activeStudentLiveLabelTitle}
-                locked={assessmentLocked}
+                locked={!rubricOnly && assessmentLocked}
                 hasSelectedGroup={Boolean(activeGroupId)}
-                hasSelectedStudent={Boolean(selectedStudent)}
-                correctionCoverage={correctionCompletionState.key ? correctionCompletionState : null}
+                hasSelectedStudent={!rubricOnly && Boolean(selectedStudent)}
+                correctionCoverage={!rubricOnly && correctionCompletionState.key ? correctionCompletionState : null}
               />
               {activeTab === "builder" && activeWorkspace ? (
                 <EditorToc
@@ -5344,7 +5430,7 @@ function App() {
                   onNavigate={navigateEditorToc}
                 />
               ) : null}
-              {!assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
+              {!rubricOnly && !assessmentLocked && classOverview ? <ClassOverviewPanel overview={classOverview} /> : null}
             </aside>
           ) : null}
         </div>

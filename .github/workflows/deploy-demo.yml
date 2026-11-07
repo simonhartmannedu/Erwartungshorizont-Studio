@@ -56,18 +56,11 @@ jobs:
       - name: Run end-to-end tests against the production build
         run: npm run test:e2e:preview
 
-      - name: Build app bundles
-        run: |
-          rm -rf .pages
-          npm run build -- --outDir .pages/app
+      - name: Build complete Pages artifact
+        run: npm run build:pages
 
-      - name: Build demo bundle
-        env:
-          VITE_APP_MODE: demo
-        run: npm run build:demo -- --outDir .pages/demo
-
-      - name: Add landing page
-        run: cp -R landing/. .pages/
+      - name: Verify Pages artifact in Chromium and Firefox
+        run: npm run test:pages:artifact
 
       - name: Upload Playwright diagnostics
         if: failure()

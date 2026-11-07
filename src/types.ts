@@ -41,6 +41,12 @@ export interface Task {
   expectation: string;
 }
 
+export interface CorrectionReview {
+  taskSignatures: Record<string, string>;
+  confirmedAt: string | null;
+  confirmedSignature: string | null;
+}
+
 export interface Section {
   id: string;
   title: string;
@@ -213,6 +219,8 @@ export interface StudentAssessment {
   /** Opaque, random work code printed on a Bogencheck answer sheet. */
   answerSheetCode?: string;
   encryptedAnswerSheetCode?: EncryptedText | null;
+  correctionReview?: CorrectionReview;
+  encryptedCorrectionReview?: EncryptedText | null;
   updatedAt: string;
   printedAt: string | null;
 }

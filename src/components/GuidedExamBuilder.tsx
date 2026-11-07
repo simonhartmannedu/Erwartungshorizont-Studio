@@ -89,6 +89,7 @@ interface Props {
   lockTargetToNew?: boolean;
   allowUnassignedWorkspace?: boolean;
   easyMode?: boolean;
+  onCreateEmptyExam: () => void;
   onApplyManualStructure: (config: {
     totalPoints: number;
     gradeScale: GradeScale;
@@ -437,6 +438,7 @@ const ComposerTaskRow = ({
   task,
   sections,
   onPointsChange,
+  onChange,
   onRemove,
   onDuplicate,
   onMoveToSection,
@@ -445,10 +447,12 @@ const ComposerTaskRow = ({
   task: Task;
   sections: ComposerSection[];
   onPointsChange: (value: number) => void;
+  onChange: (patch: Partial<Task>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
   onMoveToSection: (sectionId: string) => void;
 }) => {
+  const [editing, setEditing] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: composerTaskDndId(task.id),
     data: { type: "composer-task", sectionId: section.id, taskId: task.id },
@@ -459,6 +463,7 @@ const ComposerTaskRow = ({
     <article
       ref={setNodeRef}
       className={`composer-task-row ${isDragging ? "composer-task-row-dragging" : ""}`}
+      data-task-id={task.id}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <button
@@ -473,9 +478,15 @@ const ComposerTaskRow = ({
       </button>
       <div className="min-w-0 flex-1">
         <strong>{task.title}</strong>
-        <p>{task.description || task.expectation || "Ohne Beschreibung"}</p>
+        <p>{task.description || task.expectation || "Antwort und Bewertungskriterien selbst eintragen"}</p>
+        <button type="button" className="button-secondary mt-2 px-2 py-1 text-xs" aria-expanded={editing} aria-controls={`composer-task-editor-${task.id}`} onClick={() => setEditing(!editing)}>Baustein bearbeiten</button>
+        {editing ? <div id={`composer-task-editor-${task.id}`} className="composer-task-editor mt-3 grid min-w-0 gap-3">
+          <Field label="Aufgabentyp" inputId={`composer-task-title-${task.id}`}><input id={`composer-task-title-${task.id}`} className="field min-w-0" value={task.title} onChange={(event) => onChange({ title: event.target.value })} /></Field>
+          <Field label="Mögliche Schülerantwort / Lösung" inputId={`composer-task-answer-${task.id}`}><TextAreaField id={`composer-task-answer-${task.id}`} aria-label="Mögliche Schülerantwort / Lösung" value={task.description} onValueChange={(value) => onChange({ description: value })} placeholder="Eigene Lösung oder erwartete Antwort eintragen" /></Field>
+          <Field label="Eigene Bewertungskriterien" inputId={`composer-task-expectation-${task.id}`}><TextAreaField id={`composer-task-expectation-${task.id}`} aria-label="Eigene Bewertungskriterien" value={task.expectation} onValueChange={(value) => onChange({ expectation: value })} placeholder="Eigene Kriterien eintragen" /></Field>
+        </div> : null}
       </div>
-      <NumberInput className="field composer-task-points" value={task.maxPoints} min={0} step={0.5} onCommit={onPointsChange} />
+      <NumberInput className="field composer-task-points" ariaLabel={`Maximalpunkte für ${task.title || "diesen Baustein"}`} value={task.maxPoints} min={0} step={0.5} onCommit={onPointsChange} />
       <div className="composer-task-actions">
         {destinations.length > 0 ? (
           <select
@@ -718,6 +729,7 @@ export const GuidedExamBuilder = ({
   lockTargetToNew = false,
   allowUnassignedWorkspace = false,
   easyMode = false,
+  onCreateEmptyExam,
   onApplyManualStructure,
   onApplyComposedTemplate,
 }: Props) => {
@@ -762,7 +774,7 @@ export const GuidedExamBuilder = ({
   const [metaDraft, setMetaDraft] = useState<ExamMeta>(() => ({ ...initialMeta }));
   const composerSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, scrollBehavior: "auto" }),
   );
 
   const availableSubjects = useMemo(
@@ -1347,6 +1359,13 @@ export const GuidedExamBuilder = ({
                     <input className="field" value={section.title} aria-label="Titel des Aufgabenteils" onFocus={() => setActiveComposerSectionId(section.id)} onChange={(event) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, title: event.target.value } : entry))} />
                     <strong>{formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</strong>
                   </div>
+                  <details className="mt-3 min-w-0">
+                    <summary className="themed-muted cursor-pointer text-xs font-semibold">Abschnitt bearbeiten</summary>
+                    <div className="mt-3 grid min-w-0 gap-3">
+                      <Field label="Beschreibung des Aufgabenteils"><TextAreaField aria-label="Beschreibung des Aufgabenteils" value={section.description} onValueChange={(value) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, description: value } : entry))} /></Field>
+                      <Field label="Notiz zum Aufgabenteil"><TextAreaField aria-label="Notiz zum Aufgabenteil" value={section.note} onValueChange={(value) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, note: value } : entry))} /></Field>
+                    </div>
+                  </details>
                   <ComposerSectionDropArea sectionId={section.id}>
                     <SortableContext items={section.tasks.map((task) => composerTaskDndId(task.id))} strategy={verticalListSortingStrategy}>
                       <div className="composer-task-list">
@@ -1356,6 +1375,7 @@ export const GuidedExamBuilder = ({
                             section={section}
                             task={task}
                             sections={composerSections}
+                            onChange={(patch) => updateComposerTask(section.id, task.id, (current) => ({ ...current, ...patch }))}
                             onPointsChange={(value) => updateComposerTask(section.id, task.id, (current) => ({ ...current, maxPoints: value, achievedPoints: Math.min(current.achievedPoints, value) }))}
                             onRemove={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.filter((candidate) => candidate.id !== task.id) } : entry))}
                             onDuplicate={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: [...entry.tasks, cloneComposerTask(task, entry.title)] } : entry))}
@@ -1412,6 +1432,7 @@ export const GuidedExamBuilder = ({
         <div className="template-mode-tabs">
           {renderModeButton("templates", "Vorlagen", "Suchen und übernehmen")}
           {renderModeButton("manual", "Leere Struktur", "Frei zusammenstellen")}
+          <button type="button" className="template-mode-button" onClick={onCreateEmptyExam}><PlusIcon className="h-5 w-5" /><span><strong>Leerer EWH</strong><small>Direkt manuell bearbeiten</small></span></button>
           <button
             type="button"
             className="template-create-button button-primary gap-2"

@@ -2,8 +2,22 @@ import { describe, expect, it } from "vitest";
 import { sampleExam } from "../data/sampleExam";
 import { calculateExamSummary } from "./calculations";
 import { buildCsvContent, getTaskDocumentText, renderPrintDocument } from "./export";
+import { exportEditableExamDocx } from "./export";
+import JSZip from "jszip";
 
 describe("Dokumentausgabe", () => {
+  it("enthält das Eltern-Unterschriftsfeld auch im editierbaren Word-Dokument", async () => {
+    let exportedBlob: Blob | null = null;
+    await exportEditableExamDocx(sampleExam, calculateExamSummary(sampleExam), undefined, {
+      hideResults: true,
+      saveTarget: Promise.resolve({ filename: "test.docx", save: async (blob: Blob) => { exportedBlob = blob; return "saved" as const; } }),
+    });
+    expect(exportedBlob).not.toBeNull();
+    const zip = await JSZip.loadAsync(await (exportedBlob as unknown as Blob).arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain("Unterschrift der Eltern");
+    expect(xml).toContain("Datum: _________________");
+  });
   const task = {
     id: "task-1",
     title: "Begründung",
@@ -47,6 +61,8 @@ describe("Dokumentausgabe", () => {
     expect(document).toContain("Begründe deine Entscheidung mit einer Textstelle.");
     expect(document).not.toContain("Die Textstelle passt zur gewählten Entscheidung.");
     expect(document).not.toContain("Individuelle Rückmeldung");
+    expect(document).toContain("Unterschrift der Eltern");
+    expect(document).toContain("Datum: __________________");
   });
 });
 

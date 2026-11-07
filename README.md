@@ -13,14 +13,22 @@ Der Schulalltag rund um Klassenarbeiten besteht oft aus vielen kleinen, fehleran
 Damit kannst du:
 
 - Erwartungshorizonte, Aufgaben, Punkte und Notenschlüssel erstellen und wiederverwenden;
+- mit „Leerer EWH“ direkt einen zusätzlichen Arbeitsstand manuell aufbauen oder Bausteine schon beim Zusammenstellen bearbeiten;
 - Lerngruppen aus CSV- oder TXT-Dateien übernehmen;
 - Punkte, Kommentare und Unterschriften pro Schüler*in erfassen;
+- Aufgaben beim Korrigieren je nach verfügbarem Platz als Tabelle oder als Karten ohne horizontales Scrollen bearbeiten;
+- fehlende Eingaben, geänderte Bewertungsgrundlagen und Teilnahme über eine Abschlussprüfung durchsehen und eine zweite Durchsicht vormerken;
 - Teilnahme je Klassenarbeit als anwesend, abwesend, entschuldigt oder „schreibt nach“ dokumentieren;
 - Bewertungsbögen, Klassenübersichten und Notenlisten als Druck-PDF, Word-Datei und – für Notenlisten – CSV ausgeben;
+- auf Bewertungsbögen ein freies Feld für Datum und Unterschrift der Eltern ausgeben;
 - abgeschlossene Arbeiten archivieren und für das nächste Schuljahr wiederverwenden;
 - verschlüsselte Sicherungen deines Arbeitsstands anlegen.
 
 Die Demo enthält ausschließlich fiktive Daten.
+
+Aufgaben aus integrierten Vorlagen und der Bausteinbibliothek enthalten Aufgabentyp und Punkte. Mögliche Schülerantworten und eigene Bewertungskriterien trägst du selbst ein. Bereits gespeicherte eigene Texte bleiben erhalten. Die Moduswahl steht oben rechts neben den Editor-Reitern. Die individuelle Auswertung und das Inhaltsverzeichnis bleiben beim Korrigieren in der rechten Spalte sichtbar; die Abschlussprüfung findest du unter „Ergebnis & Druck“.
+
+Die Bedienung und Grenzen der Korrekturhilfe beschreibt [Automatische Abschlussprüfung](docs/correction-automation-research.md).
 
 ## Projektstatus
 

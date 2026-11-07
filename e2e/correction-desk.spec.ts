@@ -28,5 +28,5 @@ test("erfasst eine Aufgabe klassenweise und lässt zur Einzelkorrektur zurückke
   await expect(page.getByText("erfasst", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Einzelkorrektur", exact: true }).click();
-  await expect(page.getByText("Geteilte Rubrik, individuelle Punkte", { exact: true })).toBeVisible();
+  await expect(page.locator(".section-editor").first()).toBeVisible();
 });

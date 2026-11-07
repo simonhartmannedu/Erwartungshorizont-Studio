@@ -4,6 +4,19 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
 ## Unveröffentlicht
 
+## 1.1.0 – 07.11.2026
+
+- Vorlagen und Bibliotheksaufgaben enthalten keine vorformulierten Antworten oder Bewertungserwartungen mehr. Titel, Antwort, eigene Bewertungskriterien und Punkte sind bereits im Zusammensteller editierbar.
+- „Leerer EWH“ öffnet mit einem Klick einen zusätzlichen, leeren Arbeitsstand zur manuellen Bearbeitung, auch ohne Lerngruppe.
+- Die Moduswahl mit zwei dezenten Pills für Einzelkorrektur und Korrektur-Tisch steht oben rechts in der Reiterzeile. Die Rubrik ist direkt in der Einzelkorrektur bearbeitbar. Große Erklärungskarten entfallen. Die rechte Spalte mit individueller Auswertung und Inhaltsverzeichnis bleibt beim Korrigieren sichtbar; die Abschlussprüfung steht unter „Ergebnis & Druck“.
+- Die drei Spalten der Korrekturansicht beginnen auf gleicher Höhe; ausgeblendete Vorbereitungsfelder erzeugen keinen Leerraum über der mittleren Spalte.
+- Druck-PDF, Schülerbogen und Word-Export enthalten ein freies Feld für Datum und Unterschrift der Eltern.
+- Die Abschlussprüfung bündelt fehlende Punkte, ungültige Werte, geänderte Bewertungsgrundlagen und widersprüchliche Teilnahme. Offene Stellen sind direkt erreichbar; Prüfvermerke und eine zweite Durchsicht werden für geschützte Gruppen verschlüsselt gespeichert.
+- Das bloße Verlassen eines unberührten Punktefelds erfasst keine null Punkte.
+- Bei raschen Bewertungsänderungen überspringt die Speicherung überholte, noch wartende Zwischenstände vor der Verschlüsselung und speichert den aktuellen Stand.
+- Vor dem Pages-Upload prüfen Chromium und Firefox das vollständige Hosting-Artefakt mit Landingpage, `/app/`, `/demo/`, WASM und lokaler Speicherung.
+- Aufgeklappte Aufgaben passen sich beim Korrigieren an die verfügbare Abschnittsbreite an. Schmale Bereiche verwenden Karten; Tabellen und Aktionshilfen erzeugen auch in Firefox keine horizontale Scrollleiste mehr.
+
 ## 1.0.0 – 03.11.2026
 
 - Word-Exporte verwenden nun ein platzsparendes, drucknahes Tabellenlayout mit wiederholten Kopfzeilen und klaren Spaltenbreiten.

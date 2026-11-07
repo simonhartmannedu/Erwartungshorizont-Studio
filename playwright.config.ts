@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "pages-deployment.spec.ts",
   fullyParallel: true,
   // Password derivation is intentionally expensive. Two workers keep browser
   // interactions responsive on ordinary teacher laptops and CI runners.

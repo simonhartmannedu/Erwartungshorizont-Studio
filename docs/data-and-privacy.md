@@ -26,6 +26,8 @@ Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare, Unte
 
 Auf einem gemeinsam genutzten Gerät: Gruppe nach der Korrektur sperren, Browser schließen und kein Passwort im Browser speichern.
 
+Die Abschlussprüfung speichert pro Person die Bewertungsgrundlage sowie den zuletzt bestätigten Prüfstand. Diese Daten werden für geschützte Lerngruppen wie die übrigen Bewertungsdaten verschlüsselt gespeichert und beim Sperren aus dem Arbeitsspeicher entfernt. Sie erscheinen nicht im Schülerbogen.
+
 ### Technische Einordnung der Verschlüsselung
 
 Die Verschlüsselung findet im Browser mit Web Crypto statt: Aus dem Passwort wird mit PBKDF2-HMAC-SHA-256 (250.000 Iterationen und zufälligem 16-Byte-Salt) ein AES-256-GCM-Schlüssel abgeleitet. Jede Verschlüsselung verwendet zusätzlich einen zufälligen 12-Byte-Initialisierungsvektor. Das Verfahren schützt gespeicherte geschützte Gruppendaten und verschlüsselte Backups; es ersetzt keinen Schutz gegen ein kompromittiertes oder bereits entsperrtes Gerät.

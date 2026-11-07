@@ -6,16 +6,14 @@ const createTask = (
   title: string,
   maxPoints: number,
   category: string,
-  description: string,
-  expectation = "",
 ): Task => ({
   id: crypto.randomUUID(),
   title,
-  description,
+  description: "",
   category,
   maxPoints,
   achievedPoints: 0,
-  expectation,
+  expectation: "",
 });
 
 const createSection = (
@@ -95,8 +93,6 @@ const templateSlug = (value: string) =>
 interface TemplateTaskSeed {
   title: string;
   points?: number;
-  description: string;
-  expectation: string;
 }
 
 interface TemplateSectionSeed {
@@ -203,7 +199,7 @@ const createTemplateDefinition = (blueprint: TemplateBlueprint): ExamTemplateDef
         section.description,
         section.note,
         section.tasks.map((task, index) =>
-          createTask(task.title, taskPoints[index] ?? 0, section.title, task.description, task.expectation),
+          createTask(task.title, taskPoints[index] ?? 0, section.title),
         ),
       );
     }),
@@ -251,13 +247,9 @@ const createModernForeignLanguageSek1Blueprint = ({ subject, short }: { subject:
       tasks: [
         {
           title: "Globalverstehen",
-          description: "Hauptaussage, Situation und kommunikative Absicht erfassen.",
-          expectation: "Das Gesamtverständnis des Materials ist sicher erkennbar.",
         },
         {
           title: "Detailverstehen",
-          description: "Relevante Einzelinformationen korrekt entnehmen und zuordnen.",
-          expectation: "Details werden präzise, materialnah und nicht geraten wiedergegeben.",
         },
       ],
     },
@@ -269,13 +261,9 @@ const createModernForeignLanguageSek1Blueprint = ({ subject, short }: { subject:
       tasks: [
         {
           title: "Grammatik",
-          description: "Zielstrukturen passend und korrekt anwenden.",
-          expectation: "Die Sprachstrukturen werden sicher gebildet und funktional eingesetzt.",
         },
         {
           title: "Wortschatz",
-          description: "Wortschatz im Kontext verstehen und passend verwenden.",
-          expectation: "Die Wortwahl ist verständlich, thematisch passend und korrekt.",
         },
       ],
     },
@@ -287,13 +275,9 @@ const createModernForeignLanguageSek1Blueprint = ({ subject, short }: { subject:
       tasks: [
         {
           title: "Inhalt",
-          description: "Die Schreibaufgabe vollständig und adressatenbezogen umsetzen.",
-          expectation: "Alle geforderten Aspekte sind sinnvoll bearbeitet.",
         },
         {
           title: "Aufbau und Textsorte",
-          description: "Den Text logisch gliedern und textsortengerecht gestalten.",
-          expectation: "Der Text ist klar strukturiert und passt zur Schreibsituation.",
         },
       ],
     },
@@ -305,13 +289,9 @@ const createModernForeignLanguageSek1Blueprint = ({ subject, short }: { subject:
       tasks: [
         {
           title: "Korrektheit",
-          description: "Grammatik, Rechtschreibung und Satzbau bewerten.",
-          expectation: "Die sprachliche Form bleibt verständlich und überwiegend korrekt.",
         },
         {
           title: "Ausdruck und Kohärenz",
-          description: "Wortschatz, Verknüpfungen und Leseführung bewerten.",
-          expectation: "Die Darstellung ist zusammenhängend und angemessen formuliert.",
         },
       ],
     },
@@ -348,8 +328,6 @@ const createClassicalLanguageBlueprint = (
       tasks: [
         {
           title: "Vorerschließung",
-          description: "Inhalt, Situation, Formen oder Strukturmerkmale erschließen.",
-          expectation: "Die Erschließung bereitet die Übersetzung fachlich tragfähig vor.",
         },
       ],
     },
@@ -361,8 +339,6 @@ const createClassicalLanguageBlueprint = (
       tasks: [
         {
           title: "Sinn und Struktur übertragen",
-          description: "Textinhalt, Satzbau und sprachliche Beziehungen sachgerecht übersetzen.",
-          expectation: "Die Übersetzung ist verständlich, textnah und grammatisch abgesichert.",
         },
       ],
     },
@@ -374,13 +350,9 @@ const createClassicalLanguageBlueprint = (
       tasks: [
         {
           title: "Analyse und Deutung",
-          description: "Sprache, Aufbau, Figuren, Argumentation oder Motive untersuchen.",
-          expectation: "Deutungen sind textbezogen, fachsprachlich und nachvollziehbar.",
         },
         {
           title: "Sachwissen anwenden",
-          description: "Kulturelles, historisches oder literarisches Wissen funktional einbinden.",
-          expectation: "Sachwissen unterstützt die Interpretation und bleibt aufgabenbezogen.",
         },
       ],
     },
@@ -392,8 +364,6 @@ const createClassicalLanguageBlueprint = (
       tasks: [
         {
           title: "Fachsprache und Kohärenz",
-          description: "Gedankengang, Fachbegriffe und sprachliche Richtigkeit bewerten.",
-          expectation: "Die Darstellung ist klar, präzise und fachlich angemessen.",
         },
       ],
     },
@@ -429,14 +399,10 @@ const createModernForeignLanguageSek2Blueprint = ({ subject, short }: { subject:
         {
           title: "Inhalt",
           points: 20,
-          description: "Relevante Informationen situations- und adressatengerecht auswählen.",
-          expectation: "Der Zieltext vermittelt die relevanten Inhalte korrekt und zweckbezogen.",
         },
         {
           title: "Darstellungsleistung / Sprache",
           points: 30,
-          description: "Zieltextformat, Register, Struktur und sprachliche Angemessenheit bewerten.",
-          expectation: "Sprache und Textgestaltung passen zur Kommunikationssituation.",
         },
       ],
     },
@@ -449,20 +415,14 @@ const createModernForeignLanguageSek2Blueprint = ({ subject, short }: { subject:
         {
           title: "Textverständnis",
           points: 12,
-          description: "Zentrale Aspekte des Ausgangstextes sichern.",
-          expectation: "Das Textverständnis ist korrekt, knapp und materialbezogen.",
         },
         {
           title: "Analyse",
           points: 17,
-          description: "Aussage, Perspektive, Struktur oder Sprache analysieren.",
-          expectation: "Die Analyse ist textnah, kohärent und fachlich präzise.",
         },
         {
           title: "Commentaire / production",
           points: 15,
-          description: "Eine bewertende, produktive oder weiterführende Schreibaufgabe bearbeiten.",
-          expectation: "Die Bearbeitung ist differenziert, adressatenbezogen und begründet.",
         },
       ],
     },
@@ -475,20 +435,14 @@ const createModernForeignLanguageSek2Blueprint = ({ subject, short }: { subject:
         {
           title: "Kommunikative Textgestaltung",
           points: 22,
-          description: "Textaufbau, Leserführung, Textsortenbezug und Kohärenz bewerten.",
-          expectation: "Der Text ist funktional strukturiert und kommunikativ passend.",
         },
         {
           title: "Ausdruck / sprachliche Mittel",
           points: 22,
-          description: "Wortschatz, Eigenständigkeit, Variation und Satzbau bewerten.",
-          expectation: "Die sprachlichen Mittel sind angemessen, variabel und aufgabenbezogen.",
         },
         {
           title: "Sprachrichtigkeit",
           points: 22,
-          description: "Wortschatz, Grammatik, Orthografie und Zeichensetzung bewerten.",
-          expectation: "Fehler beeinträchtigen die Kommunikation nicht wesentlich.",
         },
       ],
     },
@@ -519,8 +473,6 @@ const createModernForeignLanguageAbiturBlueprint = ({ subject, short }: { subjec
       tasks: [
         {
           title: "Hörverstehen",
-          description: "Globale und detaillierte Informationen aus Hörmaterialien erfassen.",
-          expectation: "Antworten bilden die Hörinformationen korrekt und aufgabenbezogen ab.",
         },
       ],
     },
@@ -557,13 +509,9 @@ const createMaterialBasedSek2Blueprint = (
       tasks: [
         {
           title: "Material erschließen",
-          description: "Aussagen, Struktur, Perspektive oder Daten des Materials erfassen.",
-          expectation: "Die Analyse bleibt materialnah und fachmethodisch korrekt.",
         },
         {
           title: "Fachmethodisch auswerten",
-          description: "Material mit passenden Fachbegriffen und Verfahren untersuchen.",
-          expectation: "Die Auswertung nutzt fachliche Kategorien sicher und nachvollziehbar.",
         },
       ],
     },
@@ -575,13 +523,9 @@ const createMaterialBasedSek2Blueprint = (
       tasks: [
         {
           title: "Einordnen",
-          description: "Material in fachliche Zusammenhänge, Modelle oder Problemfelder einbetten.",
-          expectation: "Die Einordnung ist sachlich richtig und fachlich relevant.",
         },
         {
           title: "Zusammenhänge erklären",
-          description: "Ursachen, Folgen, Positionen oder Strukturen differenziert darstellen.",
-          expectation: "Zusammenhänge werden klar, fachsprachlich und begründet entfaltet.",
         },
       ],
     },
@@ -593,13 +537,9 @@ const createMaterialBasedSek2Blueprint = (
       tasks: [
         {
           title: "Beurteilen",
-          description: "Eine fachliche Fragestellung kriteriengeleitet beurteilen.",
-          expectation: "Das Urteil ist differenziert, begründet und an Analyse/Sachwissen rückgebunden.",
         },
         {
           title: "Transfer herstellen",
-          description: "Ergebnisse auf neue Kontexte, Positionen oder Problemfelder übertragen.",
-          expectation: "Der Transfer bleibt fachlich tragfähig und nicht bloß assoziativ.",
         },
       ],
     },
@@ -611,8 +551,6 @@ const createMaterialBasedSek2Blueprint = (
       tasks: [
         {
           title: "Fachsprache und Struktur",
-          description: "Gedankengang, Fachbegriffe und sprachliche Form bewerten.",
-          expectation: "Die Darstellung ist stringent, präzise und fachsprachlich angemessen.",
         },
       ],
     },
@@ -645,8 +583,6 @@ const createScienceSekBlueprint = (subject: "Biologie" | "Physik", stage: Builde
       tasks: [
         {
           title: "Konzepte anwenden",
-          description: "Fachwissen passend zur Aufgabenstellung einsetzen.",
-          expectation: "Grundideen werden korrekt, fachsprachlich und zielgerichtet genutzt.",
         },
       ],
     },
@@ -658,13 +594,9 @@ const createScienceSekBlueprint = (subject: "Biologie" | "Physik", stage: Builde
       tasks: [
         {
           title: "Material auswerten",
-          description: "Daten, Diagramme oder Experimente sachgerecht erschließen.",
-          expectation: "Relevante Informationen werden korrekt erfasst und fachlich gedeutet.",
         },
         {
           title: "Zusammenhänge erklären",
-          description: "Fachliche Ursachen, Wirkungen oder Modellzusammenhänge erläutern.",
-          expectation: "Erklärungen sind fachlich stimmig und materialgebunden.",
         },
       ],
     },
@@ -676,13 +608,9 @@ const createScienceSekBlueprint = (subject: "Biologie" | "Physik", stage: Builde
       tasks: [
         {
           title: "Transfer",
-          description: "Bekannte Konzepte auf eine neue Situation anwenden.",
-          expectation: "Der Transfer zeigt vernetztes Fachverständnis.",
         },
         {
           title: "Begründen oder bewerten",
-          description: "Aussagen, Ergebnisse oder Anwendungen fachlich beurteilen.",
-          expectation: "Bewertungen sind begründet und fachlich belastbar.",
         },
       ],
     },
@@ -715,8 +643,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Einen altersgemäßen erzählenden oder sachlichen Text erschließen.",
         note: "Kurze Texte, deutliche Aufgabenformate und bei Bedarf Lesestrategien oder Visualisierungen bereitstellen.",
         tasks: [
-          { title: "Wichtige Informationen finden", description: "Informationen gezielt aus dem Text entnehmen.", expectation: "Zentrale Informationen werden sicher gefunden und passend wiedergegeben." },
-          { title: "Text verstehen und begründen", description: "Eine Aussage zum Text mit einer Textstelle begründen.", expectation: "Die Antwort zeigt Textverständnis und nutzt einen passenden Beleg." },
+          { title: "Wichtige Informationen finden",},
+          { title: "Text verstehen und begründen",},
         ],
       },
       {
@@ -725,8 +653,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Einen kurzen, adressatenbezogenen Text planen und verfassen.",
         note: "Zum Beispiel Einladung, Bericht, Fortsetzung oder kurze Beschreibung; Textsorte transparent machen.",
         tasks: [
-          { title: "Inhalt und Reihenfolge", description: "Alle wichtigen Informationen verständlich und sinnvoll geordnet darstellen.", expectation: "Der Text erfüllt die Aufgabe und ist für die Zielperson nachvollziehbar." },
-          { title: "Passende Sprache", description: "Wörter und Sätze passend zur Textsorte und Situation wählen.", expectation: "Die Formulierungen sind verständlich und adressatengerecht." },
+          { title: "Inhalt und Reihenfolge",},
+          { title: "Passende Sprache",},
         ],
       },
       {
@@ -735,7 +663,7 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Sprachliche Regelmäßigkeiten erkennen und für das eigene Schreiben nutzen.",
         note: "Auf zuvor im Unterricht gesicherte Schwerpunkte wie Wortarten, Satzzeichen oder Rechtschreibstrategien begrenzen.",
         tasks: [
-          { title: "Strategie anwenden", description: "Eine eingeübte Rechtschreib- oder Sprachstrategie anwenden und erklären.", expectation: "Die Strategie wird passend eingesetzt und das Ergebnis nachvollziehbar überprüft." },
+          { title: "Strategie anwenden",},
         ],
       },
     ],
@@ -764,8 +692,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Sichere Rechenverfahren und Zahlvorstellungen anwenden.",
         note: "Aufgabenformate an eingeführte Verfahren und den Lernstand der Lerngruppe anpassen.",
         tasks: [
-          { title: "Rechenwege nutzen", description: "Aufgaben mit einem passenden Rechenweg lösen.", expectation: "Der Rechenweg ist nachvollziehbar und das Ergebnis stimmt." },
-          { title: "Ergebnisse prüfen", description: "Ein Ergebnis überschlagen oder mit einer Umkehraufgabe überprüfen.", expectation: "Die Kontrolle ist sinnvoll gewählt und verständlich erklärt." },
+          { title: "Rechenwege nutzen",},
+          { title: "Ergebnisse prüfen",},
         ],
       },
       {
@@ -774,8 +702,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Größen aus der Lebenswelt schätzen, umrechnen und berechnen.",
         note: "Zum Beispiel Geld, Zeit, Länge oder Masse in einem kindnahen Kontext einsetzen.",
         tasks: [
-          { title: "Mit Größen rechnen", description: "Angaben passend umrechnen und für eine Rechnung verwenden.", expectation: "Einheiten und Rechenoperationen werden korrekt eingesetzt." },
-          { title: "Ergebnis einordnen", description: "Das Ergebnis mit Blick auf die Alltagssituation beurteilen.", expectation: "Die Antwort passt zur Situation und ist plausibel." },
+          { title: "Mit Größen rechnen",},
+          { title: "Ergebnis einordnen",},
         ],
       },
       {
@@ -784,8 +712,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Eine Sachsituation mathematisch darstellen, lösen und erklären.",
         note: "Eine bildliche Darstellung, Tabelle oder Skizze kann als Unterstützung zugelassen oder erwartet werden.",
         tasks: [
-          { title: "Situation darstellen", description: "Wichtige Angaben auswählen und mit Skizze, Tabelle oder Rechnung darstellen.", expectation: "Die Darstellung hilft erkennbar beim Lösen der Aufgabe." },
-          { title: "Lösungsweg erklären", description: "Den eigenen Rechenweg in verständlichen Worten erläutern.", expectation: "Die Erklärung macht die mathematische Überlegung deutlich." },
+          { title: "Situation darstellen",},
+          { title: "Lösungsweg erklären",},
         ],
       },
     ],
@@ -814,8 +742,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Zentrale Aussagen, Informationen und Gestaltung eines Textes erschließen.",
         note: "Für literarische oder Sachtexte nutzbar; Lesestrategie und Operatoren in der Aufgabenstellung klar benennen.",
         tasks: [
-          { title: "Informationen sichern", description: "Zentrale Aussagen und Details gezielt herausarbeiten.", expectation: "Die Antworten sind textnah, vollständig und fachlich korrekt." },
-          { title: "Textstellen deuten", description: "Eine Textstelle erklären und ihre Bedeutung für das Gesamtverständnis erläutern.", expectation: "Die Deutung ist nachvollziehbar und am Text belegt." },
+          { title: "Informationen sichern",},
+          { title: "Textstellen deuten",},
         ],
       },
       {
@@ -824,8 +752,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Einen kohärenten und adressatenorientierten Text schreiben.",
         note: "Zum Beispiel Bericht, Beschreibung, Brief oder begründete Stellungnahme; Textsortenmerkmale vorher sichern.",
         tasks: [
-          { title: "Inhalt und Aufbau", description: "Die Schreibaufgabe vollständig, geordnet und adressatenbezogen umsetzen.", expectation: "Der Text erfüllt die Aufgabe und zeigt einen klaren Aufbau." },
-          { title: "Formulieren und überarbeiten", description: "Passende sprachliche Mittel einsetzen und den Text gezielt überarbeiten.", expectation: "Die Sprache ist verständlich, passend und erkennbar überarbeitet." },
+          { title: "Inhalt und Aufbau",},
+          { title: "Formulieren und überarbeiten",},
         ],
       },
       {
@@ -834,7 +762,7 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Sprache, Texte oder Medien mit fachlichen Kriterien untersuchen.",
         note: "An den Unterrichtsschwerpunkt anbinden, etwa Wortarten, Satzbau, Rechtschreibstrategien oder Wirkung eines Mediums.",
         tasks: [
-          { title: "Sprachliche Entscheidung begründen", description: "Eine sprachliche oder mediale Gestaltung mit Fachbegriffen erklären.", expectation: "Die Begründung ist fachlich stimmig und auf das Beispiel bezogen." },
+          { title: "Sprachliche Entscheidung begründen",},
         ],
       },
     ],
@@ -863,8 +791,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Einen altersangemessenen Text global und im Detail erschließen.",
         note: "Mit vertrauten Themen und klarer, altersangemessener Standardsprache arbeiten.",
         tasks: [
-          { title: "Global understanding", description: "Situation, Personen und Hauptaussage erfassen.", expectation: "Die Antworten zeigen sicheres Gesamtverständnis." },
-          { title: "Detailed information", description: "Relevante Einzelinformationen gezielt entnehmen.", expectation: "Details werden korrekt und passend zugeordnet." },
+          { title: "Global understanding",},
+          { title: "Detailed information",},
         ],
       },
       {
@@ -873,8 +801,8 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Eine kurze Mitteilung für eine konkrete Kommunikationssituation verfassen.",
         note: "Zum Beispiel email, message oder invitation; Aufgabe, Adressat und erwartete Textsorte eindeutig angeben.",
         tasks: [
-          { title: "Content and task fulfilment", description: "Geforderte Informationen verständlich und vollständig mitteilen.", expectation: "Die Mitteilung erfüllt die kommunikative Aufgabe." },
-          { title: "Text and audience", description: "Den Text übersichtlich und adressatengerecht gestalten.", expectation: "Aufbau und Ton passen zur gewählten Kommunikationssituation." },
+          { title: "Content and task fulfilment",},
+          { title: "Text and audience",},
         ],
       },
       {
@@ -883,7 +811,7 @@ const schoolFormBlueprints: TemplateBlueprint[] = [
         description: "Wortschatz, Grammatik und Orthografie funktional für die Kommunikationsaufgabe nutzen.",
         note: "Sprachliche Mittel nicht losgelöst vom Schreibprodukt, sondern mit Bezug zur Verständlichkeit bewerten.",
         tasks: [
-          { title: "Vocabulary and structures", description: "Passende Wörter und eingeübte Strukturen verständlich verwenden.", expectation: "Die Sprache unterstützt die Kommunikation und ist überwiegend korrekt." },
+          { title: "Vocabulary and structures",},
         ],
       },
     ],
@@ -916,18 +844,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Inhalte erschließen",
-            description: "Zentrale Informationen, Figuren, Positionen oder Argumente aus dem Text sichern.",
-            expectation: "Erwartet werden treffende Informationen mit Rückbezug auf den Ausgangstext.",
           },
           {
             title: "Aussagen prüfen",
-            description: "Aussagen zum Text als zutreffend, unzutreffend oder teilweise zutreffend bewerten.",
-            expectation: "Entscheidungen werden mit passenden Textstellen oder Begründungen abgesichert.",
           },
           {
             title: "Textbelege nutzen",
-            description: "Belege auswählen und knapp erläutern, warum sie zur Fragestellung passen.",
-            expectation: "Belege sind korrekt ausgewählt und funktional in die Antwort eingebunden.",
           },
         ],
       },
@@ -939,13 +861,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Gestaltungsmittel untersuchen",
-            description: "Sprachliche Mittel, Stil oder Auffälligkeiten der Darstellung analysieren.",
-            expectation: "Benennungen und Wirkungsdeutungen greifen sauber ineinander.",
           },
           {
             title: "Aufbau erklären",
-            description: "Abschnitte, Verlauf oder Argumentationsstruktur funktional erläutern.",
-            expectation: "Die Darstellung zeigt nachvollziehbar, wie der Text aufgebaut ist und wirkt.",
           },
         ],
       },
@@ -957,18 +875,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Inhaltliche Ausgestaltung",
-            description: "Die Schreibaufgabe adressaten- und aufgabenbezogen umsetzen.",
-            expectation: "Die Aufgabenstellung wird vollständig erfüllt und sinnvoll ausgestaltet.",
           },
           {
             title: "Textaufbau",
-            description: "Gedanken strukturieren, Absätze sinnvoll setzen und Textsortenmerkmale beachten.",
-            expectation: "Der Text ist klar gegliedert und passt zur geforderten Schreibsituation.",
           },
           {
             title: "Überarbeitung",
-            description: "Den Text auf Klarheit, Präzision und Anschlussfähigkeit prüfen.",
-            expectation: "Der Schreibprozess zeigt erkennbar bewusste Formulierungsentscheidungen.",
           },
         ],
       },
@@ -980,13 +892,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Sprachrichtigkeit",
-            description: "Rechtschreibung, Grammatik und Zeichensetzung bewerten.",
-            expectation: "Die sprachliche Form ist überwiegend korrekt und unterstützt das Textverständnis.",
           },
           {
             title: "Ausdruck und Kohärenz",
-            description: "Passende Wortwahl, Verknüpfungen und fachlich stimmige Darstellung bewerten.",
-            expectation: "Der Text ist sprachlich klar, zusammenhängend und angemessen formuliert.",
           },
         ],
       },
@@ -1017,18 +925,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Global understanding",
-            description: "Die Hauptaussage und Situation des Materials erfassen.",
-            expectation: "Antworten zeigen sicheres Gesamtverständnis des Materials.",
           },
           {
             title: "Detailed information",
-            description: "Schlüsselstellen, Details oder Aussagen korrekt zuordnen.",
-            expectation: "Details werden präzise und textnah herausgearbeitet.",
           },
           {
             title: "Own wording / transfer",
-            description: "Informationen knapp in eigenen Worten wiedergeben oder adressatenbezogen übertragen.",
-            expectation: "Inhalte werden verständlich, passend und nicht bloß abschreibend verarbeitet.",
           },
         ],
       },
@@ -1040,13 +942,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grammar",
-            description: "Zeiten, Satzbau, Nebensätze oder other language structures korrekt anwenden.",
-            expectation: "Die Zielstrukturen werden sicher und passend gebildet.",
           },
           {
             title: "Vocabulary in context",
-            description: "Passenden Wortschatz situationsangemessen einsetzen.",
-            expectation: "Die Wortwahl ist treffend, verständlich und aufgabenbezogen.",
           },
         ],
       },
@@ -1058,13 +956,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Content",
-            description: "Die Schreibaufgabe vollständig und aufgabenbezogen umsetzen.",
-            expectation: "Alle geforderten Aspekte sind sinnvoll bearbeitet.",
           },
           {
             title: "Structure",
-            description: "Den Text logisch gliedern und textsortengerecht aufbauen.",
-            expectation: "Der Text ist übersichtlich, verbunden und klar adressatenbezogen.",
           },
         ],
       },
@@ -1076,18 +970,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grammar and accuracy",
-            description: "Grammatische Sicherheit und formale Korrektheit bewerten.",
-            expectation: "Sprachstrukturen sind weitgehend korrekt und funktional eingesetzt.",
           },
           {
             title: "Vocabulary and expression",
-            description: "Range, precision and appropriateness of language bewerten.",
-            expectation: "Die Ausdrucksweise ist variabel, treffend und zur Situation passend.",
           },
           {
             title: "Spelling and coherence",
-            description: "Orthografie, linking words und Leserführung bewerten.",
-            expectation: "Der Text bleibt gut lesbar, zusammenhängend und formal sicher.",
           },
         ],
       },
@@ -1118,18 +1006,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Routineverfahren",
-            description: "Rechenwege, Umformungen oder Standardverfahren sicher ausführen.",
-            expectation: "Rechenschritte sind fachlich korrekt und nachvollziehbar notiert.",
           },
           {
             title: "Begriffe und Darstellungen",
-            description: "Mathematische Darstellungen lesen, ergänzen oder passend auswählen.",
-            expectation: "Begriffe, Symbole und Darstellungen werden sicher verwendet.",
           },
           {
             title: "Kontrolle einfacher Ergebnisse",
-            description: "Ergebnisse plausibilisieren und naheliegende Fehler erkennen.",
-            expectation: "Ergebnisse werden nicht nur genannt, sondern überprüft.",
           },
         ],
       },
@@ -1141,18 +1023,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Modellieren",
-            description: "Eine Sachsituation mathematisch strukturieren und passende Ansätze wählen.",
-            expectation: "Der mathematische Zugang zur Situation ist schlüssig gewählt.",
           },
           {
             title: "Berechnen",
-            description: "Die gewählten Verfahren vollständig und korrekt durchführen.",
-            expectation: "Rechenwege sind tragfähig und führen zu stimmigen Ergebnissen.",
           },
           {
             title: "Ergebnisse deuten",
-            description: "Ergebnisse auf den Kontext beziehen und fachlich angemessen formulieren.",
-            expectation: "Resultate werden sinnvoll interpretiert und nicht isoliert stehen gelassen.",
           },
         ],
       },
@@ -1164,18 +1040,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Begründen",
-            description: "Aussagen mathematisch nachvollziehbar erklären oder beweisen.",
-            expectation: "Die Begründung ist fachsprachlich stimmig und schließt logisch.",
           },
           {
             title: "Lösungsweg dokumentieren",
-            description: "Gedankengang geordnet, symbolisch korrekt und lesbar darstellen.",
-            expectation: "Zwischenschritte und Struktur machen den Lösungsweg transparent.",
           },
           {
             title: "Verfahren reflektieren",
-            description: "Lösungen vergleichen, Grenzen benennen oder alternative Wege diskutieren.",
-            expectation: "Die Reflexion zeigt Verständnis für Methode und Ergebnis.",
           },
         ],
       },
@@ -1206,18 +1076,12 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Material beschreiben",
-            description: "Quelle oder Darstellung formal und inhaltlich erschließen.",
-            expectation: "Art, Perspektive und Kernaussagen des Materials werden sicher erkannt.",
           },
           {
             title: "Informationen herausarbeiten",
-            description: "Zentrale Aussagen und Hinweise aus dem Material geordnet erfassen.",
-            expectation: "Wesentliche Informationen werden treffend und materialnah benannt.",
           },
           {
             title: "Perspektive reflektieren",
-            description: "Intention, Adressatenbezug oder Blickwinkel des Materials erläutern.",
-            expectation: "Die Perspektive wird mit passenden Hinweisen aus dem Material begründet.",
           },
         ],
       },
@@ -1229,13 +1093,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Einordnen",
-            description: "Das Material in Zeit, Thema und historische Zusammenhänge einbetten.",
-            expectation: "Die Einordnung ist sachlich richtig und historisch tragfähig.",
           },
           {
             title: "Zusammenhänge erklären",
-            description: "Ursachen, Folgen oder Entwicklungen geordnet darstellen.",
-            expectation: "Darstellungen zeigen Ursache-Wirkungs-Zusammenhänge nachvollziehbar auf.",
           },
         ],
       },
@@ -1247,13 +1107,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Sachurteil formulieren",
-            description: "Eine historische Entscheidung, Entwicklung oder Position begründet bewerten.",
-            expectation: "Das Urteil stützt sich auf Material und Kontextwissen.",
           },
           {
             title: "Transfer herstellen",
-            description: "Gegenwartsbezug, Perspektivvergleich oder historische Relevanz herausarbeiten.",
-            expectation: "Der Transfer bleibt sachlich, differenziert und aufgabenbezogen.",
           },
         ],
       },
@@ -1284,13 +1140,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grundbegriffe sichern",
-            description: "Fachbegriffe, Symbole oder Modelle korrekt einsetzen.",
-            expectation: "Die chemische Fachsprache wird sicher und passend verwendet.",
           },
           {
             title: "Modelle anwenden",
-            description: "Beobachtungen mithilfe geeigneter Modelle erklären.",
-            expectation: "Das Modell passt zur Aufgabe und wird fachlich korrekt genutzt.",
           },
         ],
       },
@@ -1302,13 +1154,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Beobachtungen auswerten",
-            description: "Messwerte, Tabellen oder Versuchsbefunde strukturiert lesen und ordnen.",
-            expectation: "Wichtige Befunde werden vollständig und sachlich korrekt herausgearbeitet.",
           },
           {
             title: "Deutung ableiten",
-            description: "Aus den Befunden fachlich stimmige Schlüsse ziehen.",
-            expectation: "Die Deutung ist direkt an die Daten oder Beobachtungen angebunden.",
           },
         ],
       },
@@ -1320,13 +1168,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Anwenden",
-            description: "Erarbeitetes Wissen auf neue Situationen oder Stoffsysteme übertragen.",
-            expectation: "Bekannte Konzepte werden zielgerichtet auf den neuen Kontext angewendet.",
           },
           {
             title: "Begründen",
-            description: "Entscheidungen oder Aussagen fachsprachlich begründen.",
-            expectation: "Begründungen zeigen chemisches Verständnis und bleiben nachvollziehbar.",
           },
         ],
       },
@@ -1357,13 +1201,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Strukturen modellieren",
-            description: "Objekte, Daten oder Zustände passend darstellen.",
-            expectation: "Das Modell passt zur Problemstellung und ist konsistent.",
           },
           {
             title: "Beziehungen erläutern",
-            description: "Zusammenhänge zwischen Elementen fachsprachlich erklären.",
-            expectation: "Die Modellbestandteile werden nicht nur genannt, sondern sinnvoll gedeutet.",
           },
         ],
       },
@@ -1375,13 +1215,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Algorithmus entwickeln",
-            description: "Einen Lösungsweg strukturiert planen und darstellen.",
-            expectation: "Der Algorithmus ist korrekt aufgebaut und zur Aufgabe passend.",
           },
           {
             title: "Code oder Ablauf prüfen",
-            description: "Vorhandene Lösungen lesen, ergänzen oder korrigieren.",
-            expectation: "Fehler oder Lücken werden sachgerecht identifiziert und behoben.",
           },
         ],
       },
@@ -1393,13 +1229,9 @@ const sek1Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Lösung analysieren",
-            description: "Korrektheit, Funktion oder Grenzen einer Lösung erläutern.",
-            expectation: "Die Analyse bleibt fachlich sauber und argumentativ nachvollziehbar.",
           },
           {
             title: "Entscheidungen begründen",
-            description: "Alternativen vergleichen oder Gestaltungsentscheidungen reflektieren.",
-            expectation: "Die Begründung zeigt Verständnis für Informatikkonzepte und Auswirkungen.",
           },
         ],
       },
@@ -1437,18 +1269,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Aussageabsicht erfassen",
-            description: "Textaussagen und Leitgedanken analytisch herausarbeiten.",
-            expectation: "Die Analyse bleibt eng am Material und arbeitet zentrale Sinnstrukturen heraus.",
           },
           {
             title: "Gestaltung untersuchen",
-            description: "Sprachliche, strukturelle oder erzählerische Mittel funktional deuten.",
-            expectation: "Mittel werden nicht isoliert benannt, sondern in ihrer Wirkung erklärt.",
           },
           {
             title: "Beleggestützt argumentieren",
-            description: "Analyseergebnisse mit präzisen Verweisen auf das Material absichern.",
-            expectation: "Die Darstellung bleibt fachsprachlich präzise und textnah.",
           },
         ],
       },
@@ -1460,13 +1286,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Deutung entwickeln",
-            description: "Auf Basis der Analyse einen schlüssigen Deutungsansatz entfalten.",
-            expectation: "Der Interpretationsgang ist eigenständig, konsistent und materialgestützt.",
           },
           {
             title: "Argumentativ verdichten",
-            description: "Gedankengang systematisch strukturieren und überzeugend entfalten.",
-            expectation: "Argumente bauen klar aufeinander auf und führen zu einem tragfähigen Ergebnis.",
           },
         ],
       },
@@ -1478,13 +1300,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Kontext herstellen",
-            description: "Textaussagen in einen größeren literarischen oder gesellschaftlichen Zusammenhang stellen.",
-            expectation: "Der Transfer bleibt fachlich präzise und nicht bloß additiv.",
           },
           {
             title: "Vergleichen oder weiterführen",
-            description: "Eine zweite Position, ein weiteres Material oder einen Kontext produktiv einbeziehen.",
-            expectation: "Bezüge werden funktional hergestellt und begründet.",
           },
         ],
       },
@@ -1496,13 +1314,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Struktur und Kohärenz",
-            description: "Textaufbau, Leserführung und logische Verbindung der Gedankenschritte bewerten.",
-            expectation: "Die Darstellung ist stringent aufgebaut und sicher gegliedert.",
           },
           {
             title: "Sprache und Fachlichkeit",
-            description: "Fachsprache, Stil und sprachliche Korrektheit bewerten.",
-            expectation: "Die Sprache ist präzise, angemessen und formal weitgehend sicher.",
           },
         ],
       },
@@ -1535,13 +1349,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Listening comprehension",
-            description: "Core ideas and relevant information from the material identify.",
-            expectation: "The response shows secure understanding of the source material.",
           },
           {
             title: "Listening tasks",
-            description: "Closed, semi-open or short-answer tasks as required complete.",
-            expectation: "Responses are precise and map correctly onto the listening items.",
           },
         ],
       },
@@ -1554,20 +1364,14 @@ const sek2Blueprints: TemplateBlueprint[] = [
           {
             title: "Comprehension",
             points: 12,
-            description: "Summarise or select central aspects of the source text.",
-            expectation: "The response secures source understanding accurately and concisely.",
           },
           {
             title: "Analysis",
             points: 17,
-            description: "Analyse message, perspective, strategy or language of the source.",
-            expectation: "The analysis is text-based, coherent and conceptually precise.",
           },
           {
             title: "Evaluation / re-creation",
             points: 15,
-            description: "Develop an evaluative, creative or context-based final task.",
-            expectation: "The final response is differentiated, task-related and well reasoned.",
           },
         ],
       },
@@ -1580,32 +1384,22 @@ const sek2Blueprints: TemplateBlueprint[] = [
           {
             title: "Communicative text design",
             points: 22,
-            description: "Assess audience orientation, text type, structure, coherence and use of references.",
-            expectation: "The text is coherent, purposeful and functionally structured.",
           },
           {
             title: "Range / linguistic resources",
             points: 22,
-            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
-            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
           },
           {
             title: "Sprachrichtigkeit: Wortschatz",
             points: 9,
-            description: "Lexical accuracy according to the NRW orientation grid.",
-            expectation: "Lexical choices support comprehension and do not distort meaning.",
           },
           {
             title: "Sprachrichtigkeit: Grammatik",
             points: 9,
-            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
-            expectation: "Grammar supports communication and does not materially impair understanding.",
           },
           {
             title: "Sprachrichtigkeit: Orthografie",
             points: 4,
-            description: "Spelling and punctuation according to the NRW orientation grid.",
-            expectation: "Orthography and punctuation remain functional for comprehension.",
           },
         ],
       },
@@ -1640,14 +1434,10 @@ const sek2Blueprints: TemplateBlueprint[] = [
           {
             title: "Mediation content",
             points: 20,
-            description: "Select and transfer relevant information for the target situation.",
-            expectation: "The mediation product is accurate, purposeful and audience-oriented.",
           },
           {
             title: "Mediation language / text construction",
             points: 30,
-            description: "Assess target-text format, addressee orientation, register, structure and language.",
-            expectation: "Language and text construction support the communicative mediation task.",
           },
         ],
       },
@@ -1660,20 +1450,14 @@ const sek2Blueprints: TemplateBlueprint[] = [
           {
             title: "Comprehension",
             points: 12,
-            description: "Summarise or select central aspects of the source text.",
-            expectation: "The response secures source understanding accurately and concisely.",
           },
           {
             title: "Analysis",
             points: 17,
-            description: "Analyse message, perspective, strategy or language of the source.",
-            expectation: "The analysis is text-based, coherent and conceptually precise.",
           },
           {
             title: "Evaluation / re-creation",
             points: 15,
-            description: "Develop an evaluative, creative or context-based final task.",
-            expectation: "The final response is differentiated, task-related and well reasoned.",
           },
         ],
       },
@@ -1686,32 +1470,22 @@ const sek2Blueprints: TemplateBlueprint[] = [
           {
             title: "Communicative text design",
             points: 22,
-            description: "Assess audience orientation, text type, structure, coherence and use of references.",
-            expectation: "The text is coherent, purposeful and functionally structured.",
           },
           {
             title: "Range / linguistic resources",
             points: 22,
-            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
-            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
           },
           {
             title: "Sprachrichtigkeit: Wortschatz",
             points: 9,
-            description: "Lexical accuracy according to the NRW orientation grid.",
-            expectation: "Lexical choices support comprehension and do not distort meaning.",
           },
           {
             title: "Sprachrichtigkeit: Grammatik",
             points: 9,
-            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
-            expectation: "Grammar supports communication and does not materially impair understanding.",
           },
           {
             title: "Sprachrichtigkeit: Orthografie",
             points: 4,
-            description: "Spelling and punctuation according to the NRW orientation grid.",
-            expectation: "Orthography and punctuation remain functional for comprehension.",
           },
         ],
       },
@@ -1742,13 +1516,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grundlagen anwenden",
-            description: "Basale Verfahren und Rechentechniken sicher durchführen.",
-            expectation: "Die wesentlichen Grundkompetenzen sind ohne Hilfsmittel sicher abrufbar.",
           },
           {
             title: "Zwischenschritte notieren",
-            description: "Lösungsweg strukturiert und nachvollziehbar darstellen.",
-            expectation: "Zwischenschritte sind mathematisch korrekt und transparent dokumentiert.",
           },
         ],
       },
@@ -1760,18 +1530,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Ansatz wählen",
-            description: "Für die Aufgabe ein tragfähiges mathematisches Modell oder Verfahren bestimmen.",
-            expectation: "Der Lösungsansatz ist sachgerecht gewählt und begründet.",
           },
           {
             title: "Verfahren durchführen",
-            description: "Rechnungen, Ableitungen, Wahrscheinlichkeiten oder Vektorschritte korrekt ausführen.",
-            expectation: "Die mathematischen Operationen führen konsistent zum Ergebnis.",
           },
           {
             title: "Kontext deuten",
-            description: "Ergebnisse im Sachzusammenhang oder Modell interpretieren.",
-            expectation: "Die Interpretation bleibt fachlich korrekt und kontextbezogen.",
           },
         ],
       },
@@ -1783,13 +1547,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Argumentieren",
-            description: "Mathematische Aussagen begründen und Zusammenhänge erklären.",
-            expectation: "Die Argumentation ist logisch schlüssig und fachsprachlich präzise.",
           },
           {
             title: "Reflektieren",
-            description: "Ergebnisse prüfen, Grenzfälle diskutieren oder alternative Verfahren vergleichen.",
-            expectation: "Die Reflexion zeigt echtes Verständnis über das reine Rechnen hinaus.",
           },
         ],
       },
@@ -1820,13 +1580,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Material erschließen",
-            description: "Formale und inhaltliche Merkmale des Materials präzise herausarbeiten.",
-            expectation: "Das Material wird sicher erfasst und in seiner Aussageabsicht gelesen.",
           },
           {
             title: "Analytische Deutung",
-            description: "Perspektive, Argumentationsweise oder Darstellungsmittel funktional analysieren.",
-            expectation: "Analyseschritte bleiben materialgebunden und historisch fachlich sauber.",
           },
         ],
       },
@@ -1838,13 +1594,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Kontextualisieren",
-            description: "Das Material in historische Prozesse, Strukturen und Akteure einordnen.",
-            expectation: "Die Einordnung ist präzise, angemessen gewichtet und sachlich korrekt.",
           },
           {
             title: "Zusammenhänge erläutern",
-            description: "Ursachen, Folgen und Wechselwirkungen differenziert erklären.",
-            expectation: "Die Darstellung zeigt komplexe historische Bezüge nachvollziehbar auf.",
           },
         ],
       },
@@ -1856,18 +1608,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Sachurteil",
-            description: "Eine historische Entwicklung oder Position begründet beurteilen.",
-            expectation: "Das Urteil ist argumentativ tragfähig und fachlich differenziert.",
           },
           {
             title: "Werturteil / Reflexion",
-            description: "Perspektiven, Gegenwartsbezug oder Deutungsgrenzen reflektieren.",
-            expectation: "Reflexionen bleiben historisch sensibel und nicht anachronistisch.",
           },
           {
             title: "Darstellung",
-            description: "Gedankengang klar gliedern und fachsprachlich präzise entfalten.",
-            expectation: "Die Darstellung ist kohärent, operatorensicher und sprachlich angemessen.",
           },
         ],
       },
@@ -1898,13 +1644,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Konzepte anwenden",
-            description: "Fachwissen und Modelle fachgerecht auf die Aufgabenstellung beziehen.",
-            expectation: "Chemische Grundideen werden korrekt und gezielt eingesetzt.",
           },
           {
             title: "Fachsprache nutzen",
-            description: "Reaktionen, Teilchenebene und Fachbegriffe präzise formulieren.",
-            expectation: "Die Fachsprache ist stimmig und unterstützt die Argumentation.",
           },
         ],
       },
@@ -1916,18 +1658,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Befunde sichern",
-            description: "Daten, Diagramme oder Versuchsergebnisse korrekt erfassen.",
-            expectation: "Relevante Informationen werden vollständig und korrekt herausgearbeitet.",
           },
           {
             title: "Deutung ableiten",
-            description: "Chemische Schlüsse aus Material oder Daten ziehen.",
-            expectation: "Die Deutung ist fachlich abgesichert und direkt an die Daten gebunden.",
           },
           {
             title: "Zusammenhänge erklären",
-            description: "Reaktionsabläufe oder Zusammenhänge zwischen Variablen erläutern.",
-            expectation: "Erklärungen bleiben modellbezogen und nachvollziehbar.",
           },
         ],
       },
@@ -1939,18 +1675,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Transfer anwenden",
-            description: "Bekannte Konzepte auf eine neue fachliche Situation übertragen.",
-            expectation: "Der Transfer zeigt tragfähiges chemisches Verständnis.",
           },
           {
             title: "Modellieren oder rechnen",
-            description: "Rechen- oder Modellierungsaufgaben vollständig lösen.",
-            expectation: "Rechenwege und Modellannahmen sind korrekt und transparent.",
           },
           {
             title: "Begründen und bewerten",
-            description: "Ergebnisse fachlich einordnen und Entscheidungen begründen.",
-            expectation: "Die Bewertung ist chemisch fundiert und argumentativ sauber.",
           },
         ],
       },
@@ -1981,13 +1711,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "System modellieren",
-            description: "Die Problemstellung in ein fachlich stimmiges Modell überführen.",
-            expectation: "Das Modell ist konsistent, vollständig genug und aufgabenbezogen.",
           },
           {
             title: "Modell erläutern",
-            description: "Komponenten, Beziehungen und Zustände fachsprachlich erklären.",
-            expectation: "Die Erläuterung zeigt, dass das Modell verstanden und begründet ist.",
           },
         ],
       },
@@ -1999,18 +1725,12 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Algorithmus entwickeln",
-            description: "Für das Problem einen korrekten und strukturierten Lösungsweg entwerfen.",
-            expectation: "Die Lösung ist logisch, ausführbar und fachlich tragfähig.",
           },
           {
             title: "Code analysieren oder ergänzen",
-            description: "Vorliegende Programme lesen, verbessern oder vervollständigen.",
-            expectation: "Programmteile werden korrekt verstanden und zielgerichtet angepasst.",
           },
           {
             title: "Datenstrukturen nutzen",
-            description: "Passende Datenstrukturen auswählen und korrekt einsetzen.",
-            expectation: "Die Wahl der Struktur ist fachlich plausibel und begründet.",
           },
         ],
       },
@@ -2022,13 +1742,9 @@ const sek2Blueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Korrektheit prüfen",
-            description: "Funktion, Randfälle oder Testfälle systematisch untersuchen.",
-            expectation: "Die Analyse deckt relevante Fälle auf und begründet das Ergebnis.",
           },
           {
             title: "Lösung bewerten",
-            description: "Effizienz, Wartbarkeit oder Alternativen fachlich diskutieren.",
-            expectation: "Die Reflexion bleibt fachlich präzise und nicht oberflächlich.",
           },
         ],
       },
@@ -2067,13 +1783,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Analyseauftrag entfalten",
-            description: "Die Aufgabenstellung systematisch und textnah bearbeiten.",
-            expectation: "Die Analyse orientiert sich präzise an Operator und Material.",
           },
           {
             title: "Gestaltung funktional deuten",
-            description: "Struktur, Sprache und Aussageabsicht argumentativ verknüpfen.",
-            expectation: "Die Deutung entwickelt sich beleggestützt und folgerichtig.",
           },
         ],
       },
@@ -2085,13 +1797,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Argumentationslinie entwickeln",
-            description: "Eine tragfähige, differenzierte Deutungs- oder Erörterungslinie entfalten.",
-            expectation: "Gedankenführung und Materialeinbindung bleiben stringent.",
           },
           {
             title: "Zusatzmaterial funktional nutzen",
-            description: "Weiteres Material oder Vergleichsaspekte zielgerichtet integrieren.",
-            expectation: "Zusatzaspekte werden nicht additiv, sondern funktional verarbeitet.",
           },
         ],
       },
@@ -2103,8 +1811,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Kontextualisieren",
-            description: "Die Analyse in einen größeren literarischen oder kulturellen Zusammenhang stellen.",
-            expectation: "Der Transfer erweitert die Deutung substanziell und fachgerecht.",
           },
         ],
       },
@@ -2116,13 +1822,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Fachsprache und Struktur",
-            description: "Stringenz, Kohärenz und fachsprachliche Präzision bewerten.",
-            expectation: "Die Darstellung erfüllt den Anspruch einer abiturvorbereitenden Klausur.",
           },
           {
             title: "Sprachliche Korrektheit",
-            description: "Sprachrichtigkeit und stilistische Angemessenheit bewerten.",
-            expectation: "Die sprachliche Form ist weitgehend sicher und adressatenangemessen.",
           },
         ],
       },
@@ -2155,13 +1857,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Listening comprehension",
-            description: "Global and detailed information from audio material identify.",
-            expectation: "Answers show accurate understanding of the listening material.",
           },
           {
             title: "Listening tasks",
-            description: "Complete closed, semi-open or short-answer tasks as required.",
-            expectation: "Responses are precise, evidence-based and task-related.",
           },
         ],
       },
@@ -2174,14 +1872,10 @@ const abiturBlueprints: TemplateBlueprint[] = [
           {
             title: "Mediation content",
             points: 20,
-            description: "Select and transfer relevant information for the target situation.",
-            expectation: "The mediation product is accurate, purposeful and audience-oriented.",
           },
           {
             title: "Mediation language",
             points: 30,
-            description: "Use appropriate register, structure and language for the target text.",
-            expectation: "Language and text construction support the communicative task.",
           },
         ],
       },
@@ -2194,20 +1888,14 @@ const abiturBlueprints: TemplateBlueprint[] = [
           {
             title: "Comprehension",
             points: 12,
-            description: "Summarise or select central aspects of the source text.",
-            expectation: "The response secures source understanding accurately and concisely.",
           },
           {
             title: "Analysis",
             points: 17,
-            description: "Analyse message, perspective, strategy or language of the source.",
-            expectation: "The analysis is text-based, coherent and conceptually precise.",
           },
           {
             title: "Evaluation / re-creation",
             points: 15,
-            description: "Develop an evaluative, creative or context-based final task.",
-            expectation: "The final response is differentiated, task-related and well reasoned.",
           },
         ],
       },
@@ -2220,32 +1908,22 @@ const abiturBlueprints: TemplateBlueprint[] = [
           {
             title: "Communicative text design",
             points: 22,
-            description: "Assess audience orientation, text type, structure, coherence and use of references.",
-            expectation: "The text is coherent, purposeful and functionally structured.",
           },
           {
             title: "Range / linguistic resources",
             points: 22,
-            description: "Assess independent wording, vocabulary, text-production vocabulary and sentence structure.",
-            expectation: "Language use is differentiated, appropriate and sufficiently independent from the source.",
           },
           {
             title: "Sprachrichtigkeit: Wortschatz",
             points: 9,
-            description: "Lexical accuracy according to the NRW orientation grid.",
-            expectation: "Lexical choices support comprehension and do not distort meaning.",
           },
           {
             title: "Sprachrichtigkeit: Grammatik",
             points: 9,
-            description: "Grammar and sentence-level correctness according to the NRW orientation grid.",
-            expectation: "Grammar supports communication and does not materially impair understanding.",
           },
           {
             title: "Sprachrichtigkeit: Orthografie",
             points: 4,
-            description: "Spelling and punctuation according to the NRW orientation grid.",
-            expectation: "Orthography and punctuation remain functional for comprehension.",
           },
         ],
       },
@@ -2279,13 +1957,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grundkompetenzen",
-            description: "Zentrale Verfahren, Umformungen oder Grundbegriffe sicher anwenden.",
-            expectation: "Die hilfsmittelfreien Grundlagen werden routiniert und korrekt bearbeitet.",
           },
           {
             title: "Darstellung",
-            description: "Zwischenschritte sauber und formal korrekt notieren.",
-            expectation: "Die Notation ist präzise und der Lösungsweg klar nachvollziehbar.",
           },
         ],
       },
@@ -2297,8 +1971,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Ansatz und Modellierung",
-            description: "Ein abiturtypisches Problem strukturieren und mathematisch fassen.",
-            expectation: "Der mathematische Zugang ist passend gewählt und begründet.",
           },
         ],
       },
@@ -2310,8 +1982,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Geometrische Verfahren",
-            description: "Vektoren, Geraden, Ebenen oder Abstands- und Lagebeziehungen bearbeiten.",
-            expectation: "Lösungswege sind formal korrekt, begründet und nachvollziehbar.",
           },
         ],
       },
@@ -2323,8 +1993,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Stochastische Verfahren",
-            description: "Wahrscheinlichkeitsmodelle, Verteilungen oder statistische Entscheidungen bearbeiten.",
-            expectation: "Rechnungen, Deutungen und Begründungen passen zum stochastischen Modell.",
           },
         ],
       },
@@ -2358,13 +2026,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Grundkompetenzen",
-            description: "Zentrale Verfahren, Umformungen oder Grundbegriffe ohne Hilfsmittel anwenden.",
-            expectation: "Die hilfsmittelfreien Grundlagen werden routiniert und korrekt bearbeitet.",
           },
           {
             title: "Darstellung",
-            description: "Zwischenschritte sauber und formal korrekt notieren.",
-            expectation: "Die Notation ist präzise und der Lösungsweg klar nachvollziehbar.",
           },
         ],
       },
@@ -2376,8 +2040,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Ansatz, Berechnung und Interpretation",
-            description: "Ein Analysis-Problem strukturieren, lösen und interpretieren.",
-            expectation: "Der mathematische Zugang ist passend, vollständig und fachlich begründet.",
           },
         ],
       },
@@ -2389,8 +2051,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Geometrische Verfahren",
-            description: "Vektoren, Geraden, Ebenen oder Abstands- und Lagebeziehungen bearbeiten.",
-            expectation: "Lösungswege sind formal korrekt, begründet und nachvollziehbar.",
           },
         ],
       },
@@ -2402,8 +2062,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Stochastische Verfahren",
-            description: "Wahrscheinlichkeitsmodelle, Verteilungen oder statistische Entscheidungen bearbeiten.",
-            expectation: "Rechnungen, Deutungen und Begründungen passen zum stochastischen Modell.",
           },
         ],
       },
@@ -2434,13 +2092,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Erschließen",
-            description: "Material formal und inhaltlich präzise erfassen.",
-            expectation: "Das Material wird sicher gelesen und in seiner Aussageabsicht erfasst.",
           },
           {
             title: "Analysieren",
-            description: "Struktur, Perspektive und historische Aussagefunktion untersuchen.",
-            expectation: "Analyseschritte sind materialnah und fachlich differenziert.",
           },
         ],
       },
@@ -2452,13 +2106,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Einordnen",
-            description: "Das Material in relevante Strukturen und Entwicklungen einbetten.",
-            expectation: "Kontextualisierung ist präzise, tragfähig und angemessen gewichtet.",
           },
           {
             title: "Zusammenhänge differenzieren",
-            description: "Ursachen, Folgen und Perspektiven systematisch verknüpfen.",
-            expectation: "Zusammenhänge werden multiperspektivisch und schlüssig dargestellt.",
           },
         ],
       },
@@ -2470,13 +2120,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Sachurteil",
-            description: "Eine historische Fragestellung argumentativ fundiert beurteilen.",
-            expectation: "Das Sachurteil basiert klar auf Analyse und Kontextwissen.",
           },
           {
             title: "Reflexion und Werturteil",
-            description: "Perspektivische, normative oder gegenwartsbezogene Dimensionen reflektieren.",
-            expectation: "Die Reflexion bleibt historisch sensibel und argumentativ tragfähig.",
           },
         ],
       },
@@ -2510,8 +2156,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Konzepte sichern",
-            description: "Zentrale chemische Modelle und Fachbegriffe passgenau nutzen.",
-            expectation: "Grundlagen sind sicher verfügbar und werden korrekt verwendet.",
           },
         ],
       },
@@ -2523,13 +2167,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Material lesen",
-            description: "Daten, Diagramme oder Versuchsinformationen präzise erfassen.",
-            expectation: "Relevante Informationen werden sicher identifiziert und geordnet.",
           },
           {
             title: "Fachlich deuten",
-            description: "Aus den Daten belastbare chemische Schlüsse ableiten.",
-            expectation: "Die Deutung ist fachlich stimmig und datenbasiert.",
           },
         ],
       },
@@ -2541,18 +2181,12 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Transfer",
-            description: "Bekannte Konzepte auf neue chemische Kontexte übertragen.",
-            expectation: "Transferleistungen zeigen vernetztes chemisches Verständnis.",
           },
           {
             title: "Rechnen oder modellieren",
-            description: "Quantitative oder modellbezogene Aufgaben vollständig lösen.",
-            expectation: "Verfahren und Rechenwege sind korrekt und nachvollziehbar.",
           },
           {
             title: "Bewerten",
-            description: "Ergebnisse chemisch einordnen und Entscheidungen begründen.",
-            expectation: "Bewertungen sind argumentativ sauber und fachlich abgesichert.",
           },
         ],
       },
@@ -2586,8 +2220,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Material erschließen und fachlich auswerten",
-            description: "Materialien, Daten, Modelle oder Experimente biologisch erschließen.",
-            expectation: "Auswertung und Fachsprache sind korrekt, materialgebunden und nachvollziehbar.",
           },
         ],
       },
@@ -2599,8 +2231,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Zusammenhänge erklären und anwenden",
-            description: "Biologische Konzepte auf den Aufgabenkontext anwenden.",
-            expectation: "Erklärungen sind fachlich präzise und vernetzen Material mit Konzeptwissen.",
           },
         ],
       },
@@ -2612,8 +2242,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Transfer und Bewertung",
-            description: "Ergebnisse übertragen, beurteilen oder begründet bewerten.",
-            expectation: "Transfer- und Bewertungsleistungen sind fachlich abgesichert und differenziert.",
           },
         ],
       },
@@ -2647,8 +2275,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Problem erfassen und modellieren",
-            description: "Physikalische Situation, Größen und Modelle strukturieren.",
-            expectation: "Der Modellansatz ist fachlich passend und nachvollziehbar begründet.",
           },
         ],
       },
@@ -2660,8 +2286,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Berechnen und auswerten",
-            description: "Daten, Diagramme oder Experimente quantitativ und qualitativ auswerten.",
-            expectation: "Rechenwege, Einheiten, Deutung und Messwertbezug sind fachlich korrekt.",
           },
         ],
       },
@@ -2673,8 +2297,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Begründen und bewerten",
-            description: "Physikalische Aussagen, Grenzen des Modells oder Anwendungen bewerten.",
-            expectation: "Begründungen sind fachsprachlich präzise und fachlich tragfähig.",
           },
         ],
       },
@@ -2705,8 +2327,6 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Problem modellieren",
-            description: "Die Ausgangslage in ein tragfähiges informatisches Modell überführen.",
-            expectation: "Das Modell ist strukturiert, konsistent und fachlich angemessen.",
           },
         ],
       },
@@ -2718,18 +2338,12 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Algorithmus entwerfen",
-            description: "Für die Problemstellung einen belastbaren Lösungsweg entwickeln.",
-            expectation: "Der Entwurf ist korrekt strukturiert und prinzipiell umsetzbar.",
           },
           {
             title: "Programmteile bearbeiten",
-            description: "Vorliegende Programmfragmente verstehen, ergänzen oder korrigieren.",
-            expectation: "Bearbeitungen sind fachlich treffend und lösen das Problem.",
           },
           {
             title: "Datenstruktur begründen",
-            description: "Strukturen oder Verfahren begründet auswählen.",
-            expectation: "Die Entscheidung zeigt informatisches Abwägen und Fachverständnis.",
           },
         ],
       },
@@ -2741,13 +2355,9 @@ const abiturBlueprints: TemplateBlueprint[] = [
         tasks: [
           {
             title: "Korrektheit und Testen",
-            description: "Lösungen mit Tests, Randfällen oder Invarianten prüfen.",
-            expectation: "Die Prüfung ist systematisch und fachlich begründet.",
           },
           {
             title: "Bewertung und Reflexion",
-            description: "Effizienz, Wartbarkeit oder Auswirkungen der Lösung diskutieren.",
-            expectation: "Die Reflexion bleibt tiefgehend, präzise und informatisch fundiert.",
           },
         ],
       },
@@ -2777,23 +2387,17 @@ export const createReadingExamTemplate = (): Exam => ({
         createTask(
           "Richtig / Falsch mit Begründung",
           10,
-          "Leseverstehen",
-          "Entscheide, ob Aussagen richtig oder falsch sind, und begründe falsche Aussagen knapp.",
-          "Die Begründungen sollen sich auf passende Textstellen stützen und nicht auf Vermutungen beruhen.",
+          "Leseverstehen"
         ),
         createTask(
           "Multiple Choice",
           10,
-          "Leseverstehen",
-          "Wähle die beste Antwort zu Fragen zum Textverständnis aus.",
-          "Die Fragen sollten Hauptaussage, Details und gegebenenfalls implizite Informationen abdecken.",
+          "Leseverstehen"
         ),
         createTask(
           "Kurze Antworten",
           10,
-          "Leseverstehen",
-          "Beantworte Fragen in kurzen, präzisen Sätzen möglichst in eigenen Worten.",
-          "Die Antworten sollen textnah sein, aber Verständnis zeigen statt ganze Zeilen zu übernehmen.",
+          "Leseverstehen"
         ),
       ],
     ),
@@ -2806,9 +2410,7 @@ export const createReadingExamTemplate = (): Exam => ({
         createTask(
           "Grammatik",
           20,
-          "Sprache",
-          "Grammatische Richtigkeit, Satzbau und passende Strukturen.",
-          "Achte auf Zeiten, Satzstellung, Nebensätze, Fragen, Verneinung und korrekte grammatische Formen.",
+          "Sprache"
         ),
       ],
     ),
@@ -2821,16 +2423,12 @@ export const createReadingExamTemplate = (): Exam => ({
         createTask(
           "Inhalt",
           10,
-          "Schreiben",
-          "Aufgabenerfüllung, inhaltliche Relevanz und nachvollziehbare Ausgestaltung.",
-          "Die Antwort erfüllt die Aufgabenstellung vollständig, enthält passende Inhalte und entwickelt Gedanken nachvollziehbar.",
+          "Schreiben"
         ),
         createTask(
           "Aufbau",
           10,
-          "Schreiben",
-          "Struktur, Absatzbildung, Kohärenz und passende Textsortenmerkmale.",
-          "Der Text soll klar gegliedert sein und zur geforderten Textsorte passen, zum Beispiel E-Mail oder Stellungnahme.",
+          "Schreiben"
         ),
       ],
     ),
@@ -2843,30 +2441,22 @@ export const createReadingExamTemplate = (): Exam => ({
         createTask(
           "Grammatik",
           7.5,
-          "Sprache im Schreiben",
-          "Grammatische Richtigkeit, Satzbau und passende Strukturen im Schreibprodukt.",
-          "Bewertet werden korrekte Zeiten, Satzmuster, Verknüpfungen und grammatische Sicherheit im Text.",
+          "Sprache im Schreiben"
         ),
         createTask(
           "Wortschatz",
           7.5,
-          "Sprache im Schreiben",
-          "Treffsichere, abwechslungsreiche und zur Schreibaufgabe passende Wortwahl.",
-          "Bewertet werden Wortschatzbreite, Angemessenheit, idiomatische Wendungen und Präzision.",
+          "Sprache im Schreiben"
         ),
         createTask(
           "Rechtschreibung",
           7.5,
-          "Sprache im Schreiben",
-          "Orthografie, Zeichensetzung und formale sprachliche Genauigkeit im Text.",
-          "Achte auf korrekt geschriebene Wörter, sinnvolle Zeichensetzung und formale Genauigkeit.",
+          "Sprache im Schreiben"
         ),
         createTask(
           "Ausdrucksvermögen",
           7.5,
-          "Sprache im Schreiben",
-          "Sprachliche Variabilität, Klarheit und angemessener stilistischer Ausdruck.",
-          "Bewertet werden differenzierte Formulierungen, sprachliche Flexibilität und ein passender Stil.",
+          "Sprache im Schreiben"
         ),
       ],
     ),
@@ -2884,23 +2474,17 @@ export const createListeningExamTemplate = () => {
     createTask(
       "Global understanding",
       10,
-      "Teil A: Hörverstehen",
-      "Die Gesamtsituation, Stimmung oder Hauptaussage des Audios erfassen.",
-      "Antworten zeigen sicheres Globalverstehen des Hörtexts.",
+      "Teil A: Hörverstehen"
     ),
     createTask(
       "Detailed information",
       10,
-      "Teil A: Hörverstehen",
-      "Details wie Gründe, Orte, Zeiten oder Meinungen korrekt herausarbeiten.",
-      "Die genannten Informationen sind präzise und hörtextnah erfasst.",
+      "Teil A: Hörverstehen"
     ),
     createTask(
       "Notes / transfer",
       10,
-      "Teil A: Hörverstehen",
-      "Stichworte sichern oder Informationen kurz übertragen.",
-      "Die Informationen sind verständlich, passend ausgewählt und korrekt wiedergegeben.",
+      "Teil A: Hörverstehen"
     ),
   ];
   return template;
@@ -2917,23 +2501,17 @@ export const createMediationExamTemplate = () => {
     createTask(
       "Selection of relevant content",
       10,
-      "Teil A: Sprachmittlung",
-      "Relevante Informationen aus dem Ausgangstext auswählen.",
-      "Nur die für die Zielperson wirklich nötigen Inhalte werden übernommen.",
+      "Teil A: Sprachmittlung"
     ),
     createTask(
       "Addressing the audience",
       10,
-      "Teil A: Sprachmittlung",
-      "Mitteilung adressaten- und situationsgerecht formulieren.",
-      "Register, Umfang und Kommunikationsziel passen erkennbar zur Situation.",
+      "Teil A: Sprachmittlung"
     ),
     createTask(
       "Clear mediation",
       10,
-      "Teil A: Sprachmittlung",
-      "Informationen verständlich und sinngemäß auf Englisch übermitteln.",
-      "Die Mitteilung bleibt klar, funktional und kommunikativ erfolgreich.",
+      "Teil A: Sprachmittlung"
     ),
   ];
   return template;

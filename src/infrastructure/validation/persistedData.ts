@@ -1,5 +1,14 @@
 import * as v from "valibot";
-import { DraftBundle, ExpectationArchiveEntry, StudentDatabase } from "../../types";
+import { CorrectionReview, DraftBundle, ExpectationArchiveEntry, StudentDatabase } from "../../types";
+
+const correctionReviewSchema = v.object({
+  taskSignatures: v.record(v.string(), v.string()),
+  confirmedAt: v.nullable(v.string()),
+  confirmedSignature: v.nullable(v.string()),
+});
+
+export const isValidCorrectionReviewShape = (value: unknown): value is CorrectionReview =>
+  v.safeParse(correctionReviewSchema, value).success;
 
 const encryptedTextSchema = v.object({
   ciphertext: v.string(),
@@ -224,6 +233,8 @@ const studentDatabaseSchema = v.object({
       encryptedParticipationStatus: v.optional(v.nullable(encryptedTextSchema)),
       answerSheetCode: v.optional(v.string()),
       encryptedAnswerSheetCode: v.optional(v.nullable(encryptedTextSchema)),
+      correctionReview: v.optional(correctionReviewSchema),
+      encryptedCorrectionReview: v.optional(v.nullable(encryptedTextSchema)),
       updatedAt: v.string(),
       printedAt: v.nullable(v.string()),
     }),

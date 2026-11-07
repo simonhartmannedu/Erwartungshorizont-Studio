@@ -1,6 +1,8 @@
-import { DraftWorkspace, Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentParticipationStatus, StudentRecord } from "../types";
+import { CorrectionReview, DraftWorkspace, Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentParticipationStatus, StudentRecord } from "../types";
 import { clamp } from "./format";
 import { decryptText, encryptText } from "./crypto";
+import { reviewAfterScoreChange } from "./correctionReview";
+import { isValidCorrectionReviewShape } from "../infrastructure/validation/persistedData";
 
 const POINT_STEP = 0.5;
 
@@ -174,8 +176,11 @@ export const updateStudentScore = (
   studentId: string,
   taskId: string,
   score: number,
+  rubricSignature?: string,
 ): StudentDatabase => {
   const assessment = getStudentAssessment(database, studentId, workspaceId);
+  // Controlled inputs also commit on blur. Visiting a field is no review.
+  if (Object.prototype.hasOwnProperty.call(assessment.taskScores, taskId) && assessment.taskScores[taskId] === score) return database;
   const assessmentKey = getAssessmentKey(workspaceId, studentId);
 
   return {
@@ -190,12 +195,32 @@ export const updateStudentScore = (
           [taskId]: score,
         },
         encryptedTaskScores: assessment.encryptedTaskScores ?? null,
+        correctionReview: reviewAfterScoreChange(assessment.correctionReview, taskId, rubricSignature),
         updatedAt: new Date().toISOString(),
       },
     },
     updatedAt: new Date().toISOString(),
   };
 };
+
+export const updateStudentCorrectionReview = (
+  database: StudentDatabase,
+  workspaceId: string,
+  studentId: string,
+  correctionReview: CorrectionReview,
+): StudentDatabase => ({
+  ...database,
+  assessments: {
+    ...database.assessments,
+    [getAssessmentKey(workspaceId, studentId)]: {
+      ...getStudentAssessment(database, studentId, workspaceId),
+      workspaceId,
+      correctionReview,
+      updatedAt: new Date().toISOString(),
+    },
+  },
+  updatedAt: new Date().toISOString(),
+});
 
 /** Stores only an opaque Bogencheck work code; the student name remains in the protected roster. */
 export const updateStudentAnswerSheetCode = (
@@ -593,7 +618,7 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
     Object.entries(database.assessments).map(([assessmentKey, assessment]) => {
       const groupId = getStudentGroupIdByStudentId(database, assessment.studentId);
       if (!groupId || !targetIds.has(groupId)) return [assessmentKey, assessment];
-      if (Object.keys(assessment.taskScores).length === 0 && !assessment.teacherComment && !assessment.signatureDataUrl && !assessment.answerSheetCode && (assessment.participationStatus ?? "present") === "present") {
+      if (Object.keys(assessment.taskScores).length === 0 && !assessment.teacherComment && !assessment.signatureDataUrl && !assessment.answerSheetCode && !assessment.correctionReview && (assessment.participationStatus ?? "present") === "present") {
         return [assessmentKey, assessment];
       }
 
@@ -607,6 +632,7 @@ export const scrubSensitiveAssessmentsForGroups = (database: StudentDatabase, gr
           signatureDataUrl: null,
           participationStatus: "present",
           answerSheetCode: "",
+          correctionReview: undefined,
         },
       ];
     }),
@@ -646,6 +672,9 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
       const encryptedAnswerSheetCode = assessment.answerSheetCode
         ? await encryptText(assessment.answerSheetCode, password)
         : assessment.encryptedAnswerSheetCode ?? null;
+      const encryptedCorrectionReview = assessment.correctionReview
+        ? await encryptText(JSON.stringify(assessment.correctionReview), password)
+        : assessment.encryptedCorrectionReview ?? null;
 
       if (
         !hasTaskScores &&
@@ -656,6 +685,7 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
         encryptedSignatureDataUrl === (assessment.encryptedSignatureDataUrl ?? null)
         && encryptedParticipationStatus === (assessment.encryptedParticipationStatus ?? null)
         && encryptedAnswerSheetCode === (assessment.encryptedAnswerSheetCode ?? null)
+        && encryptedCorrectionReview === (assessment.encryptedCorrectionReview ?? null)
       ) {
         return [assessmentKey, assessment] as const;
       }
@@ -675,6 +705,8 @@ export const encryptAndScrubSensitiveAssessmentsForGroups = async (
           participationStatus: "present",
           encryptedAnswerSheetCode,
           answerSheetCode: "",
+          encryptedCorrectionReview,
+          correctionReview: undefined,
         },
       ] as const;
     }),
@@ -705,6 +737,7 @@ export const hydrateSensitiveAssessmentsForGroup = async (
       let taskScores = assessment.taskScores;
       let participationStatus = assessment.participationStatus ?? "present";
       let answerSheetCode = assessment.answerSheetCode ?? "";
+      let correctionReview = assessment.correctionReview;
 
       if (Object.keys(taskScores).length === 0 && assessment.encryptedTaskScores) {
         const parsedTaskScores = JSON.parse(await decryptText(assessment.encryptedTaskScores, password)) as Record<string, number>;
@@ -732,6 +765,13 @@ export const hydrateSensitiveAssessmentsForGroup = async (
         didChange = true;
       }
 
+      if (!correctionReview && assessment.encryptedCorrectionReview) {
+        const parsed: unknown = JSON.parse(await decryptText(assessment.encryptedCorrectionReview, password));
+        if (!isValidCorrectionReviewShape(parsed)) throw new Error("Ungültige Daten der Abschlussprüfung");
+        correctionReview = parsed;
+        didChange = true;
+      }
+
       return [
         assessmentKey,
         {
@@ -741,6 +781,7 @@ export const hydrateSensitiveAssessmentsForGroup = async (
           signatureDataUrl,
           participationStatus,
           answerSheetCode,
+          correctionReview,
         },
       ] as const;
     }),
@@ -773,7 +814,7 @@ export const serializeStudentDatabaseForStorage = async (
 
       const unlockedPassword = getUnlockedPassword(group.id);
       if (!unlockedPassword) {
-        if (!assessment.encryptedTaskScores && !assessment.encryptedTeacherComment && !assessment.encryptedSignatureDataUrl && !assessment.encryptedParticipationStatus && !assessment.encryptedAnswerSheetCode) {
+        if (!assessment.encryptedTaskScores && !assessment.encryptedTeacherComment && !assessment.encryptedSignatureDataUrl && !assessment.encryptedParticipationStatus && !assessment.encryptedAnswerSheetCode && !assessment.encryptedCorrectionReview) {
           return [assessmentKey, assessment] as const;
         }
 
@@ -786,6 +827,7 @@ export const serializeStudentDatabaseForStorage = async (
             signatureDataUrl: null,
             participationStatus: "present",
             answerSheetCode: "",
+            correctionReview: undefined,
           },
         ] as const;
       }
@@ -803,6 +845,9 @@ export const serializeStudentDatabaseForStorage = async (
       const encryptedAnswerSheetCode = assessment.answerSheetCode
         ? await encryptText(assessment.answerSheetCode, unlockedPassword)
         : assessment.encryptedAnswerSheetCode ?? null;
+      const encryptedCorrectionReview = assessment.correctionReview
+        ? await encryptText(JSON.stringify(assessment.correctionReview), unlockedPassword)
+        : assessment.encryptedCorrectionReview ?? null;
 
       return [
         assessmentKey,
@@ -818,6 +863,8 @@ export const serializeStudentDatabaseForStorage = async (
           participationStatus: "present",
           encryptedAnswerSheetCode,
           answerSheetCode: "",
+          encryptedCorrectionReview,
+          correctionReview: undefined,
         },
       ] as const;
     }),

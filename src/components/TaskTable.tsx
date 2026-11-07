@@ -72,9 +72,22 @@ export const TaskTable = ({
     </div>
   );
 
+  const renderOwnCriteria = (task: Task) => (
+    <details className="mt-3 min-w-0">
+      <summary className="themed-muted cursor-pointer text-xs font-semibold">Eigene Bewertungskriterien</summary>
+      <TextAreaField
+        className="mt-2 min-h-24 min-w-0 !px-3 !py-2.5 text-sm leading-6"
+        aria-label={`Eigene Bewertungskriterien für ${task.title || "diese Aufgabe"}`}
+        value={task.expectation}
+        onValueChange={(value) => onChange(task.id, { expectation: value })}
+        placeholder="Eigene Kriterien eintragen"
+      />
+    </details>
+  );
+
   return (
-    <div className="space-y-4" data-score-sequence>
-    <div className="space-y-3 md:hidden">
+    <div className="task-table space-y-4" data-score-sequence>
+    <div className="task-table-cards space-y-3">
       {tasks.map((task, index) => (
         <div
           key={task.id}
@@ -127,6 +140,7 @@ export const TaskTable = ({
                 placeholder="Stichpunkte oder mögliche Schülerantwort"
               />
             </Field>
+            {renderOwnCriteria(task)}
             <div className={`grid gap-3 ${showScores ? "grid-cols-2" : ""}`}>
               <Field label="Max.">
                 <NumberInput
@@ -152,16 +166,16 @@ export const TaskTable = ({
       ))}
     </div>
 
-    <div className="hidden md:block">
+    <div className="task-table-grid">
       <div className="themed-table-shell overflow-hidden rounded-2xl border">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-xs">
+          <table className="w-full table-fixed text-xs">
             <colgroup>
-              <col className="w-[20%]" />
-              <col className="w-[58%]" />
-              <col className="w-[7%]" />
-              {showScores ? <col className="w-[7%]" /> : null}
-              <col className="w-[8%]" />
+              <col className="w-[25%]" />
+              <col />
+              <col className="w-20" />
+              {showScores ? <col className="w-28" /> : null}
+              <col className="w-24" />
             </colgroup>
             <thead className="themed-table-head">
               <tr className="text-left text-xs uppercase tracking-[0.16em]">
@@ -185,7 +199,7 @@ export const TaskTable = ({
                         Aufgabentyp
                       </p>
                       <input
-                        className="field min-w-[9rem] !px-3 !py-2.5 text-sm font-medium"
+                        className="field min-w-0 !px-3 !py-2.5 text-sm font-medium"
                         value={task.title}
                         onChange={(e) => onChange(task.id, { title: e.target.value })}
                       />
@@ -197,11 +211,12 @@ export const TaskTable = ({
                         Inhalt
                       </p>
                       <TextAreaField
-                        className="min-h-28 min-w-[18rem] !px-3 !py-2.5 text-sm leading-6"
+                        className="min-h-28 min-w-0 !px-3 !py-2.5 text-sm leading-6"
                         value={task.description}
                         onValueChange={(value) => onChange(task.id, { description: value })}
                         placeholder="Stichpunkte oder mögliche Schülerantwort"
                       />
+                      {renderOwnCriteria(task)}
                     </div>
                   </td>
                   <td className="px-3 py-3">

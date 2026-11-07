@@ -40,18 +40,18 @@
           </aside>
 
           <div class="start-actions">
-            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="1.0.0">
+            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="1.1.0">
               <div class="terminal-bar">
                 <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
                 <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-                <span class="terminal-version">v1.0.0</span>
+                <span class="terminal-version">v1.1.0</span>
               </div>
-              <pre aria-label="Aktuelle Änderungen in Version 1.0.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+              <pre aria-label="Aktuelle Änderungen in Version 1.1.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
               <div class="release-terminal-footer">
                 <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
                 <nav class="release-terminal-navigation" aria-label="Versionshinweise wechseln">
                   <button id="release-terminal-newer" type="button" aria-label="Neuere Versionshinweise anzeigen" title="Neuere Versionshinweise">←</button>
-                  <span id="release-terminal-position" aria-live="polite">1 / 6</span>
+                  <span id="release-terminal-position" aria-live="polite">1 / 8</span>
                   <button id="release-terminal-older" type="button" aria-label="Ältere Versionshinweise anzeigen" title="Ältere Versionshinweise">→</button>
                 </nav>
               </div>
@@ -103,6 +103,20 @@
         if (!terminal || !output || !versionLabel || !position || !newerButton || !olderButton) return;
 
         const releases = [
+          {
+            version: "1.1.0",
+            lines: [
+              "$ release v1.1.0",
+              "✓ Leerer EWH mit einem Klick; Bausteine schon im Zusammensteller bearbeiten",
+              "✓ Antwort und Bewertungskriterien selbst eintragen statt vorformulierter Erwartungen",
+              "✓ Schlanke Korrekturansicht; Abschlussprüfung und Auswertung unter Ergebnis & Druck",
+              "✓ Unterschrift der Eltern in Druck-PDF und Word",
+              "✓ Abschlussprüfung für fehlende Punkte, Rubrikänderungen und Teilnahme",
+              "✓ Offene Stellen direkt öffnen und die nächste offene Arbeit auswählen",
+              "✓ Prüfvermerke und zweite Durchsicht bei geschützten Gruppen verschlüsselt gespeichert",
+              "✓ Aufgaben passen auch in Firefox ohne horizontales Scrollen in den Korrekturbereich"
+            ]
+          },
           {
             version: "1.0.0",
             lines: [

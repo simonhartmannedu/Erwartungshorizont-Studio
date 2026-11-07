@@ -4,6 +4,7 @@ import {
   clearBackupFailure,
   compareBackupVersions,
   createEncryptedStudentDatabaseBackup,
+  createEncryptedAppBackup,
   describeBackupStatus,
   getLatestVersionTimestamp,
   getStudentDatabaseVersionTimestamp,
@@ -15,6 +16,7 @@ import {
   parseStudentDatabaseBackup,
 } from "./backup";
 import { StudentDatabase } from "../types";
+import { sampleExam } from "../data/sampleExam";
 
 const localStorageState = new Map<string, string>();
 
@@ -48,6 +50,28 @@ const databaseWithStudentData = {
 } as StudentDatabase;
 
 describe("Backup-Validierung", () => {
+  it("erhält Abschlussprüfungen im Vollbackup und lehnt beschädigte Prüfstände ab", async () => {
+    const database: StudentDatabase = {
+      version: 1,
+      groups: [{ id: "group", subject: "Deutsch", className: "T1", passwordVerifier: null,
+        students: [{ id: "student", alias: "T1-01", encryptedName: { ciphertext: "AA==", iv: "AA==", salt: "AA==" }, createdAt: "2026-11-07" }],
+        createdAt: "2026-11-07", updatedAt: "2026-11-07" }],
+      assessments: { "work::student": { workspaceId: "work", studentId: "student", taskScores: { task: 0 }, teacherComment: "",
+        correctionReview: { taskSignatures: { task: "Bewertungsgrundlage" }, confirmedAt: "2026-11-07", confirmedSignature: "Prüfstand" },
+        updatedAt: "2026-11-07", printedAt: null } }, updatedAt: "2026-11-07",
+    };
+    const payload = {
+      draftBundle: { activeWorkspaceId: "work", workspaces: [{ id: "work", label: "Test", exam: sampleExam, activeArchiveEntryId: null, assignedGroupId: "group", updatedAt: "2026-11-07", versions: [] }] },
+      archiveEntries: [], studentDatabase: database,
+    };
+    const backup = await createEncryptedAppBackup(payload, "test-passwort");
+    const restored = await parseAppBackup(backup, "test-passwort");
+    expect(restored.studentDatabase.assessments["work::student"].correctionReview).toEqual(database.assessments["work::student"].correctionReview);
+    database.assessments["work::student"].correctionReview!.taskSignatures = 42 as never;
+    const invalid = await createEncryptedAppBackup(payload, "test-passwort");
+    await expect(parseAppBackup(invalid, "test-passwort")).rejects.toMatchObject({ code: "BACKUP_PAYLOAD_INVALID" });
+  });
+
   it("vergleicht den Datenstand eines Backups mit dem lokalen Stand", () => {
     expect(compareBackupVersions("2026-08-06T12:00:00.000Z", "2026-08-07T12:00:00.000Z").relation).toBe("backup-newer");
     expect(compareBackupVersions("2026-08-07T12:00:00.000Z", "2026-08-06T12:00:00.000Z").relation).toBe("backup-older");

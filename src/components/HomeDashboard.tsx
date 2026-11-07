@@ -40,6 +40,7 @@ type HomeDashboardProps = {
   onNavigate: (destination: HomeDestination) => void;
   onOpenWorkspace: (workspaceId: string) => void;
   onQuickBackup: () => void;
+  onCreateEmptyExam: () => void;
 };
 
 const formatUpdate = (value: string | null) => {
@@ -77,6 +78,7 @@ export const HomeDashboard = ({
   onNavigate,
   onOpenWorkspace,
   onQuickBackup,
+  onCreateEmptyExam,
 }: HomeDashboardProps) => {
   const hasActiveWorkspace = Boolean(activeWorkspaceLabel);
   const correctionProgress = relevantStudentCount > 0 ? Math.round((correctedCount / relevantStudentCount) * 100) : 0;
@@ -260,6 +262,7 @@ export const HomeDashboard = ({
           <div className="home-panel-header"><div><p className="home-eyebrow">Schnellzugriff</p><h3>Verwalten</h3></div></div>
           <div className="home-shortcuts">
             <button type="button" onClick={() => onNavigate("guidedBuilder")}><TemplateIcon /><span>EWH erstellen</span></button>
+            <button type="button" onClick={onCreateEmptyExam}><TemplateIcon /><span>Leerer EWH</span></button>
             <button type="button" onClick={() => onNavigate("groups")}><GroupIcon /><span>Lerngruppen</span></button>
             <button type="button" onClick={() => onNavigate("archive")}><ArchiveIcon /><span>Archiv <em>{archiveCount}</em></span></button>
             <button type="button" onClick={onQuickBackup}><SaveIcon /><span>Backup</span></button>

@@ -7,6 +7,8 @@ import {
   serializeStudentDatabaseForStorage,
   updateClassworkSignatures,
   updateStudentParticipationStatus,
+  encryptAndScrubSensitiveAssessmentsForGroups,
+  scrubSensitiveAssessmentsForGroups,
 } from "./students";
 import type { StudentDatabase } from "../types";
 
@@ -17,6 +19,43 @@ beforeAll(() => {
       btoa: (value: string) => Buffer.from(value, "binary").toString("base64"),
       atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
     },
+  });
+});
+
+describe("geschützte Abschlussprüfung", () => {
+  const createDatabase = (): StudentDatabase => ({
+    version: 1,
+    groups: [{ id: "group", subject: "Deutsch", className: "T1", passwordVerifier: { ciphertext: "AA==", iv: "AA==", salt: "AA==" },
+      students: [{ id: "student", alias: "T1-01", encryptedName: { ciphertext: "AA==", iv: "AA==", salt: "AA==" }, createdAt: "2026-11-07" }],
+      createdAt: "2026-11-07", updatedAt: "2026-11-07" }],
+    assessments: { "work::student": { workspaceId: "work", studentId: "student", taskScores: { task: 0 }, teacherComment: "Geprüfter Kommentar",
+      correctionReview: { taskSignatures: { task: "vertrauliche Bewertungsgrundlage" }, confirmedAt: "2026-11-07", confirmedSignature: "vertraulicher Prüfstand" },
+      updatedAt: "2026-11-07", printedAt: null } }, updatedAt: "2026-11-07",
+  });
+
+  it("verschlüsselt Prüfstände bei Speicherung und Sperren und stellt sie wieder her", async () => {
+    const original = createDatabase();
+    const stored = await serializeStudentDatabaseForStorage(original, () => "test-passwort");
+    expect(stored.assessments["work::student"].correctionReview).toBeUndefined();
+    expect(stored.assessments["work::student"].encryptedCorrectionReview).toBeTruthy();
+    expect(JSON.stringify(stored)).not.toContain("vertraulich");
+    const hydrated = await hydrateSensitiveAssessmentsForGroup(stored, "group", "test-passwort");
+    expect(hydrated.assessments["work::student"].correctionReview).toEqual(original.assessments["work::student"].correctionReview);
+    const scrubbed = scrubSensitiveAssessmentsForGroups(hydrated, ["group"]);
+    expect(scrubbed.assessments["work::student"].correctionReview).toBeUndefined();
+    const relocked = await encryptAndScrubSensitiveAssessmentsForGroups(hydrated, { group: "test-passwort" });
+    expect(relocked.assessments["work::student"].correctionReview).toBeUndefined();
+    const unlocked = await hydrateSensitiveAssessmentsForGroup(relocked, "group", "test-passwort");
+    expect(unlocked.assessments["work::student"].correctionReview).toEqual(original.assessments["work::student"].correctionReview);
+    expect(unlocked.assessments["work::student"].taskScores).toEqual({ task: 0 });
+    await expect(hydrateSensitiveAssessmentsForGroup(stored, "group", "falsches-passwort")).rejects.toThrow();
+  });
+
+  it("weist einen entschlüsselbaren, aber beschädigten Prüfstand zurück", async () => {
+    const stored = createDatabase();
+    stored.assessments["work::student"].correctionReview = undefined;
+    stored.assessments["work::student"].encryptedCorrectionReview = await encryptText('{"taskSignatures":42}', "test-passwort");
+    await expect(hydrateSensitiveAssessmentsForGroup(stored, "group", "test-passwort")).rejects.toThrow("Ungültige Daten der Abschlussprüfung");
   });
 });
 
