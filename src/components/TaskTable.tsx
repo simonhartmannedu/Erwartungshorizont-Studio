@@ -1,15 +1,17 @@
+import { Fragment } from "react";
+import { InsertionPoint } from "./TaskInsertion";
 import { Task } from "../types";
-import { DuplicateIcon, ListIcon, PlusIcon, TrashIcon } from "./icons";
+import { DuplicateIcon, ListIcon, TrashIcon } from "./icons";
 import { canTransformToBulletList, Field, IconButton, NumberInput, TextAreaField, toBulletList } from "./ui";
 
 interface Props {
   tasks: Task[];
+  sectionId: string;
   scoresLocked?: boolean;
   showScores?: boolean;
   onLockedScoreAttempt?: () => void;
   getTaskAnchorId?: (task: Task) => string;
   onChange: (taskId: string, patch: Partial<Task>) => void;
-  onAdd: () => void;
   onDelete: (taskId: string) => void;
   onDuplicate: (taskId: string) => void;
   onMove: (taskId: string, direction: "up" | "down") => void;
@@ -17,12 +19,12 @@ interface Props {
 
 export const TaskTable = ({
   tasks,
+  sectionId,
   scoresLocked = false,
   showScores = true,
   onLockedScoreAttempt,
   getTaskAnchorId,
   onChange,
-  onAdd,
   onDelete,
   onDuplicate,
   onMove,
@@ -87,11 +89,13 @@ export const TaskTable = ({
 
   return (
     <div className="task-table space-y-4" data-score-sequence>
-    <div className="task-table-cards space-y-3">
+    <div className="task-table-cards">
+      <InsertionPoint target={{ sectionId, taskId: tasks[0]?.id ?? null, position: tasks.length ? "before" : "end" }} empty={!tasks.length} />
       {tasks.map((task, index) => (
+        <Fragment key={task.id}>
         <div
-          key={task.id}
           data-editor-anchor={getTaskAnchorId?.(task)}
+          data-insertion-task-id={task.id}
           className="surface-elevated scroll-mt-24 rounded-2xl border p-4"
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -128,6 +132,8 @@ export const TaskTable = ({
             <Field label="Aufgabentyp">
               <input
                 className="field !px-3 !py-2.5 text-sm font-medium"
+                data-task-title
+                aria-label="Aufgabentyp"
                 value={task.title}
                 onChange={(e) => onChange(task.id, { title: e.target.value })}
               />
@@ -163,6 +169,8 @@ export const TaskTable = ({
             </div>
           </div>
         </div>
+        <InsertionPoint target={{ sectionId, taskId: task.id, position: "after" }} />
+        </Fragment>
       ))}
     </div>
 
@@ -187,10 +195,12 @@ export const TaskTable = ({
               </tr>
             </thead>
             <tbody className="themed-table-body">
+              <tr className="task-insertion-table-row"><td colSpan={showScores ? 5 : 4}><InsertionPoint target={{ sectionId, taskId: tasks[0]?.id ?? null, position: tasks.length ? "before" : "end" }} empty={!tasks.length} /></td></tr>
               {tasks.map((task, index) => (
+                <Fragment key={task.id}>
                 <tr
-                  key={task.id}
                   data-editor-anchor={getTaskAnchorId?.(task)}
+                  data-insertion-task-id={task.id}
                   className="themed-table-row scroll-mt-24 align-top"
                 >
                   <td className="px-3 py-3">
@@ -200,6 +210,8 @@ export const TaskTable = ({
                       </p>
                       <input
                         className="field min-w-0 !px-3 !py-2.5 text-sm font-medium"
+                        data-task-title
+                        aria-label="Aufgabentyp"
                         value={task.title}
                         onChange={(e) => onChange(task.id, { title: e.target.value })}
                       />
@@ -266,18 +278,14 @@ export const TaskTable = ({
                     </div>
                   </td>
                 </tr>
+                <tr className="task-insertion-table-row"><td colSpan={showScores ? 5 : 4}><InsertionPoint target={{ sectionId, taskId: task.id, position: "after" }} /></td></tr>
+                </Fragment>
               ))}
             </tbody>
           </table>
         </div>
       </div>
     </div>
-    <Field label="Neue Unteraufgabe" as="div">
-      <button type="button" className="button-secondary w-full gap-2 sm:w-auto" onClick={onAdd}>
-        <PlusIcon />
-        Unteraufgabe ergänzen
-      </button>
-    </Field>
       {showScores ? <p className="status-note text-xs leading-5">Punkte werden sofort gespeichert. Mit Enter springst du zum nächsten Punktefeld.</p> : null}
     </div>
   );

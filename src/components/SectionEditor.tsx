@@ -57,7 +57,6 @@ interface Props {
   onTotalPointsChange: (value: number) => void;
   onToggleCollapse: () => void;
   onTaskChange: (taskId: string, patch: Partial<Task>) => void;
-  onAddTask: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onMove: (direction: "up" | "down") => void;
@@ -88,7 +87,6 @@ export const SectionEditor = ({
   onTotalPointsChange,
   onToggleCollapse,
   onTaskChange,
-  onAddTask,
   onDelete,
   onDuplicate,
   onMove,
@@ -264,12 +262,12 @@ export const SectionEditor = ({
         </div>
         <TaskTable
           tasks={section.tasks}
+          sectionId={section.id}
           scoresLocked={scoresLocked}
           showScores={showScores}
           onLockedScoreAttempt={onLockedScoreAttempt}
           getTaskAnchorId={(task) => getEditorTaskAnchorId(section.id, task.id)}
           onChange={onTaskChange}
-          onAdd={onAddTask}
           onDelete={onDeleteTask}
           onDuplicate={onDuplicateTask}
           onMove={onMoveTask}

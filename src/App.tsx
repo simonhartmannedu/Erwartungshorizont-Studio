@@ -148,6 +148,8 @@ import {
 import { ImportSortOptions, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
 import { generateSecurityToken, SecurityTokenCard } from "./utils/securityTokens";
 import { ExamHeaderForm } from "./components/ExamHeaderForm";
+import { TaskInsertion } from "./components/TaskInsertion";
+import { canUndoTaskInsertion, getInsertionAssessmentState, insertTaskAtTarget, resolveInsertionPosition, type InsertionTarget } from "./utils/taskInsertion";
 import { SectionEditor } from "./components/SectionEditor";
 import { GradeScaleEditor } from "./components/GradeScaleEditor";
 import { SummaryPanel } from "./components/SummaryPanel";
@@ -950,6 +952,7 @@ function App() {
     if (requestedMode !== "easy" && requestedMode !== "expert") return storedPreferences;
     return { ...storedPreferences, easyMode: requestedMode === "easy" };
   });
+  const userPreferencesRef = useRef(userPreferences);
   const easyMode = userPreferences.easyMode;
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(() => !hasDismissedFirstRunGuide());
@@ -1110,7 +1113,9 @@ function App() {
       detail,
     });
   };
-  const showSupportPrompt = () => setSupportPromptOpen(true);
+  const showSupportPrompt = (occasion: "export" | "full-backup" = "export") => {
+    if (occasion === "full-backup" || userPreferencesRef.current.showSupportPrompts) setSupportPromptOpen(true);
+  };
 
   const clearSensitiveGlobalSearch = () => {
     searchNameResolutionVersionRef.current += 1;
@@ -1176,7 +1181,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "guidedBuilder" || loadedExamTemplates) return;
+    if ((activeTab !== "guidedBuilder" && activeTab !== "builder") || loadedExamTemplates) return;
 
     let cancelled = false;
 
@@ -1415,6 +1420,7 @@ function App() {
   }, [visualTheme]);
 
   useEffect(() => {
+    userPreferencesRef.current = userPreferences;
     saveUserPreferences(userPreferences);
   }, [userPreferences]);
 
@@ -2557,6 +2563,42 @@ function App() {
     });
   };
 
+  // Include legacy assessments and encrypted records, even when no student is selected.
+  const insertionAssessments = Object.values(studentDatabase.assessments).filter((assessment) =>
+    assessment.workspaceId === activeWorkspace?.id || (assessment.workspaceId == null &&
+      getStudentGroup(studentDatabase, activeWorkspace?.assignedGroupId ?? null)?.students.some((student) => student.id === assessment.studentId)))
+    .map((assessment) => {
+      const group = studentDatabase.groups.find((entry) => entry.students.some((student) => student.id === assessment.studentId));
+      // Unlocking starts before decryption finishes. Until clear scores are present,
+      // an encrypted record must still be treated as unknown.
+      return group && (!group.passwordVerifier || unlockedGroupIds.includes(group.id)) && Object.keys(assessment.taskScores).length > 0
+        ? { ...assessment, encryptedTaskScores: null } : assessment;
+    });
+  const insertionAssessmentState = getInsertionAssessmentState(insertionAssessments);
+  const canUndoInsertedTask = (taskId: string) => canUndoTaskInsertion(taskId, insertionAssessments,
+    (exam.answerSheetSettings?.blocks ?? []).map((block) => block.taskId));
+  const confirmTaskInsertion = (target: InsertionTarget, task: Task) => {
+    if (!insertionAssessmentState.hasScores && !insertionAssessmentState.uncertain) return null;
+    const nextSections = insertTaskAtTarget(exam.sections, target, task);
+    if (!nextSections) return "Die Einfügestelle ist nicht mehr vorhanden. Bitte brich ab und wähle die Stelle erneut.";
+    const previousMax = calculateExamSummary(exam).totalMaxPoints;
+    const nextMax = calculateExamSummary(normalizeExamStructure({ ...exam, sections: nextSections })).totalMaxPoints;
+    const pointsMessage = previousMax === nextMax
+      ? `Die Maximalpunktzahl bleibt bei ${formatNumber(previousMax)} Punkten.`
+      : `Die Maximalpunktzahl steigt von ${formatNumber(previousMax)} auf ${formatNumber(nextMax)} Punkte.`;
+    return `${pointsMessage} ${insertionAssessmentState.uncertain
+      ? "Gesperrte Bewertungsdaten können bereits Korrekturen enthalten. Für die neue Unteraufgabe fehlt dann noch die Bewertung."
+      : "Für die neue Unteraufgabe fehlen in bisherigen Korrekturen noch Bewertungen."} Ergebnisse und Korrekturstatus werden neu berechnet. Abgeschlossene Arbeiten müssen erneut geprüft werden.`;
+  };
+  const insertEditorTask = (target: InsertionTarget, task: Task) => {
+    if (!activeWorkspace || !resolveInsertionPosition(exam.sections, target)) return false;
+    setActiveWorkspaceExam((current) => {
+      const sections = insertTaskAtTarget(current.sections, target, task);
+      return sections ? normalizeExamStructure({ ...current, sections }) : current;
+    });
+    return true;
+  };
+
   const duplicateTask = (sectionId: string, taskId: string) => {
     setActiveWorkspaceExam((current) =>
       normalizeExamStructure({
@@ -3222,7 +3264,7 @@ function App() {
           ? `Verschlüsseltes Backup am gewählten Speicherort erstellt: ${filename}.`
           : `Verschlüsseltes Backup erstellt am ${new Date(backup.exportedAt).toLocaleString("de-DE")}.`,
       );
-      showSupportPrompt();
+      showSupportPrompt("full-backup");
       return true;
     } catch {
       const failure = { occurredAt: exportedAt, code: "BACKUP_EXPORT_FAILED" };
@@ -3270,7 +3312,7 @@ function App() {
       setLastBackupAt(backup.exportedAt);
       setLastBackupFailure(null);
       pushNotice("success", "Nextcloud-Backup gespeichert", "Die verschlüsselte Sicherung liegt im lokalen Nextcloud-Ordner. Der Nextcloud-Desktop-Client übernimmt die Synchronisation.");
-      showSupportPrompt();
+      showSupportPrompt("full-backup");
       return true;
     } catch (error) {
       const failure = { occurredAt: exportedAt, code: "NEXTCLOUD_FOLDER_BACKUP_FAILED" };
@@ -4400,6 +4442,11 @@ function App() {
           isFullscreenAvailable={document.fullscreenEnabled}
           onToggleAppFullscreen={toggleAppFullscreen}
           onOpenUserGuide={openUserGuide}
+          showSupportPrompts={userPreferences.showSupportPrompts}
+          onShowSupportPromptsChange={(showSupportPrompts) => {
+            setUserPreferences((current) => ({ ...current, showSupportPrompts }));
+            if (!showSupportPrompts) setSupportPromptOpen(false);
+          }}
           showSelectionReminder={userPreferences.showSelectionReminder}
           onShowSelectionReminderChange={(showSelectionReminder) =>
             setUserPreferences((current) => ({ ...current, showSelectionReminder }))
@@ -5122,6 +5169,14 @@ function App() {
 
                 {activeWorkspace && rubricOnly ? <h2 className="themed-strong text-sm font-semibold">Erwartungshorizont überarbeiten</h2> : null}
 
+                <TaskInsertion key={activeWorkspace?.id ?? "no-workspace"} mode="editor" sections={exam.sections} templates={loadedExamTemplates}
+                  subject={exam.meta.subject} createBlankTask={createTask} getConfirmation={confirmTaskInsertion}
+                  onInsert={insertEditorTask} canUndo={canUndoInsertedTask}
+                  onUndo={(taskId) => {
+                    if (!canUndoInsertedTask(taskId)) return false;
+                    setActiveWorkspaceExam((current) => normalizeExamStructure({ ...current, sections: current.sections.map((section) => ({ ...section, tasks: section.tasks.filter((task) => task.id !== taskId) })) }));
+                    return true;
+                  }}>
                 {activeWorkspace && displayExam.sections.map((section, index) => {
                   const nextSection = displayExam.sections[index + 1];
                   const isLinkedLead = isLinkedSectionLeader(displayExam.sections, index);
@@ -5168,7 +5223,6 @@ function App() {
                         scoresLocked={rubricOnly ? false : assessmentLocked}
                         showScores={!rubricOnly}
                         onLockedScoreAttempt={rubricOnly ? undefined : () => openHeaderUnlockDialog("scores")}
-                        onAddTask={() => updateSection(entry.id, { tasks: [...exam.sections[entryIndex].tasks, createTask()] })}
                         onDelete={() => setSectionToDelete(exam.sections[entryIndex])}
                         onDuplicate={() => duplicateSection(entry.id)}
                         onMove={(direction) => moveSection(entry.id, direction)}
@@ -5235,6 +5289,7 @@ function App() {
                     </div>
                   );
                 })}
+                </TaskInsertion>
 
                 {activeWorkspace ? (
                     <div className="no-print">

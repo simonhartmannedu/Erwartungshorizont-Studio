@@ -17,7 +17,7 @@
       </a>
 
       <section class="start" id="start" aria-labelledby="start-title">
-        <p class="release-badge"><span>Neu</span> Version 1.0 ist da</p>
+        <p class="release-badge"><span>Neu</span> Version 1.2 ist da</p>
         <p class="eyebrow"><span aria-hidden="true"></span> Lokal. Ohne Konto. Kostenlos.</p>
         <h1 id="start-title">Wie möchtest du<br /><em>heute korrigieren?</em></h1>
         <div class="start-content">
@@ -40,13 +40,13 @@
           </aside>
 
           <div class="start-actions">
-            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="1.1.0">
+            <section class="release-terminal" aria-labelledby="release-terminal-title" data-version="1.2.0">
               <div class="terminal-bar">
                 <span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>
                 <p id="release-terminal-title">ewh-studio · aktuelle Änderungen</p>
-                <span class="terminal-version">v1.1.0</span>
+                <span class="terminal-version">v1.2.0</span>
               </div>
-              <pre aria-label="Aktuelle Änderungen in Version 1.1.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
+              <pre aria-label="Aktuelle Änderungen in Version 1.2.0"><code id="release-terminal-output"></code><span class="terminal-cursor" aria-hidden="true">▋</span></pre>
               <div class="release-terminal-footer">
                 <a class="release-terminal-link" href="https://github.com/simonhartmannedu/Erwartungshorizont-Studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Alle Änderungen im GitHub-Changelog →</a>
                 <nav class="release-terminal-navigation" aria-label="Versionshinweise wechseln">
@@ -103,6 +103,18 @@
         if (!terminal || !output || !versionLabel || !position || !newerButton || !olderButton) return;
 
         const releases = [
+          {
+            version: "1.2.0",
+            lines: [
+              "$ release v1.2.0",
+              "✓ Erst die Stelle, dann die Aufgabe: kompaktes Plus-Menü in Builder und Editor",
+              "✓ Favicon im App-Kopf und kompakte Überschriften für mehr Platz beim Arbeiten",
+              "✓ Bausteinbibliothek gezielt öffnen; mobil als Schublade",
+              "✓ Bestätigung bei bestehenden Bewertungen und geschütztes Rückgängig",
+              "✓ Lokale Suche in Vorlagen, Bausteinen, Klassenarbeiten und Schülercodes mit Tippfehlertoleranz",
+              "✓ Ko-fi-Popups abschaltbar; Vollbackup und Footer-Hinweis bleiben erhalten"
+            ]
+          },
           {
             version: "1.1.0",
             lines: [

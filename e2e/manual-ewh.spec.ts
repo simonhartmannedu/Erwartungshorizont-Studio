@@ -16,7 +16,8 @@ test("öffnet mit einem Klick einen leeren EWH und lässt ihn ohne Lerngruppe ma
   await answer.fill("Meine eigene Musterlösung.");
   await section.locator("summary:visible", { hasText: "Eigene Bewertungskriterien" }).first().click();
   await section.getByRole("textbox", { name: /Eigene Bewertungskriterien für/ }).fill("Ein Punkt je nachvollziehbarem Schritt.");
-  await page.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).click();
+  await section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).last().click();
+  await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
   await expect(section.locator('textarea[placeholder="Stichpunkte oder mögliche Schülerantwort"]:visible')).toHaveCount(2);
   await expect(page.getByText("Erwartung: Die Mitteilung erfüllt die kommunikative Aufgabe.", { exact: false })).toHaveCount(0);
 });

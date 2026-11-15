@@ -110,6 +110,8 @@ type AppHeaderProps = {
   isFullscreenAvailable: boolean;
   onToggleAppFullscreen: () => void;
   onOpenUserGuide: () => void;
+  showSupportPrompts: boolean;
+  onShowSupportPromptsChange: (enabled: boolean) => void;
   showSelectionReminder: boolean;
   onShowSelectionReminderChange: (enabled: boolean) => void;
   easyMode: boolean;
@@ -128,6 +130,8 @@ export const AppHeader = ({
   isFullscreenAvailable,
   onToggleAppFullscreen,
   onOpenUserGuide,
+  showSupportPrompts,
+  onShowSupportPromptsChange,
   showSelectionReminder,
   onShowSelectionReminderChange,
   easyMode,
@@ -136,9 +140,10 @@ export const AppHeader = ({
   <header className="app-header mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
     <div className="min-w-0">
       <div className="brand-header-lockup">
+        <img className="app-brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} width="44" height="44" alt="" aria-hidden="true" />
         <div className="min-w-0">
-          <h1 className="font-display font-medium themed-strong text-2xl md:text-3xl">Erwartungshorizont Studio</h1>
-          <p className="themed-muted mt-1 text-sm leading-6">
+          <h1 className="app-brand-title font-display font-medium themed-strong">Erwartungshorizont Studio</h1>
+          <p className="app-brand-subtitle themed-muted">
             Klassenarbeiten vorbereiten, korrigieren und sichern
           </p>
         </div>
@@ -184,6 +189,16 @@ export const AppHeader = ({
               <span>
                 <strong className="themed-strong block">Easy Mode</strong>
                 <span className="themed-muted">Zeigt nur EWH-Erstellung, Bearbeitung und Export. Lerngruppen, Archiv, Backup und weitere Menüs bleiben ausgeblendet.</span>
+              </span>
+            </label>
+          </div>
+          <div>
+            <p className="label">Unterstützung</p>
+            <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-5">
+              <input type="checkbox" className="mt-1" checked={showSupportPrompts} onChange={(event) => onShowSupportPromptsChange(event.target.checked)} />
+              <span>
+                <strong className="themed-strong block">Ko-fi-Popups anzeigen</strong>
+                <span className="themed-muted">Nach Export und Druck. Beim Vollbackup bleibt das Popup aktiv; der Ko-fi-Hinweis am Seitenende ist immer sichtbar.</span>
               </span>
             </label>
           </div>

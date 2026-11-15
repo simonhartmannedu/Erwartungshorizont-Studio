@@ -1,0 +1,197 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const dismissGuide = async (page: Page) => {
+  const button = page.getByRole("button", { name: "Einführung schließen" });
+  await expect(page.locator(".local-save-status")).toContainText("Lokal gespeichert");
+  if (await button.isVisible()) await button.click();
+};
+const openComposer = async (page: Page) => {
+  await page.goto("/?mode=easy");
+  await dismissGuide(page);
+  await page.locator(".template-result-card").first().click();
+  await expect(page.locator(".composer-task-row").first()).toBeVisible();
+};
+
+test("fügt Vorschläge und Bibliothekstreffer an derselben Stelle ein und erhält die Position bei Filtern", async ({ page }, testInfo) => {
+  await openComposer(page);
+  const section = page.locator(".composer-section").first();
+  const rows = section.locator(".composer-task-row");
+  if (await rows.count() < 3) await rows.first().getByRole("button", { name: "Aufgabe duplizieren", exact: true }).click();
+  const ids = await rows.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-task-id")));
+  const count = await page.locator(".composer-task-row").count();
+  const sumBefore = Number((await page.locator(".composer-stat strong").innerText()).replace(" P.", "").replace(",", "."));
+  const plus = section.getByRole("button", { name: "Baustein einfügen", exact: true }).nth(2);
+  await plus.click();
+  await expect(page.getByRole("dialog")).toContainText("Teil A · nach Aufgabe 2");
+  await expect(page.getByRole("textbox", { name: "Aufgaben durchsuchen" })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("builder-menue.png") });
+  const suggestion = page.locator(".task-insertion-option").first();
+  const points = Number((await suggestion.locator("strong").innerText()).replace(" P.", "").replace(",", "."));
+  await suggestion.click();
+  await expect(page.locator(".composer-task-row")).toHaveCount(count + 1);
+  await expect(rows.nth(1)).toHaveAttribute("data-task-id", ids[1]!);
+  await expect(rows.nth(3)).toHaveAttribute("data-task-id", ids[2]!);
+  await expect(page.locator(".composer-stat strong")).toHaveText(`${String(sumBefore + points).replace(".", ",")} P.`);
+  await page.getByRole("button", { name: "Rückgängig", exact: true }).click();
+  await expect(rows.nth(2)).toHaveAttribute("data-task-id", ids[2]!);
+
+  await plus.click();
+  await page.getByRole("button", { name: "Alle Bausteine durchsuchen", exact: true }).click();
+  await page.getByRole("combobox", { name: "Fach für Aufgaben filtern" }).selectOption("all");
+  await page.getByRole("textbox", { name: "Aufgaben durchsuchen" }).fill("Anaylse");
+  await expect(page.locator(".task-library-results .task-insertion-option").first()).toBeVisible();
+  await page.getByRole("textbox", { name: "Aufgaben durchsuchen" }).fill("Text");
+  await page.getByRole("combobox", { name: "Vorlage für Aufgaben filtern" }).selectOption({ index: 1 });
+  await page.getByRole("combobox", { name: "Vorlage für Aufgaben filtern" }).selectOption("all");
+  await expect(page.getByRole("dialog")).toContainText("Teil A · nach Aufgabe 2");
+  await page.locator(".task-library-results .task-insertion-option").first().click();
+  await expect(rows.nth(3)).toHaveAttribute("data-task-id", ids[2]!);
+  // A later edit to another task survives the targeted undo.
+  await rows.first().getByRole("button", { name: "Baustein bearbeiten", exact: true }).click();
+  await rows.first().getByRole("textbox", { name: "Aufgabentyp", exact: true }).fill("Spätere Änderung");
+  await page.getByRole("button", { name: "Rückgängig", exact: true }).click();
+  await expect(rows.first()).toContainText("Spätere Änderung");
+  await expect(rows.nth(2)).toHaveAttribute("data-task-id", ids[2]!);
+
+  await plus.focus(); await page.keyboard.press("Enter"); await page.keyboard.press("Escape");
+  await expect(plus).toBeFocused();
+  await plus.click();
+  // Simulate the anchor disappearing while the picker is open.
+  await rows.nth(1).getByRole("button", { name: "Aufgabe entfernen", exact: true }).evaluate((button: HTMLButtonElement) => button.click());
+  await page.locator(".task-insertion-option").first().click();
+  await expect(page.getByRole("status").filter({ hasText: "Einfügestelle ist nicht mehr vorhanden" })).toBeVisible();
+  await expect(rows).toHaveCount(ids.length - 1);
+});
+
+test("ergänzt leere Unteraufgaben mit Titelfokus, dupliziert darunter und öffnet auf schmalen Ansichten eine Schublade", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/?mode=easy");
+  await dismissGuide(page);
+  await page.getByRole("button", { name: "Leerer EWH", exact: false }).click();
+  await page.getByRole("button", { name: "Abschnitt manuell ergänzen", exact: true }).click();
+  const section = page.locator(".section-editor").first();
+  const titles = section.locator("input[data-task-title]:visible");
+  await titles.first().fill("Aufgabe 1");
+  for (const title of ["Aufgabe 2", "Aufgabe 3"]) {
+    await section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).last().click();
+    await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+    await expect(titles.last()).toBeFocused();
+    await titles.last().fill(title);
+  }
+  await page.locator(".header-settings > summary").click();
+  await page.locator(".theme-picker > details > summary").click();
+  await page.getByRole("option", { name: "Bernsteinzimmer im Lehrerzimmer", exact: true }).click();
+  await page.locator(".header-settings > summary").click();
+  await expect(section.locator(".task-just-inserted")).toHaveCount(0);
+  await page.getByRole("button", { name: "Hinweis schließen", exact: true }).click();
+  const plus = section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).nth(2);
+  await plus.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const accent = await page.locator(".task-insertion-point.is-active .task-insertion-line:visible").evaluate((line) => getComputedStyle(line).backgroundColor);
+  expect(accent).not.toBe("rgb(0, 83, 179)");
+  await page.screenshot({ path: testInfo.outputPath("editor-menue.png") });
+  await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+  await expect(titles.nth(2)).toBeFocused();
+  await titles.nth(2).fill("Neue Unteraufgabe");
+  await expect(titles.nth(3)).toHaveValue("Aufgabe 3");
+  await page.getByRole("button", { name: "Rückgängig", exact: true }).click();
+  await expect(titles).toHaveCount(3);
+  await section.getByRole("button", { name: "Duplizieren", exact: true }).nth(1).click();
+  await expect(titles.nth(2)).toHaveValue("Aufgabe 2 Kopie");
+  await expect(titles.nth(3)).toHaveValue("Aufgabe 3");
+  await section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).first().click();
+  await page.getByRole("button", { name: "Aus Vorlage einfügen …", exact: true }).click();
+  await page.locator(".task-library-results .task-insertion-option").first().click();
+  await expect(titles.nth(1)).toHaveValue("Aufgabe 1");
+  await titles.first().fill("Langer Titel mit vielen Wörtern für einen vollständig bearbeitbaren Vorlagenbaustein");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobilePlus = section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).nth(2);
+  await mobilePlus.dispatchEvent("pointerdown", { pointerType: "touch" });
+  await mobilePlus.dispatchEvent("click");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const box = await page.getByRole("dialog").boundingBox();
+  expect(box!.y + box!.height).toBeCloseTo(844, 0);
+  await page.screenshot({ path: testInfo.outputPath("schublade-mobil.png") });
+  await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).dispatchEvent("click");
+  await expect(titles.nth(2)).not.toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  while (await titles.count()) await section.getByRole("button", { name: "Löschen", exact: true }).first().click();
+  const emptyPlus = section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true });
+  await expect(emptyPlus).toContainText("Unteraufgabe ergänzen");
+  await emptyPlus.click();
+  await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+  await expect(titles).toHaveCount(1);
+});
+
+test("bestätigt vorhandene Korrekturen vor dem Einfügen und schützt ein inzwischen bewertetes Einfügeergebnis", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/?demo=1&freshDemo=1");
+  await dismissGuide(page);
+  await page.getByRole("textbox", { name: "Schüler:innen und Klassenarbeiten durchsuchen" }).fill("Unit 5");
+  await page.locator("#global-search-results").getByRole("option", { name: /Englisch-Klassenarbeit Unit 5/ }).click();
+  await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
+  await page.getByLabel("Schülercode").selectOption("demo-student-1");
+  const section = page.locator(".section-editor").first();
+  await section.getByRole("button", { name: "Aufklappen", exact: true }).click();
+  const titles = section.locator("input[data-task-title]:visible");
+  const count = await titles.count();
+  const plus = section.getByRole("button", { name: "Unteraufgabe ergänzen", exact: true }).nth(2);
+  await plus.click(); await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText(/Gesperrte Bewertungsdaten|Für die neue Unteraufgabe fehlen/);
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).last().click();
+  await expect(titles).toHaveCount(count);
+  await expect(plus).toBeFocused();
+  await page.locator(".app-navigation-security-button").click();
+  await page.locator("#header-unlock-password").fill("demo");
+  await page.getByRole("button", { name: "Entsperren", exact: true }).click();
+  const scores = section.locator(".score-input:visible");
+  const before = await scores.evaluateAll((nodes) => nodes.map((node) => (node as HTMLInputElement).value));
+  await plus.click(); await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Für die neue Unteraufgabe fehlen");
+  await page.getByRole("button", { name: "Unteraufgabe einfügen", exact: true }).click();
+  await expect(titles).toHaveCount(count + 1);
+  await expect(scores.nth(0)).toHaveValue(before[0]);
+  await expect(scores.nth(1)).toHaveValue(before[1]);
+  await expect(scores.nth(3)).toHaveValue(before[2]);
+  await expect(page.getByRole("button", { name: "Rückgängig", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Ergebnis & Druck", exact: true }).click();
+  await page.getByRole("button", { name: "Abschlussprüfung", exact: true }).click();
+  await expect(page.locator('[aria-label^="Abschlussprüfung für"] > p').first()).toContainText("1 fehlende Punkteingaben");
+  await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
+  const expand = section.getByRole("button", { name: "Aufklappen", exact: true });
+  if (await expand.isVisible()) await expand.click();
+  await scores.nth(2).fill("0"); await scores.nth(2).press("Enter");
+  await expect(scores.nth(3)).toBeFocused();
+  await expect(page.getByRole("button", { name: "Rückgängig", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Korrektur-Tisch", exact: true }).click();
+  await expect(page.locator(".task-insertion-trigger:visible")).toHaveCount(0);
+  await page.locator(".correction-desk-score").first().fill("2");
+  await page.locator(".correction-desk-score").first().press("Enter");
+  await expect(page.locator(".correction-desk-score").nth(1)).toBeFocused();
+  await page.locator(".app-navigation-security-button").click();
+  await expect(page.locator(".correction-desk-score").first()).toBeDisabled();
+  await page.getByRole("button", { name: "Einzelkorrektur", exact: true }).click();
+  if (await expand.isVisible()) await expand.click();
+  await plus.click();
+  await page.getByRole("button", { name: "Leere Unteraufgabe", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Gesperrte Bewertungsdaten", { timeout: 90_000 });
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).last().click();
+});
+
+test("sucht Vorlagen mit Tippfehlern und behält den leeren Builder für eigene Zusammenstellungen", async ({ page }) => {
+  await page.goto("/?mode=easy");
+  await dismissGuide(page);
+  await page.getByRole("textbox", { name: "Vorlagen durchsuchen", exact: true }).fill("Deutsh Anaylse");
+  await expect(page.locator(".template-result-card").first()).toContainText("Deutsch");
+  await page.getByRole("textbox", { name: "Vorlagen durchsuchen", exact: true }).fill('"zzzzzz"');
+  await expect(page.locator(".template-result-card")).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Vorlagen durchsuchen", exact: true }).fill("");
+  await page.getByRole("button", { name: /Leere Struktur.*Frei zusammenstellen/ }).click();
+  await expect(page.getByRole("button", { name: "Baustein einfügen", exact: true })).toHaveText("+Baustein einfügen");
+  await page.getByRole("button", { name: "Baustein einfügen", exact: true }).click();
+  await expect(page.locator(".task-insertion-option")).toHaveCount(1);
+  await page.getByRole("button", { name: "Alle Bausteine durchsuchen", exact: true }).click();
+  await page.locator(".task-library-results .task-insertion-option").first().click();
+  await expect(page.locator(".composer-task-row")).toHaveCount(1);
+});

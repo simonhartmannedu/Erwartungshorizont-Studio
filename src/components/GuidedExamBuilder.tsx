@@ -1,4 +1,4 @@
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { Fragment, type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -7,7 +7,6 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
-  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -17,6 +16,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { ExamTemplateDefinition, TemplateSchoolForm } from "../data/templates";
 import { BuilderSchoolStage, BUILDER_SUBJECT_OPTIONS, getBuilderGuidance } from "../data/builderResearch";
 import { Exam, ExamMeta, GradeScale, Section, StudentGroup, Task } from "../types";
+import { InsertionPoint, TaskInsertion } from "./TaskInsertion";
+import { copyTaskForInsertion, insertTaskAtTarget, resolveInsertionPosition } from "../utils/taskInsertion";
+import { createLocalSearchIndex, searchLocalIndex } from "../utils/localSearch";
 import { formatNumber } from "../utils/format";
 import { applyNotengeneratorGradeScale } from "../utils/gradeScaleGenerator";
 import { SECTION_CHART_PALETTE } from "../utils/sectionChart";
@@ -108,14 +110,6 @@ interface Props {
 }
 
 type ComposerSection = Pick<Section, "id" | "title" | "description" | "note" | "tasks">;
-
-type ComposerLibraryItem = {
-  id: string;
-  subject: string;
-  templateTitle: string;
-  sectionTitle: string;
-  task: Task;
-};
 
 const getPartLabel = (index: number) => `Teil ${String.fromCharCode(65 + index)}`;
 
@@ -370,55 +364,10 @@ const buildComposerSections = (template: ExamTemplateDefinition, sectionPoints: 
 const getComposerTotal = (sections: ComposerSection[]) =>
   Math.round(sections.reduce((sum, section) => sum + section.tasks.reduce((taskSum, task) => taskSum + task.maxPoints, 0), 0) * 100) / 100;
 
-const cloneComposerTask = (task: Task, category: string): Task => ({
-  ...task,
-  id: crypto.randomUUID(),
-  category,
-  achievedPoints: 0,
-});
+const cloneComposerTask = copyTaskForInsertion;
 
 const composerTaskDndId = (taskId: string) => `composer-task:${taskId}`;
 const composerSectionDndId = (sectionId: string) => `composer-section:${sectionId}`;
-
-const ComposerLibraryTask = ({
-  item,
-  onAdd,
-}: {
-  item: ComposerLibraryItem;
-  onAdd: () => void;
-}) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `library-task:${item.id}`,
-    data: { type: "library-task", itemId: item.id },
-  });
-
-  return (
-    <article
-      ref={setNodeRef}
-      className={`composer-library-task ${isDragging ? "composer-library-task-dragging" : ""}`}
-      style={{ transform: CSS.Translate.toString(transform) }}
-    >
-      <button
-        type="button"
-        className="composer-drag-handle"
-        aria-label={`Aufgabe ${item.task.title} ziehen`}
-        title="Aufgabe ziehen"
-        {...attributes}
-        {...listeners}
-      >
-        <DragIcon />
-      </button>
-      <div className="min-w-0 flex-1">
-        <strong>{item.task.title}</strong>
-        <p>{item.sectionTitle} · {formatNumber(item.task.maxPoints)} P.</p>
-      </div>
-      <button type="button" className="button-secondary composer-add-button" onClick={onAdd}>
-        +
-        <span className="sr-only">Zu aktivem Teil hinzufügen</span>
-      </button>
-    </article>
-  );
-};
 
 const ComposerSectionDropArea = ({ sectionId, children }: { sectionId: string; children: ReactNode }) => {
   const { setNodeRef, isOver } = useDroppable({
@@ -442,6 +391,7 @@ const ComposerTaskRow = ({
   onRemove,
   onDuplicate,
   onMoveToSection,
+  onMove,
 }: {
   section: ComposerSection;
   task: Task;
@@ -451,6 +401,7 @@ const ComposerTaskRow = ({
   onRemove: () => void;
   onDuplicate: () => void;
   onMoveToSection: (sectionId: string) => void;
+  onMove: (direction: "up" | "down") => void;
 }) => {
   const [editing, setEditing] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -464,6 +415,7 @@ const ComposerTaskRow = ({
       ref={setNodeRef}
       className={`composer-task-row ${isDragging ? "composer-task-row-dragging" : ""}`}
       data-task-id={task.id}
+      data-insertion-task-id={task.id}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <button
@@ -488,6 +440,8 @@ const ComposerTaskRow = ({
       </div>
       <NumberInput className="field composer-task-points" ariaLabel={`Maximalpunkte für ${task.title || "diesen Baustein"}`} value={task.maxPoints} min={0} step={0.5} onCommit={onPointsChange} />
       <div className="composer-task-actions">
+        <button type="button" className="icon-button" title="Aufgabe nach oben" disabled={section.tasks[0]?.id === task.id} onClick={() => onMove("up")}>↑</button>
+        <button type="button" className="icon-button" title="Aufgabe nach unten" disabled={section.tasks[section.tasks.length - 1]?.id === task.id} onClick={() => onMove("down")}>↓</button>
         {destinations.length > 0 ? (
           <select
             className="field composer-task-move"
@@ -750,11 +704,7 @@ export const GuidedExamBuilder = ({
   const [composerTemplateId, setComposerTemplateId] = useState<string | null>(null);
   const [blankComposer, setBlankComposer] = useState(false);
   const [composerSections, setComposerSections] = useState<ComposerSection[]>([]);
-  const [composerQuery, setComposerQuery] = useState("");
-  const [composerSubjectFilter, setComposerSubjectFilter] = useState<string>(initialSubject || "all");
   const [activeComposerSectionId, setActiveComposerSectionId] = useState<string | null>(null);
-  const [composerSidebarTab, setComposerSidebarTab] = useState<"outline" | "library">("library");
-  const [composerToolsOpen, setComposerToolsOpen] = useState(false);
   const [composerReviewOpen, setComposerReviewOpen] = useState(false);
   const [draggedTaskTitle, setDraggedTaskTitle] = useState<string | null>(null);
   const [templatePointDrafts, setTemplatePointDrafts] = useState<Record<string, number[]>>({});
@@ -785,46 +735,20 @@ export const GuidedExamBuilder = ({
     [templates],
   );
 
-  const scoredTemplates = useMemo(() => {
-    const normalizedQuery = normalizeText(query);
-    const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
-
-    return templates
-      .map((template, index) => {
-        const searchText = getTemplateSearchText(template);
-        const titleText = `${template.title} ${template.shortLabel}`.toLowerCase();
-        const previewText = template.previewSections
-          .flatMap((section) => [section.title, ...section.tasks])
-          .join(" ")
-          .toLowerCase();
-        const queryMatches = queryTokens.every((token) => searchText.includes(token));
-        const subjectMatches = subjectFilter === "all" || template.subject === subjectFilter;
-        const stageMatches = stageFilter === "all" || (template.schoolStage === stageFilter && template.schoolForm !== "grundschule");
-        const schoolFormMatches = schoolFormFilter === "all" || template.schoolForm === schoolFormFilter;
-        const focusMatches = focusFilter === "all" || template.focus === focusFilter;
-        const initialSubjectBonus = normalizeText(template.subject) === normalizeText(initialSubject) ? 8 : 0;
-        const score =
-          queryTokens.reduce((sum, token) => {
-            if (titleText.includes(token)) return sum + 12;
-            if (normalizeText(template.subject).includes(token)) return sum + 9;
-            if (previewText.includes(token)) return sum + 6;
-            if (searchText.includes(token)) return sum + 3;
-            return sum;
-          }, 0) +
-          initialSubjectBonus +
-          (template.focus === "abitur" ? 1 : 0);
-
-        return {
-          template,
-          index,
-          visible: queryMatches && subjectMatches && stageMatches && schoolFormMatches && focusMatches,
-          score,
-        };
-      })
-      .filter((entry) => entry.visible)
-      .sort((a, b) => b.score - a.score || a.index - b.index)
-      .map((entry) => entry.template);
-  }, [focusFilter, initialSubject, query, schoolFormFilter, stageFilter, subjectFilter, templates]);
+  const templateSearchIndex = useMemo(() => createLocalSearchIndex(templates, (template) => [
+    { text: `${template.title} ${template.shortLabel}`, weight: 12 },
+    { text: template.subject, weight: 9 },
+    { text: template.previewSections.flatMap((section) => [section.title, ...section.tasks]).join(" "), weight: 6 },
+    { text: getTemplateSearchText(template), weight: 3 },
+  ]), [templates]);
+  const scoredTemplates = useMemo(() => searchLocalIndex(templateSearchIndex, query)
+    .filter(({ item: template }) => (subjectFilter === "all" || template.subject === subjectFilter) &&
+      (stageFilter === "all" || (template.schoolStage === stageFilter && template.schoolForm !== "grundschule")) &&
+      (schoolFormFilter === "all" || template.schoolForm === schoolFormFilter) &&
+      (focusFilter === "all" || template.focus === focusFilter))
+    .map((entry) => ({ ...entry, score: entry.score + (normalizeText(entry.item.subject) === normalizeText(initialSubject) ? 0.08 : 0) + (entry.item.focus === "abitur" ? 0.01 : 0) }))
+    .sort((a, b) => b.score - a.score || a.order - b.order).map((entry) => entry.item),
+  [templateSearchIndex, query, subjectFilter, stageFilter, schoolFormFilter, focusFilter, initialSubject]);
 
   const selectedTemplate = useMemo(
     () => scoredTemplates.find((template) => template.id === selectedTemplateId) ?? scoredTemplates[0] ?? null,
@@ -849,25 +773,6 @@ export const GuidedExamBuilder = ({
     () => composerSections.reduce((sum, section) => sum + section.tasks.length, 0),
     [composerSections],
   );
-  const composerLibrary = useMemo<ComposerLibraryItem[]>(() => {
-    const normalizedQuery = normalizeText(composerQuery);
-    return templates.flatMap((template) =>
-      template.build().sections.flatMap((section) =>
-        section.tasks.map((task, taskIndex) => ({
-          id: `${template.id}:${section.id}:${taskIndex}`,
-          subject: template.subject,
-          templateTitle: template.shortLabel,
-          sectionTitle: section.title,
-          task,
-        })),
-      ),
-    ).filter((item) => {
-      const subjectMatches = composerSubjectFilter === "all" || item.subject === composerSubjectFilter;
-      const text = `${item.subject} ${item.templateTitle} ${item.sectionTitle} ${item.task.title} ${item.task.description} ${item.task.expectation}`.toLowerCase();
-      return subjectMatches && (!normalizedQuery || text.includes(normalizedQuery));
-    });
-  }, [composerQuery, composerSubjectFilter, templates]);
-
   const manualResolvedSubject = manualSubject === "__custom__" ? manualCustomSubject.trim() : manualSubject;
   const manualGuidance = useMemo(
     () => getBuilderGuidance(manualResolvedSubject || "Eigenes Fach", manualStage),
@@ -971,11 +876,7 @@ export const GuidedExamBuilder = ({
     setComposerTemplateId(template.id);
     setBlankComposer(false);
     setComposerSections(sections);
-    setComposerSubjectFilter(template.subject);
-    setComposerQuery("");
     setActiveComposerSectionId(sections[0]?.id ?? null);
-    setComposerSidebarTab("library");
-    setComposerToolsOpen(false);
     setComposerReviewOpen(false);
     const nextTotal = getComposerTotal(sections);
     setTotalPoints(nextTotal);
@@ -994,11 +895,7 @@ export const GuidedExamBuilder = ({
     setComposerTemplateId(null);
     setBlankComposer(true);
     setComposerSections(sections);
-    setComposerSubjectFilter("all");
-    setComposerQuery("");
     setActiveComposerSectionId(sections[0].id);
-    setComposerSidebarTab("library");
-    setComposerToolsOpen(false);
     setComposerReviewOpen(false);
     setTotalPoints(0);
     setGradeScale((current) => gradeScaleFor(current, 1, manualStage));
@@ -1006,16 +903,6 @@ export const GuidedExamBuilder = ({
 
   const updateComposerSections = (updater: (current: ComposerSection[]) => ComposerSection[]) => {
     setComposerSections(updater);
-  };
-
-  const appendLibraryItem = (item: ComposerLibraryItem, sectionId = activeComposerSectionId) => {
-    const destinationId = sectionId ?? composerSections[0]?.id;
-    if (!destinationId) return;
-    updateComposerSections((current) => current.map((section) => (
-      section.id === destinationId
-        ? { ...section, tasks: [...section.tasks, cloneComposerTask(item.task, section.title)] }
-        : section
-    )));
   };
 
   const moveComposerTask = (sourceSectionId: string, taskId: string, targetSectionId: string, insertionIndex: number) => {
@@ -1061,10 +948,6 @@ export const GuidedExamBuilder = ({
 
   const handleComposerDragStart = (event: DragStartEvent) => {
     const data = event.active.data.current;
-    if (data?.type === "library-task") {
-      setDraggedTaskTitle(composerLibrary.find((item) => item.id === data.itemId)?.task.title ?? "Aufgabe");
-      return;
-    }
     if (data?.type === "composer-task") {
       const source = composerSections.find((section) => section.id === data.sectionId);
       setDraggedTaskTitle(source?.tasks.find((task) => task.id === data.taskId)?.title ?? "Aufgabe");
@@ -1077,22 +960,6 @@ export const GuidedExamBuilder = ({
     const dropDestination = getComposerDropDestination(event.over.id);
     if (!dropDestination) return;
     const data = event.active.data.current;
-    if (data?.type === "library-task") {
-      const item = composerLibrary.find((entry) => entry.id === data.itemId);
-      if (!item) return;
-      updateComposerSections((current) => current.map((section) => section.id === dropDestination.sectionId
-        ? {
-            ...section,
-            tasks: [
-              ...section.tasks.slice(0, dropDestination.insertionIndex),
-              cloneComposerTask(item.task, section.title),
-              ...section.tasks.slice(dropDestination.insertionIndex),
-            ],
-          }
-        : section));
-      setActiveComposerSectionId(dropDestination.sectionId);
-      return;
-    }
     if (data?.type === "composer-task") {
       let destination = dropDestination;
       if (data.sectionId === destination.sectionId) {
@@ -1269,7 +1136,6 @@ export const GuidedExamBuilder = ({
   };
 
   const renderComposer = () => {
-    const composerSubjects = availableSubjects.filter((subject) => templates.some((template) => template.subject === subject));
     const addComposerSection = () => {
       const section: ComposerSection = {
         id: crypto.randomUUID(),
@@ -1280,10 +1146,19 @@ export const GuidedExamBuilder = ({
       };
       updateComposerSections((current) => [...current, section]);
       setActiveComposerSectionId(section.id);
-      setComposerSidebarTab("outline");
     };
 
     return (
+      <TaskInsertion mode="builder" sections={composerSections} templates={templates} selectedTemplateId={composerTemplateId} subject={composerTemplate?.subject}
+        onInsert={(target, task) => {
+          if (!resolveInsertionPosition(composerSections, target)) return false;
+          updateComposerSections((current) => insertTaskAtTarget(current, target, task) ?? current);
+          return true;
+        }}
+        onUndo={(taskId) => {
+          updateComposerSections((current) => current.map((section) => ({ ...section, tasks: section.tasks.filter((task) => task.id !== taskId) })));
+          return true;
+        }}>
       <DndContext
         sensors={composerSensors}
         collisionDetection={closestCenter}
@@ -1310,50 +1185,23 @@ export const GuidedExamBuilder = ({
             </div>
           </div>
 
-          <div className={`composer-layout ${composerToolsOpen ? "composer-layout-tools-open" : ""}`}>
-            <aside className="composer-sidebar">
-              <button type="button" className="composer-sidebar-close" onClick={() => setComposerToolsOpen(false)}>Werkzeuge schließen</button>
-              <div className="composer-sidebar-tabs" role="tablist" aria-label="Werkzeuge für die Zusammenstellung">
-                <button type="button" role="tab" aria-selected={composerSidebarTab === "outline"} className={composerSidebarTab === "outline" ? "composer-sidebar-tab-active" : ""} onClick={() => { setComposerSidebarTab("outline"); setComposerToolsOpen(false); }}>Gliederung</button>
-                <button type="button" role="tab" aria-selected={composerSidebarTab === "library"} className={composerSidebarTab === "library" ? "composer-sidebar-tab-active" : ""} onClick={() => setComposerSidebarTab("library")}>Bibliothek <span>{composerLibrary.length}</span></button>
-              </div>
-
-              {composerSidebarTab === "outline" ? (
-                <div className="composer-outline" role="tabpanel">
-                  <p className="themed-muted text-xs leading-5">Wähle einen Teil aus oder ergänze einen neuen.</p>
-                  {composerSections.map((section, index) => (
-                    <button key={section.id} type="button" className={`composer-outline-item ${activeComposerSectionId === section.id ? "composer-outline-item-active" : ""}`} onClick={() => setActiveComposerSectionId(section.id)}>
-                      <span>{getPartLabel(index)}</span><strong>{section.title || "Unbenannter Teil"}</strong><small>{section.tasks.length} Aufgaben · {formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</small>
-                    </button>
-                  ))}
-                  <button type="button" className="button-secondary mt-2 w-full justify-center gap-2" onClick={addComposerSection}><PlusIcon />Teil ergänzen</button>
-                </div>
-              ) : (
-                <div className="composer-library" role="tabpanel">
-                  <div className="composer-library-heading">
-                    <p className="themed-muted text-xs leading-5">{composerTemplate ? `Aufgaben für ${composerSubject}; andere Fächer sind optional.` : "Wähle passende Aufgaben aus der Bibliothek."}</p>
-                  </div>
-                  <input className="field" value={composerQuery} onChange={(event) => setComposerQuery(event.target.value)} placeholder="Aufgabe suchen …" aria-label="Aufgaben durchsuchen" />
-                  <select className="field composer-library-filter" value={composerSubjectFilter} aria-label="Fach für Aufgaben filtern" onChange={(event) => setComposerSubjectFilter(event.target.value)}>
-                    {composerTemplate ? <option value={composerSubject}>{composerSubject}</option> : null}
-                    <option value="all">Alle Fächer</option>
-                    {composerSubjects.filter((subject) => subject !== composerSubject).map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-                  </select>
-                  <div className="composer-library-list">
-                    {composerLibrary.map((item) => <ComposerLibraryTask key={item.id} item={item} onAdd={() => appendLibraryItem(item)} />)}
-                    {composerLibrary.length === 0 && <p className="themed-muted text-sm">Keine passenden Elemente gefunden.</p>}
-                  </div>
-                </div>
-              )}
-            </aside>
-
+          <div className="composer-layout">
             <section className="composer-canvas">
               <div className="composer-canvas-toolbar">
                 <div><span>Aufbau</span><strong>{formatNumber(composerTotalPoints)} Punkte · {composerTaskCount} Aufgaben</strong></div>
-                <div className="flex gap-2"><button type="button" className="button-secondary composer-mobile-tools-trigger px-3 py-2 text-xs" onClick={() => setComposerToolsOpen(true)}>Bibliothek</button><button type="button" className="button-secondary px-3 py-2 text-xs" onClick={addComposerSection}><PlusIcon />Teil ergänzen</button></div>
+                <button type="button" className="button-secondary px-3 py-2 text-xs" onClick={addComposerSection}><PlusIcon />Teil ergänzen</button>
               </div>
+              <details className="composer-outline-disclosure">
+                <summary className="themed-muted cursor-pointer text-xs font-semibold">Gliederung</summary>
+                <nav className="composer-outline" aria-label="Gliederung der Klausur">
+                  {composerSections.map((section, index) => <button key={section.id} type="button" className={`composer-outline-item ${activeComposerSectionId === section.id ? "composer-outline-item-active" : ""}`}
+                    onClick={() => { setActiveComposerSectionId(section.id); document.getElementById(`composer-part-${section.id}`)?.scrollIntoView({ block: "start", behavior: "auto" }); }}>
+                    <strong>{getPartLabel(index)} · {section.title}</strong><span>{section.tasks.length} Aufgaben · {formatNumber(section.tasks.reduce((sum, task) => sum + task.maxPoints, 0))} P.</span>
+                  </button>)}
+                </nav>
+              </details>
               {composerSections.map((section, index) => (
-                <section key={section.id} className={`composer-section ${activeComposerSectionId === section.id ? "composer-section-active" : ""}`} onFocus={() => setActiveComposerSectionId(section.id)}>
+                <section key={section.id} id={`composer-part-${section.id}`} className={`composer-section ${activeComposerSectionId === section.id ? "composer-section-active" : ""}`} onFocus={() => setActiveComposerSectionId(section.id)}>
                   <div className="composer-section-header">
                     <span className="composer-part-label">{getPartLabel(index)}</span>
                     <input className="field" value={section.title} aria-label="Titel des Aufgabenteils" onFocus={() => setActiveComposerSectionId(section.id)} onChange={(event) => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, title: event.target.value } : entry))} />
@@ -1369,24 +1217,29 @@ export const GuidedExamBuilder = ({
                   <ComposerSectionDropArea sectionId={section.id}>
                     <SortableContext items={section.tasks.map((task) => composerTaskDndId(task.id))} strategy={verticalListSortingStrategy}>
                       <div className="composer-task-list">
+                        <InsertionPoint target={{ sectionId: section.id, taskId: section.tasks[0]?.id ?? null, position: section.tasks.length ? "before" : "end" }} empty={!section.tasks.length} />
                         {section.tasks.map((task) => (
+                          <Fragment key={task.id}>
                           <ComposerTaskRow
-                            key={task.id}
                             section={section}
                             task={task}
                             sections={composerSections}
                             onChange={(patch) => updateComposerTask(section.id, task.id, (current) => ({ ...current, ...patch }))}
                             onPointsChange={(value) => updateComposerTask(section.id, task.id, (current) => ({ ...current, maxPoints: value, achievedPoints: Math.min(current.achievedPoints, value) }))}
                             onRemove={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: entry.tasks.filter((candidate) => candidate.id !== task.id) } : entry))}
-                            onDuplicate={() => updateComposerSections((current) => current.map((entry) => entry.id === section.id ? { ...entry, tasks: [...entry.tasks, cloneComposerTask(task, entry.title)] } : entry))}
+                            onDuplicate={() => updateComposerSections((current) => insertTaskAtTarget(current, { sectionId: section.id, taskId: task.id, position: "after" }, cloneComposerTask(task, section.title)) ?? current)}
+                            onMove={(direction) => {
+                              const taskIndex = section.tasks.findIndex((entry) => entry.id === task.id);
+                              moveComposerTask(section.id, task.id, section.id, direction === "up" ? taskIndex - 1 : taskIndex + 2);
+                            }}
                             onMoveToSection={(targetSectionId) => moveComposerTask(section.id, task.id, targetSectionId, composerSections.find((entry) => entry.id === targetSectionId)?.tasks.length ?? 0)}
                           />
+                          <InsertionPoint target={{ sectionId: section.id, taskId: task.id, position: "after" }} />
+                          </Fragment>
                         ))}
-                        {section.tasks.length === 0 ? <p className="composer-empty-dropzone">Aufgabe hier ablegen oder aus der Bibliothek hinzufügen</p> : null}
                       </div>
                     </SortableContext>
                   </ComposerSectionDropArea>
-                  <button type="button" className="composer-add-inline" onClick={() => { setActiveComposerSectionId(section.id); setComposerSidebarTab("library"); setComposerToolsOpen(true); }}>+ Aufgabe aus Bibliothek</button>
                 </section>
               ))}
             </section>
@@ -1407,6 +1260,7 @@ export const GuidedExamBuilder = ({
         </div>
         <DragOverlay dropAnimation={null}>{draggedTaskTitle ? <div className="composer-drag-overlay"><DragIcon />{draggedTaskTitle}</div> : null}</DragOverlay>
       </DndContext>
+      </TaskInsertion>
     );
   };
 
@@ -1415,7 +1269,7 @@ export const GuidedExamBuilder = ({
       <div className="template-decision-header">
         <div>
           <p className="label">Schnellentscheidung</p>
-          <h2 className="themed-strong mt-2 text-2xl font-semibold">Erwartungshorizont erstellen</h2>
+          <h2 className="app-page-title themed-strong mt-2 font-semibold">Erwartungshorizont erstellen</h2>
           <p className="themed-muted mt-2 max-w-3xl text-sm leading-6">
             Starte mit einer Vorlage oder einer leeren Struktur. Die passende Grundlage landet sofort im
             EWH-Editor und kann dort weiter angepasst werden. Vor dem Einsatz bitte mit den aktuellen Vorgaben der

@@ -7,7 +7,7 @@ EWH-Studio verarbeitet Arbeitsstände und Schülerdaten grundsätzlich lokal im 
 | Daten | Speicherort |
 | --- | --- |
 | Klassenarbeiten, Archive und Schülerdaten | sql.js-Datenbank in IndexedDB des Browsers |
-| Darstellung und Backup-Status | `localStorage` des Browsers |
+| Darstellung, Bedienpräferenzen (einschließlich Ko-fi-Hinweisen) und Backup-Status | `localStorage` des Browsers |
 | Ausgewählte Sicherungs- und Nextcloud-Ordner | Browser-Ordnerfreigaben in IndexedDB; keine Datei- oder Zugangsdaten |
 | Sicherungen | von dir heruntergeladene, verschlüsselte Datei |
 | Optionale Nextcloud-Ablage | ausschließlich eine neu erzeugte, verschlüsselte Backup-Datei im lokal synchronisierten und schulisch freigegebenen Nextcloud-Ordner |
@@ -22,7 +22,7 @@ Löscht du Browserdaten, verwendest ein privates Fenster oder wechselst das Ger�
 
 ## Schutz geschützter Lerngruppen
 
-Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare, Unterschriften, Teilnahmestatus und Antwortbogencodes je Klassenarbeit liegen beim Speichern verschlüsselt vor. Für die aktive, entsperrte Gruppe werden diese Werte im JavaScript-Arbeitsspeicher bereitgestellt; beim Sperren werden sie dort entfernt und erneut verschlüsselt gespeichert. Nach 15 Minuten ohne Aktivität sperrt die Anwendung entsperrte Gruppen automatisch. Die globale Suche lädt Klarnamen nur für aktuell entsperrte Lerngruppen; beim Sperren oder automatischen Sitzungs-Timeout werden diese Suchdaten und die aktuelle Suchanfrage verworfen. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.
+Geschützte Lerngruppen speichern Namen verschlüsselt. Punkte, Kommentare, Unterschriften, Teilnahmestatus und Antwortbogencodes je Klassenarbeit liegen beim Speichern verschlüsselt vor. Für die aktive, entsperrte Gruppe werden diese Werte im JavaScript-Arbeitsspeicher bereitgestellt; beim Sperren werden sie dort entfernt und erneut verschlüsselt gespeichert. Nach 15 Minuten ohne Aktivität sperrt die Anwendung entsperrte Gruppen automatisch. Die globale Suche lädt Klarnamen nur für aktuell entsperrte Lerngruppen; beim Sperren oder automatischen Sitzungs-Timeout werden diese Suchdaten, der daraus abgeleitete flüchtige Volltextindex und die aktuelle Suchanfrage verworfen. Die Tippfehlersuche überträgt keine Anfragen oder Namen an externe Suchdienste. Gruppenpasswörter und Backup-Passwörter werden nicht dauerhaft gespeichert.
 
 Auf einem gemeinsam genutzten Gerät: Gruppe nach der Korrektur sperren, Browser schließen und kein Passwort im Browser speichern.
 
@@ -47,3 +47,5 @@ Die Ordnerverbindung benötigt einen Browser mit Dateisystemzugriff (derzeit ins
 Du bzw. deine Schule verantwortet die Freigabe des gewählten Cloud-Speichers, dessen Serverstandort, Zugriffsrechte, Auftragsverarbeitung, Verzeichnis der Verarbeitungstätigkeiten und die Datenschutzprüfung. Vor der Nutzung mit Schülerdaten muss der Speicher durch Schule oder Schulträger freigegeben sein. EWH-Studio übernimmt keine Gewähr für Verfügbarkeit oder Sicherheitskonfiguration fremder Cloud-Speicher.
 
 Office 365, OneDrive und iCloud werden nicht angebunden.
+
+Die Ko-fi-Einstellung wird als optionaler boolescher Wert in den vorhandenen, nach Demo und Produktivmodus getrennten Browserpräferenzen gespeichert. Ältere Einstellungen ohne diesen Wert behalten das bisherige Verhalten (Hinweise aktiv); ungültige Werte fallen auf diesen Standard zurück. Arbeitsstände und verschlüsselte Backups behalten ihr bestehendes Format. Erst das bewusste Öffnen des Ko-fi-Links führt zur externen Seite.

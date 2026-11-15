@@ -4,6 +4,15 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
 ## Unveröffentlicht
 
+## 1.2.0 – 15.11.2026
+
+- Das vorhandene Favicon steht neben dem App-Titel. Kompakte, responsive Überschriftengrößen ordnen Übersicht, Vorlagenauswahl und Wizard unter dem App-Titel ein und lassen mehr Platz für die EWH-Arbeit.
+- Neuer lokal gespeicherter Schalter „Ko-fi-Popups anzeigen“ in den Einstellungen, auch im Easy Mode: deaktiviert die Popups nach Export und Druck. Der Ko-fi-Hinweis im Footer bleibt immer sichtbar. Vollbackups behalten den Hinweis, einschließlich verwalteter und lokaler Nextcloud-Ordner. Bestehende Einstellungen behalten als Standard die bisher aktiven Hinweise.
+- Gemeinsames kompaktes Einfügemenü im Klausur-Builder und EWH-Editor: erst Plus an der Zielstelle, dann Vorlagenbaustein oder leere Unteraufgabe wählen. Auf schmalen Ansichten erscheint eine Schublade.
+- Der Klausuraufbau nutzt die Hauptfläche; die gemeinsame Bausteinbibliothek mit Suche und Filtern öffnet gezielt aus dem Menü. Einfügeorte bleiben über IDs erhalten, fehlende Anker werden abgewiesen.
+- Rubrikänderungen durch Einfügen benötigen bei vorhandenen oder gesperrten Bewertungen eine Bestätigung mit Punktedifferenz. Neue Aufgaben bleiben unbewertet; bestehende Punkte und Bogencheck-Verknüpfungen behalten ihre IDs. Gezieltes Rückgängig schützt inzwischen bewertete oder verknüpfte Aufgaben.
+- Die lokale Vorlagen-, Baustein- und globale Suche gewichtet Titel und Namen, toleriert kleinere Tippfehler und unterstützt Wortanfänge, mehrere Begriffe, genaue Wortgruppen und ausgeschlossene Begriffe. Klarnamen bleiben auf entsperrte Sitzungen begrenzt; die globale Suche unterstützt Pfeiltasten und Escape. Keine zusätzlichen Dienste oder Abhängigkeiten.
+
 ## 1.1.0 – 07.11.2026
 
 - Vorlagen und Bibliotheksaufgaben enthalten keine vorformulierten Antworten oder Bewertungserwartungen mehr. Titel, Antwort, eigene Bewertungskriterien und Punkte sind bereits im Zusammensteller editierbar.

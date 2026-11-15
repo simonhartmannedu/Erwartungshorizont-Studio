@@ -99,7 +99,7 @@ export const EwhWizard = ({ stepIndex, protectedGroupAvailable, classListAvailab
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
             <p className="hero-kicker mb-3 inline-flex items-center gap-2"><WizardIcon />Geführter Ablauf</p>
-            <h2 id="ewh-wizard-title" className="font-display themed-strong text-3xl">EWH-Wizard</h2>
+            <h2 id="ewh-wizard-title" className="app-page-title font-display themed-strong">EWH-Wizard</h2>
             <p className="themed-muted mt-3 text-sm leading-6 sm:text-base">Von der geschützten Klassenliste bis zur druckfertigen Ausgabe – der Wizard führt dich durch den üblichen Ablauf und öffnet immer genau den passenden Arbeitsbereich.</p>
           </div>
           <span className="ewh-wizard-count">{activeIndex + 1} / {steps.length}</span>

@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type MutableRefObject, useMemo, useState } from "react";
 import { ArchiveIcon, CheckIcon, GroupIcon, HomeIcon, LoadingIcon, LockIcon, PencilIcon, PlusIcon, SaveIcon, ScanIcon, SearchIcon, UnlockIcon, WizardIcon } from "../components/icons";
+import { createLocalSearchIndex, searchLocalIndex } from "../utils/localSearch";
 import type { GlobalSearchResult } from "./AppHeader";
 
 export type AppTabId = "home" | "wizard" | "guidedBuilder" | "builder" | "groups" | "bogencheck" | "archive" | "backup";
@@ -72,19 +73,20 @@ const GlobalSearch = ({
   onSearchResultSelect,
 }: Pick<AppNavigationProps, "searchResults" | "onSearchResultSelect">) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("de-DE");
-  const visibleSearchResults = useMemo(
-    () =>
-      normalizedQuery
-        ? searchResults
-            .filter((result) => `${result.label} ${result.detail}`.toLocaleLowerCase("de-DE").includes(normalizedQuery))
-            .slice(0, 7)
-        : [],
-    [normalizedQuery, searchResults],
-  );
+  const normalizedQuery = searchQuery.trim();
+  const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
+  // The parent supplies aliases and only currently unlocked clear names. This
+  // ephemeral index is rebuilt on changes and remounted when that session ends.
+  const searchIndex = useMemo(() => createLocalSearchIndex(searchResults, (result) => [
+    { text: result.label, weight: 10 }, { text: result.detail, weight: 3 },
+  ]), [searchResults]);
+  const visibleSearchResults = useMemo(() => normalizedQuery
+    ? searchLocalIndex(searchIndex, normalizedQuery).slice(0, 7).map((entry) => entry.item) : [],
+  [normalizedQuery, searchIndex]);
   const selectSearchResult = (resultId: string) => {
     onSearchResultSelect(resultId);
     setSearchQuery("");
+    setActiveSearchIndex(-1);
   };
 
   return (
@@ -96,24 +98,35 @@ const GlobalSearch = ({
         <input
           className="field header-control"
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          onChange={(event) => { setSearchQuery(event.target.value); setActiveSearchIndex(-1); }}
           onKeyDown={(event) => {
+            if (event.key === "Escape") { setSearchQuery(""); setActiveSearchIndex(-1); return; }
+            if (["ArrowDown", "ArrowUp"].includes(event.key) && visibleSearchResults.length) {
+              event.preventDefault();
+              setActiveSearchIndex((current) => event.key === "ArrowDown"
+                ? (current + 1) % visibleSearchResults.length : (current <= 0 ? visibleSearchResults.length : current) - 1);
+              return;
+            }
             if (event.key !== "Enter" || !visibleSearchResults[0]) return;
             event.preventDefault();
-            selectSearchResult(visibleSearchResults[0].id);
+            selectSearchResult((visibleSearchResults[activeSearchIndex] ?? visibleSearchResults[0]).id);
           }}
           placeholder="Schüler:in oder Klassenarbeit suchen"
           aria-label="Schüler:innen und Klassenarbeiten durchsuchen"
           aria-controls="global-search-results"
+          aria-autocomplete="list"
+          aria-activedescendant={visibleSearchResults[activeSearchIndex] ? `global-search-option-${activeSearchIndex}` : undefined}
           aria-expanded={visibleSearchResults.length > 0}
         />
       </div>
       {normalizedQuery ? (
         <div id="global-search-results" className="global-search-results" role="listbox" aria-label="Suchergebnisse">
           {visibleSearchResults.length > 0 ? (
-            visibleSearchResults.map((result) => (
+            visibleSearchResults.map((result, index) => (
               <button
                 key={result.id}
+                id={`global-search-option-${index}`}
+                aria-selected={index === activeSearchIndex}
                 type="button"
                 className="global-search-result"
                 role="option"

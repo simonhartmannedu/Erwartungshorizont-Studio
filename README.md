@@ -28,6 +28,12 @@ Die Demo enthält ausschließlich fiktive Daten.
 
 Aufgaben aus integrierten Vorlagen und der Bausteinbibliothek enthalten Aufgabentyp und Punkte. Mögliche Schülerantworten und eigene Bewertungskriterien trägst du selbst ein. Bereits gespeicherte eigene Texte bleiben erhalten. Die Moduswahl steht oben rechts neben den Editor-Reitern. Die individuelle Auswertung und das Inhaltsverzeichnis bleiben beim Korrigieren in der rechten Spalte sichtbar; die Abschlussprüfung findest du unter „Ergebnis & Druck“.
 
+Im Builder und im Editor wählst du zuerst das kleine Plus an der gewünschten Stelle. Im Builder fügt ein Klick auf einen der bis zu drei Vorlagenvorschläge den Baustein sofort ein. „Alle Bausteine durchsuchen“ öffnet die vollständige Bibliothek; Suche und Filter behalten die Einfügestelle bei. Im Editor stehen „Leere Unteraufgabe“ und „Aus Vorlage einfügen …“ zur Wahl. Bei vorhandenen oder nicht einsehbaren geschützten Bewertungen bestätigst du die Rubrikänderung vorher. Neue Unteraufgaben bleiben in bisherigen Korrekturen unbewertet. „Rückgängig“ entfernt nur die neue Aufgabe und ist nach deren Bewertung oder Bogencheck-Verknüpfung nicht mehr verfügbar.
+
+Die Suche in Vorlagen, Bausteinen und der globalen Suche berücksichtigt Titel und Namen stärker als Beschreibung und Kontext. Sie findet auch Wortanfänge und kleinere Tippfehler. Mehrere Begriffe dürfen an verschiedenen Stellen vorkommen; `"Wortgruppe"` sucht eine genaue Wortfolge, `-Begriff` schließt Treffer aus. Die Suchindizes bleiben flüchtig im Browser. Die globale Suche berücksichtigt Klarnamen ausschließlich während einer entsperrten Sitzung; beim Sperren wird auch der Suchindex verworfen. Pfeiltasten wählen globale Treffer aus, Enter öffnet sie, Escape schließt die Suche.
+
+Unter **Einstellungen → Unterstützung → Ko-fi-Popups anzeigen** lassen sich die Popups nach Exporten und Drucken ausschalten. Der Ko-fi-Hinweis im Footer bleibt immer sichtbar. Die Auswahl bleibt lokal in diesem Browser gespeichert und gilt auch im Easy Mode. Nach einem erfolgreichen **Vollbackup** bleibt das Popup aktiv, auch beim Speichern im verwalteten oder lokalen Nextcloud-Ordner. Schuljahr- und Dokumentexporte beachten den Schalter.
+
 Die Bedienung und Grenzen der Korrekturhilfe beschreibt [Automatische Abschlussprüfung](docs/correction-automation-research.md).
 
 ## Projektstatus
