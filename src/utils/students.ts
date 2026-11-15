@@ -1,6 +1,6 @@
 import { CorrectionReview, DraftWorkspace, Exam, SelectedStudentContext, StudentAssessment, StudentDatabase, StudentGroup, StudentParticipationStatus, StudentRecord } from "../types";
 import { clamp } from "./format";
-import { decryptText, encryptText } from "./crypto";
+import { createPasswordVerifier, decryptText, encryptText, verifyPassword } from "./crypto";
 import { reviewAfterScoreChange } from "./correctionReview";
 import { isValidCorrectionReviewShape } from "../infrastructure/validation/persistedData";
 
@@ -406,6 +406,9 @@ export const markStudentPrinted = (
   };
 };
 
+export const getStudentGroupKey = (subject: string, className: string) =>
+  JSON.stringify([subject, className].map((value) => value.trim().toLocaleLowerCase("de-DE")));
+
 export const createStudentGroup = (subject: string, className: string): StudentGroup => ({
   id: crypto.randomUUID(),
   subject,
@@ -416,6 +419,32 @@ export const createStudentGroup = (subject: string, className: string): StudentG
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });
+
+export const copyStudentGroupForSubject = async (
+  source: StudentGroup,
+  sourcePassword: string,
+  subject: string,
+  targetPassword: string,
+): Promise<StudentGroup> => {
+  if (!subject.trim()) throw new Error("Bitte gib das Fach der neuen Lerngruppe ein.");
+  if (!targetPassword.trim()) throw new Error("Bitte vergib ein Passwort für die neue Lerngruppe.");
+  if (!sourcePassword || !await verifyPassword(source.passwordVerifier, source.id, sourcePassword)) {
+    throw new Error("Bitte entsperre die ursprüngliche Klasse erneut, bevor du sie duplizierst.");
+  }
+
+  const copy = createStudentGroup(subject.trim(), source.className);
+  copy.passwordVerifier = await createPasswordVerifier(copy.id, targetPassword);
+  for (const student of source.students) {
+    const fullName = await decryptText(student.encryptedName, sourcePassword);
+    copy.students.push({
+      id: crypto.randomUUID(),
+      alias: student.alias,
+      encryptedName: await encryptText(fullName, targetPassword),
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return copy;
+};
 
 export const addStudentGroup = (database: StudentDatabase, group: StudentGroup): StudentDatabase => ({
   ...database,

@@ -7,6 +7,7 @@ test("passt aufgeklappte Aufgaben ohne horizontale Scrollleisten in den Korrektu
   await page.getByRole("tab", { name: "Korrigieren", exact: true }).click();
   await page.getByRole("button", { name: "Alle aufklappen", exact: true }).click();
   await expect(page.locator(".section-editor").first()).toBeVisible();
+  await expect(page.locator(".section-editor summary").filter({ hasText: "Eigene Bewertungskriterien" })).toHaveCount(0);
 
   for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createPasswordVerifier, encryptText } from "./crypto";
+import { createPasswordVerifier, decryptText, encryptText, verifyPassword } from "./crypto";
 import {
   getStudentParticipationStatus,
   hydrateSensitiveAssessmentsForGroup,
@@ -9,6 +9,11 @@ import {
   updateStudentParticipationStatus,
   encryptAndScrubSensitiveAssessmentsForGroups,
   scrubSensitiveAssessmentsForGroups,
+  addStudentGroup,
+  copyStudentGroupForSubject,
+  createStudentGroup,
+  getStudentAssessment,
+  getStudentGroupKey,
 } from "./students";
 import type { StudentDatabase } from "../types";
 
@@ -19,6 +24,68 @@ beforeAll(() => {
       btoa: (value: string) => Buffer.from(value, "binary").toString("base64"),
       atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
     },
+  });
+});
+
+describe("Klassen für weitere Fächer", () => {
+  it("unterscheidet gleiche Klassennamen nach Fach und ignoriert Großschreibung und äußere Leerzeichen", () => {
+    expect(getStudentGroupKey(" Englisch ", "8A")).toBe(getStudentGroupKey("englisch", " 8a "));
+    expect(getStudentGroupKey("Englisch", "8a")).not.toBe(getStudentGroupKey("Mathematik", "8a"));
+  });
+
+  const createSource = async () => {
+    const group = createStudentGroup("Englisch", "8a");
+    group.passwordVerifier = await createPasswordVerifier(group.id, "quelle-passwort");
+    group.defaultSignatureDataUrl = "data:image/png;base64,quelle";
+    group.students = [{
+      id: "quelle-schueler",
+      alias: "8A-01",
+      encryptedName: await encryptText("Beispiel, Alex", "quelle-passwort"),
+      isAbsent: true,
+      createdAt: "2026-08-18T08:00:00.000Z",
+    }];
+    return group;
+  };
+
+  it("kopiert die Liste mit neuen IDs und eigenem Zugang ohne Bewertungen oder Abwesenheiten zu übernehmen", async () => {
+    const source = await createSource();
+    const before = JSON.stringify(source);
+    const copy = await copyStudentGroupForSubject(source, "quelle-passwort", " Mathematik ", "ziel-passwort");
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.subject).toBe("Mathematik");
+    expect(copy.className).toBe(source.className);
+    expect(copy.students.map((student) => student.alias)).toEqual(source.students.map((student) => student.alias));
+    expect(copy.students[0].id).not.toBe(source.students[0].id);
+    expect(copy.students[0].isAbsent).toBeUndefined();
+    expect(copy.defaultSignatureDataUrl).toBeNull();
+    await expect(decryptText(copy.students[0].encryptedName, "ziel-passwort")).resolves.toBe("Beispiel, Alex");
+    await expect(decryptText(copy.students[0].encryptedName, "quelle-passwort")).rejects.toThrow();
+    await expect(verifyPassword(copy.passwordVerifier, copy.id, "ziel-passwort")).resolves.toBe(true);
+    const database: StudentDatabase = {
+      version: 1, groups: [source], updatedAt: source.updatedAt,
+      assessments: { "quelle-schueler": {
+        workspaceId: null, studentId: "quelle-schueler", taskScores: { aufgabe: 4 },
+        teacherComment: "Quellkommentar", updatedAt: source.updatedAt, printedAt: null,
+      } },
+    };
+    const withCopy = addStudentGroup(database, copy);
+    expect(withCopy.assessments).toBe(database.assessments);
+    expect(getStudentAssessment(withCopy, copy.students[0].id).taskScores).toEqual({});
+    expect(getStudentAssessment(withCopy, copy.students[0].id).teacherComment).toBe("");
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it("weist falsche oder fehlende Passwörter und beschädigte Namen ohne Änderung der Quelle zurück", async () => {
+    const source = await createSource();
+    const before = JSON.stringify(source);
+    for (const sourcePassword of ["", "falsches-passwort"]) {
+      await expect(copyStudentGroupForSubject(source, sourcePassword, "Mathematik", "ziel-passwort")).rejects.toThrow("entsperre");
+    }
+    await expect(copyStudentGroupForSubject(source, "quelle-passwort", "Mathematik", "")).rejects.toThrow("Passwort");
+    await expect(copyStudentGroupForSubject(source, "quelle-passwort", " ", "ziel-passwort")).rejects.toThrow("Fach");
+    const damaged = { ...source, students: [{ ...source.students[0], encryptedName: { ciphertext: "AA==", iv: "AA==", salt: "AA==" } }] };
+    await expect(copyStudentGroupForSubject(damaged, "quelle-passwort", "Mathematik", "ziel-passwort")).rejects.toThrow();
+    expect(JSON.stringify(source)).toBe(before);
   });
 });
 

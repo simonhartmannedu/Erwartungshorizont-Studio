@@ -97,6 +97,8 @@ import {
   addStudentToGroup,
   buildExamForStudent,
   createStudentGroup,
+  copyStudentGroupForSubject,
+  getStudentGroupKey,
   getStudentAssessment,
   getStudentCorrectionStatus,
   getStudentParticipationStatus,
@@ -3048,16 +3050,47 @@ function App() {
     setStudentDatabase((current) => setStudentOrderInGroup(current, groupId, orderedStudentIds));
   };
 
+  const handleDuplicateGroup = async (
+    groupId: string,
+    subject: string,
+    access: { mode: GroupAccessMode; password?: string },
+  ) => {
+    const source = getStudentGroup(studentDatabaseRef.current, groupId);
+    if (!source) throw new Error("Die ursprüngliche Klasse ist nicht mehr vorhanden.");
+    const targetKey = getStudentGroupKey(subject, source.className);
+    const checkTarget = () => {
+      if (studentDatabaseRef.current.groups.some((group) => getStudentGroupKey(group.subject, group.className) === targetKey)) {
+        throw new Error(`Die Lerngruppe ${subject.trim()} · ${source.className} gibt es bereits. Bitte wähle ein anderes Fach.`);
+      }
+    };
+    checkTarget();
+    const token = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
+    const copy = await copyStudentGroupForSubject(source, unlockedGroupPasswordsRef.current[groupId] ?? "", subject, token);
+    checkTarget();
+    if (!getStudentGroup(studentDatabaseRef.current, groupId)) {
+      throw new Error("Die ursprüngliche Klasse wurde während des Duplizierens entfernt. Bitte versuche es erneut.");
+    }
+    setStudentDatabase((current) => addStudentGroup(current, copy));
+    unlockedGroupPasswordsRef.current = { ...unlockedGroupPasswordsRef.current, [copy.id]: token };
+    setUnlockedGroupIds((current) => [...current, copy.id]);
+    setActiveGroupId(copy.id);
+    setActiveStudentId(copy.students[0]?.id ?? "");
+    if (access.mode === "generated") {
+      setPendingSecurityTokenCards([{ groupId: copy.id, subject: copy.subject, className: copy.className, token }]);
+    }
+    pushNotice("success", "Klasse dupliziert", `${copy.subject} · ${copy.className} wurde mit ${copy.students.length} Schülern angelegt.`);
+  };
+
   const handleRenameGroup = (groupId: string, nextClassName: string) => {
     const group = getStudentGroup(studentDatabase, groupId);
     const className = nextClassName.trim();
     if (!group || !className || className === group.className) return false;
 
     const duplicate = studentDatabase.groups.some(
-      (entry) => entry.id !== groupId && entry.className.trim().toLocaleLowerCase("de-DE") === className.toLocaleLowerCase("de-DE"),
+      (entry) => entry.id !== groupId && getStudentGroupKey(entry.subject, entry.className) === getStudentGroupKey(group.subject, className),
     );
     if (duplicate) {
-      pushNotice("warning", "Klassenbezeichnung bereits vorhanden", `Eine Lerngruppe mit der Bezeichnung ${className} gibt es bereits.`);
+      pushNotice("warning", "Klassenbezeichnung bereits vorhanden", `Die Lerngruppe ${group.subject} · ${className} gibt es bereits.`);
       return false;
     }
 
@@ -3704,27 +3737,28 @@ function App() {
     const importedStudentsPerClass = new Map<string, number>();
     const generatedSecurityTokens: SecurityTokenCard[] = [];
     const skippedClasses = new Set<string>();
-    const groupByClassName = new Map(
-      nextDatabase.groups.map((group) => [group.className.trim().toLocaleLowerCase("de-DE"), group]),
+    const importSubject = subject.trim() || exam.meta.course || "Englisch";
+    const groupBySubjectAndClass = new Map(
+      nextDatabase.groups.map((group) => [getStudentGroupKey(group.subject, group.className), group]),
     );
 
     for (const row of rows) {
       const className = row.className.trim();
-      const classKey = className.toLocaleLowerCase("de-DE");
-      let group = groupByClassName.get(classKey) ?? null;
+      const classKey = getStudentGroupKey(importSubject, className);
+      let group = groupBySubjectAndClass.get(classKey) ?? null;
 
       if (!group) {
         if (access.mode === "manual" && !access.password?.trim()) {
           throw new Error("Für neue Klassen wird ein Import-Passwort benötigt. Bitte gib ein Passwort ein oder verwende ein automatisch erzeugtes Security-Token.");
         }
 
-        group = createStudentGroup(subject.trim() || exam.meta.course || "Englisch", className);
+        group = createStudentGroup(importSubject, className);
         const nextToken = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
         group.passwordVerifier = await createPasswordVerifier(group.id, nextToken);
         nextDatabase = addStudentGroup(nextDatabase, group);
         nextUnlockedPasswords[group.id] = nextToken;
         passwordCache.set(group.id, nextToken);
-        groupByClassName.set(classKey, group);
+        groupBySubjectAndClass.set(classKey, group);
         if (access.mode === "generated") {
           generatedSecurityTokens.push({
             groupId: group.id,
@@ -3772,7 +3806,7 @@ function App() {
 
       const updatedGroup = getStudentGroup(nextDatabase, group.id);
       if (updatedGroup) {
-        groupByClassName.set(classKey, updatedGroup);
+        groupBySubjectAndClass.set(classKey, updatedGroup);
         group = updatedGroup;
       }
 
@@ -3789,7 +3823,7 @@ function App() {
 
     const firstImportedClassName = importedStudentsPerClass.keys().next().value as string | undefined;
     if (firstImportedClassName) {
-      const importedGroup = nextDatabase.groups.find((group) => group.className === firstImportedClassName);
+      const importedGroup = groupBySubjectAndClass.get(getStudentGroupKey(importSubject, firstImportedClassName));
       if (importedGroup) {
         setActiveGroupId(importedGroup.id);
         const lastImportedStudent = importedGroup.students[importedGroup.students.length - 1] ?? null;
@@ -4752,6 +4786,7 @@ function App() {
                 onRevealGroupStudentNames={handleRevealGroupStudentNames}
                 onApplyStudentOrder={handleApplyStudentOrder}
                 onRenameGroup={handleRenameGroup}
+                onDuplicateGroup={handleDuplicateGroup}
               />
             )}
             </div>

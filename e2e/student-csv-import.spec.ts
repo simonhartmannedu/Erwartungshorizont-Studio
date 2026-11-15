@@ -117,3 +117,99 @@ test("explains skipped locked classes and reports partial imports accurately", a
   await expect(page.getByRole("button", { name: "CSV-Testfach · 5csv", exact: true })).toBeVisible();
   await expect(lockedGroup).toContainText("1 Schülercodes in dieser Liste.");
 });
+
+test("imports the same class independently for two subjects and selects the correct group", async ({ page }) => {
+  const importer = page.locator("#group-import");
+  const fileInput = importer.locator('input[type="file"]');
+  const completeImport = importer.getByRole("button", { name: "Import abschließen", exact: true });
+  const file = {
+    name: "klasse-8fach.csv", mimeType: "text/csv",
+    buffer: Buffer.from("Nachname;Vorname;Klasse\nBeispiel;Alex;8fach\nMüller;Mia;8fach"),
+  };
+  await importer.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
+  await importer.getByPlaceholder("Passwort fuer neu importierte Klassen").fill("e2e-englisch-passwort");
+  await importer.getByLabel("Fach für importierte Klassen").fill("Englisch");
+  await fileInput.setInputFiles(file);
+  await completeImport.click();
+  await expect(importer.getByRole("status")).toContainText("Import abgeschlossen: 2 Schüler.");
+  const english = page.getByRole("button", { name: "Englisch · 8fach", exact: true }).locator("xpath=ancestor::section[1]");
+  await expect(english).toContainText("2 Schülercodes in dieser Liste.");
+
+  await importer.getByLabel("Fach für importierte Klassen").fill("Mathematik");
+  await importer.getByPlaceholder("Passwort fuer neu importierte Klassen").fill("e2e-mathe-passwort");
+  await fileInput.setInputFiles(file);
+  await completeImport.click();
+  await expect(importer.getByRole("status")).toContainText("Import abgeschlossen: 2 Schüler.");
+  const maths = page.getByRole("button", { name: "Mathematik · 8fach", exact: true }).locator("xpath=ancestor::section[1]");
+  await expect(maths.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await expect(maths).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(english).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(english).toContainText("Nur Schülercodes sichtbar");
+
+  // A locked class in the same subject must still require unlocking.
+  await importer.getByLabel("Fach für importierte Klassen").fill(" englisch ");
+  await fileInput.setInputFiles(file);
+  await completeImport.click();
+  await expect(importer.getByRole("alert")).toContainText("Übersprungen: 8fach.");
+  await expect(english).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(maths).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(page.getByRole("button", { name: / · 8fach$/ })).toHaveCount(2);
+});
+
+test("duplicates a class for another subject with independent students and access protection", async ({ page }) => {
+  const importer = page.locator("#group-import");
+  await importer.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
+  await importer.getByPlaceholder("Passwort fuer neu importierte Klassen").fill("e2e-quelle-passwort");
+  await importer.getByLabel("Fach für importierte Klassen").fill("Englisch");
+  await importer.locator('input[type="file"]').setInputFiles({
+    name: "klasse-9dup.csv", mimeType: "text/csv",
+    buffer: Buffer.from("Nachname;Vorname;Klasse\nBeispiel;Alex;9dup\nMüller;Mia;9dup"),
+  });
+  await importer.getByRole("button", { name: "Import abschließen", exact: true }).click();
+  await expect(importer.getByRole("status")).toContainText("Import abgeschlossen: 2 Schüler.");
+  const source = page.getByRole("button", { name: "Englisch · 9dup", exact: true }).locator("xpath=ancestor::section[1]");
+  const sourceIds = await source.locator('[id^="student-roster-row-"]').evaluateAll((rows) => rows.map((row) => row.id));
+  expect(sourceIds).toHaveLength(2);
+  await source.getByRole("button", { name: "Klasse duplizieren", exact: true }).click();
+  const form = page.getByRole("form", { name: "Klasse für weiteres Fach duplizieren" });
+  await form.getByLabel("Fach der neuen Lerngruppe").fill(" englisch ");
+  await form.getByRole("button", { name: "Für weiteres Fach anlegen", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText("gibt es bereits");
+  await form.getByLabel("Fach der neuen Lerngruppe").fill("Mathematik");
+  await form.getByRole("button", { name: "Für weiteres Fach anlegen", exact: true }).click();
+  const tokenDialog = page.locator(".dialog-panel").filter({ has: page.getByRole("heading", { name: "Security-Token sichern" }) });
+  await expect(tokenDialog.getByText("Mathematik · 9dup", { exact: true })).toBeVisible();
+  await tokenDialog.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  await expect(form).toHaveCount(0);
+  const maths = page.getByRole("button", { name: "Mathematik · 9dup", exact: true }).locator("xpath=ancestor::section[1]");
+  await expect(maths.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await expect(maths.locator("tbody tr")).toHaveCount(2);
+  await expect(maths.locator("tbody tr").first()).toContainText("Beispiel, Alex");
+  await expect(maths.locator("tbody tr").first()).toContainText("9DUP-01");
+  const targetIds = await maths.locator('[id^="student-roster-row-"]').evaluateAll((rows) => rows.map((row) => row.id));
+  expect(targetIds.every((id) => !sourceIds.includes(id))).toBe(true);
+  await expect(source).toContainText("2 Schülercodes in dieser Liste.");
+
+  await source.getByRole("button", { name: "Klasse duplizieren", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText("entsperre sie oben über das Schloss");
+  await expect(form.getByRole("button", { name: "Für weiteres Fach anlegen", exact: true })).toBeDisabled();
+  await form.getByRole("button", { name: "Abbrechen", exact: true }).click();
+
+  await maths.getByRole("button", { name: "Klasse duplizieren", exact: true }).click();
+  await form.getByLabel("Fach der neuen Lerngruppe").fill("Physik");
+  await form.getByRole("switch", { name: "Automatisches Security-Token verwenden" }).click();
+  await form.getByRole("button", { name: "Für weiteres Fach anlegen", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText("Bitte vergib ein Passwort");
+  await form.getByLabel("Passwort der neuen Lerngruppe").fill("e2e-physik-passwort");
+  await form.getByRole("button", { name: "Für weiteres Fach anlegen", exact: true }).click();
+  await expect(form).toHaveCount(0);
+  const physics = page.getByRole("button", { name: "Physik · 9dup", exact: true }).locator("xpath=ancestor::section[1]");
+  await expect(physics).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(physics.locator("tbody tr").first()).toContainText("Beispiel, Alex");
+  await expect(page.locator(".local-save-status")).toHaveClass(/local-save-status-saved/);
+  await page.reload();
+  await page.getByRole("tab", { name: "Lerngruppen" }).click();
+  await expect(source).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(maths).toContainText("2 Schülercodes in dieser Liste.");
+  await expect(physics).toContainText("2 Schülercodes in dieser Liste.");
+});

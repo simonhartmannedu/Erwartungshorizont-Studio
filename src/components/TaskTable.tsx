@@ -146,7 +146,7 @@ export const TaskTable = ({
                 placeholder="Stichpunkte oder mögliche Schülerantwort"
               />
             </Field>
-            {renderOwnCriteria(task)}
+            {!showScores && renderOwnCriteria(task)}
             <div className={`grid gap-3 ${showScores ? "grid-cols-2" : ""}`}>
               <Field label="Max.">
                 <NumberInput
@@ -228,7 +228,7 @@ export const TaskTable = ({
                         onValueChange={(value) => onChange(task.id, { description: value })}
                         placeholder="Stichpunkte oder mögliche Schülerantwort"
                       />
-                      {renderOwnCriteria(task)}
+                      {!showScores && renderOwnCriteria(task)}
                     </div>
                   </td>
                   <td className="px-3 py-3">

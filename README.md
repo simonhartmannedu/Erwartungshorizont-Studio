@@ -26,6 +26,10 @@ Damit kannst du:
 
 Die Demo enthält ausschließlich fiktive Daten.
 
+Beim Klassenimport wählst du zuerst eine CSV- oder TXT-Datei und klickst dann auf **Import abschließen**. Lerngruppen werden anhand von **Fach und Klasse** zugeordnet: Dieselbe Klasse kann z. B. für Englisch und Mathematik getrennt importiert werden. Vorhandene Lerngruppen desselben Fachs müssen zum Ergänzen entsperrt sein. Fehler und übersprungene Klassen werden direkt beim Import erklärt.
+
+Mit **Klasse duplizieren** an einer Klassenliste übernimmst du eine entsperrte Klasse für ein weiteres Fach. Schülerliste, Reihenfolge und Schülercodes bleiben erhalten; die Kopie erhält neue Schüler-IDs und ein eigenes Passwort oder Security-Token. Bewertungen, Teilnahme, Unterschriften und Klassenarbeiten werden nicht kopiert. Beide Lerngruppen lassen sich anschließend unabhängig bearbeiten und werden wie bisher lokal gespeichert und gesichert; bestehende Daten brauchen keine Umwandlung.
+
 Aufgaben aus integrierten Vorlagen und der Bausteinbibliothek enthalten Aufgabentyp und Punkte. Mögliche Schülerantworten und eigene Bewertungskriterien trägst du selbst ein. Bereits gespeicherte eigene Texte bleiben erhalten. Die Moduswahl steht oben rechts neben den Editor-Reitern. Die individuelle Auswertung und das Inhaltsverzeichnis bleiben beim Korrigieren in der rechten Spalte sichtbar; die Abschlussprüfung findest du unter „Ergebnis & Druck“.
 
 Im Builder und im Editor wählst du zuerst das kleine Plus an der gewünschten Stelle. Im Builder fügt ein Klick auf einen der bis zu drei Vorlagenvorschläge den Baustein sofort ein. „Alle Bausteine durchsuchen“ öffnet die vollständige Bibliothek; Suche und Filter behalten die Einfügestelle bei. Im Editor stehen „Leere Unteraufgabe“ und „Aus Vorlage einfügen …“ zur Wahl. Bei vorhandenen oder nicht einsehbaren geschützten Bewertungen bestätigst du die Rubrikänderung vorher. Neue Unteraufgaben bleiben in bisherigen Korrekturen unbewertet. „Rückgängig“ entfernt nur die neue Aufgabe und ist nach deren Bewertung oder Bogencheck-Verknüpfung nicht mehr verfügbar.

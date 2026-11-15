@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   DownloadIcon,
+  DuplicateIcon,
   EyeIcon,
   GroupIcon,
   PlusIcon,
@@ -44,6 +45,7 @@ interface Props {
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   onApplyStudentOrder: (groupId: string, orderedStudentIds: string[]) => void;
   onRenameGroup: (groupId: string, className: string) => boolean;
+  onDuplicateGroup: (groupId: string, subject: string, access: { mode: GroupAccessMode; password?: string }) => Promise<void>;
 }
 
 const collator = new Intl.Collator("de-DE", { sensitivity: "base", numeric: true });
@@ -171,6 +173,7 @@ export const StudentRosterPanel = ({
   onRevealGroupStudentNames,
   onApplyStudentOrder,
   onRenameGroup,
+  onDuplicateGroup,
 }: Props) => {
   const [subject, setSubject] = useState("");
   const [className, setClassName] = useState("");
@@ -196,6 +199,13 @@ export const StudentRosterPanel = ({
   >({});
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [renamedClassName, setRenamedClassName] = useState("");
+  const [duplicateGroupId, setDuplicateGroupId] = useState<string | null>(null);
+  const [duplicateSubject, setDuplicateSubject] = useState("");
+  const [duplicateAccessMode, setDuplicateAccessMode] = useState<GroupAccessMode>("generated");
+  const [duplicatePassword, setDuplicatePassword] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
+  const duplicatingRef = useRef(false);
+  const [duplicateError, setDuplicateError] = useState("");
 
   useEffect(() => {
     setImportSubject((current) => current || defaultImportSubject);
@@ -724,6 +734,22 @@ export const StudentRosterPanel = ({
                         />
                         <button
                           type="button"
+                          className="button-secondary gap-2 px-3 py-2 text-xs"
+                          disabled={duplicating}
+                          onClick={() => {
+                            setCollapsedGroupIds((current) => current.filter((entry) => entry !== group.id));
+                            setDuplicateGroupId(group.id);
+                            setDuplicateSubject("");
+                            setDuplicateAccessMode("generated");
+                            setDuplicatePassword("");
+                            setDuplicateError("");
+                          }}
+                        >
+                          <DuplicateIcon className="h-4 w-4" />
+                          Klasse duplizieren
+                        </button>
+                        <button
+                          type="button"
                           className="button-secondary px-3 py-2 text-xs"
                           onClick={() => {
                             setCollapsedGroupIds((current) => current.filter((entry) => entry !== group.id));
@@ -748,6 +774,64 @@ export const StudentRosterPanel = ({
 
                     {!isCollapsed && (
                       <div className="border-t px-5 py-5" style={{ borderColor: "var(--app-border)" }}>
+                        {duplicateGroupId === group.id && (
+                          <form
+                            aria-label="Klasse für weiteres Fach duplizieren"
+                            className="surface-muted mb-5 space-y-3 rounded-2xl p-4"
+                            onSubmit={async (event) => {
+                              event.preventDefault();
+                              if (duplicatingRef.current || !isUnlocked || !duplicateSubject.trim()) return;
+                              duplicatingRef.current = true;
+                              setDuplicating(true);
+                              setDuplicateError("");
+                              try {
+                                await onDuplicateGroup(group.id, duplicateSubject, {
+                                  mode: duplicateAccessMode,
+                                  password: duplicateAccessMode === "manual" ? duplicatePassword : undefined,
+                                });
+                                setDuplicateGroupId(null);
+                                setDuplicatePassword("");
+                              } catch (error) {
+                                setDuplicateError(error instanceof Error ? error.message : "Die Klasse konnte nicht dupliziert werden. Bitte versuche es erneut.");
+                              } finally {
+                                duplicatingRef.current = false;
+                                setDuplicating(false);
+                              }
+                            }}
+                          >
+                            <p className="themed-strong text-sm font-semibold">{group.className} für ein weiteres Fach übernehmen</p>
+                            <p className="themed-muted text-xs leading-5">Schülerliste und Schülercodes werden übernommen. Bewertungen und Klassenarbeiten bleiben beim bisherigen Fach. Die neue Lerngruppe erhält einen eigenen Zugangsschutz.</p>
+                            {!isUnlocked && <p role="alert" className="themed-muted text-sm">Aktiviere diese Klasse und entsperre sie oben über das Schloss, um die Schülerliste zu übernehmen.</p>}
+                            <fieldset disabled={duplicating} className="min-w-0 space-y-3" aria-busy={duplicating}>
+                              <Field label="Fach der neuen Lerngruppe">
+                                <input className="field" value={duplicateSubject} placeholder="z. B. Mathematik" onChange={(event) => setDuplicateSubject(event.target.value)} />
+                              </Field>
+                              <Field as="div" label="Zugangsschutz der neuen Lerngruppe">
+                                <GroupAccessToggle mode={duplicateAccessMode} onChange={(mode) => {
+                                  setDuplicateAccessMode(mode);
+                                  if (mode === "generated") setDuplicatePassword("");
+                                }} />
+                              </Field>
+                              {duplicateAccessMode === "manual" && (
+                                <Field label="Passwort der neuen Lerngruppe">
+                                  <input className="field" type="password" value={duplicatePassword} onChange={(event) => setDuplicatePassword(event.target.value)} />
+                                </Field>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                <button type="submit" className="button-primary gap-2 text-sm" disabled={!isUnlocked || !duplicateSubject.trim()}>
+                                  <DuplicateIcon className="h-4 w-4" />
+                                  {duplicating ? "Klasse wird dupliziert …" : "Für weiteres Fach anlegen"}
+                                </button>
+                                <button type="button" className="button-secondary text-sm" onClick={() => {
+                                  setDuplicateGroupId(null);
+                                  setDuplicatePassword("");
+                                }}>Abbrechen</button>
+                              </div>
+                            </fieldset>
+                            {duplicateError && <p role="alert" className="badge-rose rounded-2xl p-3 text-sm">{duplicateError}</p>}
+                            {duplicating && <p role="status" className="themed-muted text-sm">Die Schülerliste wird für das neue Fach angelegt und verschlüsselt …</p>}
+                          </form>
+                        )}
                         {renamingGroupId === group.id ? (
                           <form
                             className="surface-muted mb-5 flex flex-wrap items-end gap-3 rounded-2xl p-4"
