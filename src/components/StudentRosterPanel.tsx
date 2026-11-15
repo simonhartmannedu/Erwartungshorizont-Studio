@@ -1,6 +1,6 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DraftWorkspace, GroupAccessMode, StudentDatabase, StudentGroup, StudentRecord } from "../types";
-import { ImportSortOptions } from "../utils/studentImport";
+import { ImportSortOptions, StudentImportResult } from "../utils/studentImport";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -39,7 +39,7 @@ interface Props {
     access: { mode: GroupAccessMode; password?: string },
     subject: string,
     sortOptions: ImportSortOptions,
-  ) => void;
+  ) => Promise<StudentImportResult>;
   onRemoveGroup: (groupId: string, groupLabel: string, studentCount: number) => void;
   onRevealGroupStudentNames: (groupId: string) => Promise<Record<string, string>>;
   onApplyStudentOrder: (groupId: string, orderedStudentIds: string[]) => void;
@@ -182,6 +182,10 @@ export const StudentRosterPanel = ({
   const [importSubject, setImportSubject] = useState(defaultImportSubject);
   const [importSortField, setImportSortField] = useState<ImportSortOptions["field"]>("lastName");
   const [importSortDirection, setImportSortDirection] = useState<ImportSortOptions["direction"]>("ascending");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importInFlightRef = useRef(false);
+  const [importFeedback, setImportFeedback] = useState<{ tone: "success" | "warning" | "danger"; message: string } | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<string[]>([]);
   const [studentDraftsByGroupId, setStudentDraftsByGroupId] = useState<Record<string, { alias: string; fullName: string }>>({});
   const [pendingStudentDelete, setPendingStudentDelete] = useState<{ groupId: string; studentId: string; label: string } | null>(null);
@@ -272,17 +276,42 @@ export const StudentRosterPanel = ({
   const totalStudents = database.groups.reduce((sum, group) => sum + group.students.length, 0);
   const activeGroupLabel = activeGroup ? `${activeGroup.subject} · ${activeGroup.className}` : "Keine Lerngruppe aktiv";
 
-  const handleStudentImport = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    onImportStudents(file, {
-      mode: importAccessMode,
-      password: importAccessMode === "manual" ? importPassword.trim() : undefined,
-    }, importSubject.trim() || defaultImportSubject, {
-      field: importSortField,
-      direction: importSortDirection,
-    });
+    setImportFile(file);
+    setImportFeedback(null);
     event.target.value = "";
+  };
+
+  const handleStudentImport = async () => {
+    if (!importFile || importInFlightRef.current) return;
+
+    importInFlightRef.current = true;
+    setImporting(true);
+    setImportFeedback(null);
+    try {
+      const result = await onImportStudents(importFile, {
+        mode: importAccessMode,
+        password: importAccessMode === "manual" ? importPassword.trim() : undefined,
+      }, importSubject.trim() || defaultImportSubject, {
+        field: importSortField,
+        direction: importSortDirection,
+      });
+      setImportFeedback({
+        tone: result.importedCount === 0 ? "danger" : result.skippedClassCount > 0 ? "warning" : "success",
+        message: result.message,
+      });
+      if (result.importedCount > 0) setImportFile(null);
+    } catch (error) {
+      const reason = error instanceof Error && error.message
+        ? error.message
+        : "Die Datei konnte nicht gelesen oder die Schülerdaten konnten nicht verschlüsselt werden. Bitte versuche es erneut.";
+      setImportFeedback({ tone: "danger", message: `Import fehlgeschlagen: ${reason}` });
+    } finally {
+      importInFlightRef.current = false;
+      setImporting(false);
+    }
   };
 
   const toggleGroupSection = (groupId: string) => {
@@ -457,7 +486,7 @@ export const StudentRosterPanel = ({
               <p className="themed-muted mt-3 text-sm leading-6">
                 Die App legt für jede Klasse eine Lerngruppe an und erzeugt Schülercodes. Du kannst die Sortierung vor dem Import festlegen.
               </p>
-              <div className="mt-4 grid gap-3">
+              <fieldset disabled={importing} className="mt-4 grid min-w-0 gap-3" aria-busy={importing}>
                 <Field label="Fach für importierte Klassen">
                   <input
                     className="field"
@@ -510,16 +539,28 @@ export const StudentRosterPanel = ({
                     </select>
                   </Field>
                 </div>
-                <label className="button-primary w-full cursor-pointer gap-2 sm:w-auto">
+                <label className={`button-secondary w-full gap-2 sm:w-auto ${importing ? "cursor-wait opacity-50" : "cursor-pointer"}`}>
                   <UploadIcon />
-                  Klassenliste importieren
+                  {importFile ? "Andere Klassenliste auswählen" : "Klassenliste auswählen"}
                   <input
                     type="file"
                     accept=".csv,.txt,text/csv,text/plain"
                     className="hidden"
-                    onChange={handleStudentImport}
+                    onChange={handleImportFileSelection}
                   />
                 </label>
+                {importFile && (
+                  <p className="themed-muted break-words text-sm">Ausgewählte Klassenliste: <strong>{importFile.name}</strong></p>
+                )}
+                <button
+                  type="button"
+                  className="button-primary w-full gap-2 sm:w-auto"
+                  disabled={!importFile || importing}
+                  onClick={() => void handleStudentImport()}
+                >
+                  <UploadIcon />
+                  {importing ? "Import läuft …" : "Import abschließen"}
+                </button>
                 <a
                   className="button-secondary w-full gap-2 sm:w-auto"
                   href={`${import.meta.env.BASE_URL}klassenimport-vorlage.csv`}
@@ -528,7 +569,16 @@ export const StudentRosterPanel = ({
                   <DownloadIcon />
                   CSV-Vorlage herunterladen
                 </a>
-              </div>
+              </fieldset>
+              {importing && <p role="status" className="status-note mt-3 text-sm">Die Klassen werden angelegt und die Schülerdaten verschlüsselt. Bitte warten …</p>}
+              {importFeedback && (
+                <p
+                  role={importFeedback.tone === "danger" ? "alert" : "status"}
+                  className={`mt-3 break-words rounded-2xl p-4 text-sm leading-6 ${importFeedback.tone === "danger" ? "badge-rose" : importFeedback.tone === "warning" ? "badge-amber" : "badge-emerald"}`}
+                >
+                  {importFeedback.message}
+                </p>
+              )}
               <p className="status-note mt-3 text-xs leading-5">
                 Erwartete Spalten: <strong>Nachname</strong>, <strong>Name/Vorname</strong>, <strong>Klasse</strong>. Alternativ funktioniert eine TXT/CSV-Liste ohne Kopfzeile im Format <strong>Nachname, Vorname, Klasse</strong>. Die Vorlage enthält drei Beispieldatensätze.
               </p>

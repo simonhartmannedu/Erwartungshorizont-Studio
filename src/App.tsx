@@ -145,7 +145,7 @@ import {
   prepareFileSave,
   resolveCommentTemplate,
 } from "./utils/export";
-import { ImportSortOptions, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
+import { ImportSortOptions, StudentImportResult, buildStudentAlias, parseStudentImportFile, sortImportedStudentRows } from "./utils/studentImport";
 import { generateSecurityToken, SecurityTokenCard } from "./utils/securityTokens";
 import { ExamHeaderForm } from "./components/ExamHeaderForm";
 import { TaskInsertion } from "./components/TaskInsertion";
@@ -3687,138 +3687,130 @@ function App() {
     }
   };
 
-  const handleImportStudents = (
+  const handleImportStudents = async (
     file: File,
     access: { mode: GroupAccessMode; password?: string },
     subject: string,
     sortOptions: ImportSortOptions,
-  ) => {
-    void (async () => {
-      try {
-        const rows = sortImportedStudentRows(await parseStudentImportFile(file), sortOptions);
-        if (rows.length === 0) {
-          pushNotice("warning", "Keine gültigen Schülerdaten", "Die Importdatei enthält keine gültigen Schülerdaten.");
-          return;
+  ): Promise<StudentImportResult> => {
+    const rows = sortImportedStudentRows(await parseStudentImportFile(file), sortOptions);
+    if (rows.length === 0) {
+      throw new Error("Die Importdatei enthält keine gültigen Schülerdaten.");
+    }
+
+    let nextDatabase = studentDatabaseRef.current;
+    const nextUnlockedPasswords = { ...unlockedGroupPasswordsRef.current };
+    const passwordCache = new Map<string, string>();
+    const importedStudentsPerClass = new Map<string, number>();
+    const generatedSecurityTokens: SecurityTokenCard[] = [];
+    const skippedClasses = new Set<string>();
+    const groupByClassName = new Map(
+      nextDatabase.groups.map((group) => [group.className.trim().toLocaleLowerCase("de-DE"), group]),
+    );
+
+    for (const row of rows) {
+      const className = row.className.trim();
+      const classKey = className.toLocaleLowerCase("de-DE");
+      let group = groupByClassName.get(classKey) ?? null;
+
+      if (!group) {
+        if (access.mode === "manual" && !access.password?.trim()) {
+          throw new Error("Für neue Klassen wird ein Import-Passwort benötigt. Bitte gib ein Passwort ein oder verwende ein automatisch erzeugtes Security-Token.");
         }
 
-        let nextDatabase = studentDatabase;
-        const nextUnlockedPasswords = { ...unlockedGroupPasswordsRef.current };
-        const passwordCache = new Map<string, string>();
-        const importedStudentsPerClass = new Map<string, number>();
-        const generatedSecurityTokens: SecurityTokenCard[] = [];
-        const skippedClasses = new Set<string>();
-        const groupByClassName = new Map(
-          nextDatabase.groups.map((group) => [group.className.trim().toLocaleLowerCase("de-DE"), group]),
-        );
-
-        for (const row of rows) {
-          const className = row.className.trim();
-          const classKey = className.toLocaleLowerCase("de-DE");
-          let group = groupByClassName.get(classKey) ?? null;
-
-          if (!group) {
-            if (access.mode === "manual" && !access.password?.trim()) {
-              throw new Error("Fuer neue Klassen wird ein Import-Passwort benoetigt.");
-            }
-
-            group = createStudentGroup(subject.trim() || exam.meta.course || "Englisch", className);
-            const nextToken = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
-            group.passwordVerifier = await createPasswordVerifier(group.id, nextToken);
-            nextDatabase = addStudentGroup(nextDatabase, group);
-            nextUnlockedPasswords[group.id] = nextToken;
-            passwordCache.set(group.id, nextToken);
-            groupByClassName.set(classKey, group);
-            if (access.mode === "generated") {
-              generatedSecurityTokens.push({
-                groupId: group.id,
-                subject: group.subject,
-                className: group.className,
-                token: nextToken,
-              });
-            }
-          }
-
-          if (!group.passwordVerifier) {
-            skippedClasses.add(group.className);
-            continue;
-          }
-
-          const password = passwordCache.get(group.id) ?? nextUnlockedPasswords[group.id] ?? "";
-          if (!password) {
-            skippedClasses.add(group.className);
-            continue;
-          }
-
-          const isValidPassword = await verifyPassword(group.passwordVerifier, group.id, password);
-          if (!isValidPassword) {
-            skippedClasses.add(group.className);
-            delete nextUnlockedPasswords[group.id];
-            continue;
-          }
-
-          passwordCache.set(group.id, password);
-
-          const alias = buildStudentAlias(
-            group.className,
-            group.students.length + 1,
-            new Set(group.students.map((student) => student.alias)),
-          );
-          const encryptedName = await encryptText(`${row.lastName}, ${row.firstName}`, password);
-          const studentId = crypto.randomUUID();
-
-          nextDatabase = addStudentToGroup(nextDatabase, group.id, {
-            id: studentId,
-            alias,
-            encryptedName,
-            createdAt: new Date().toISOString(),
+        group = createStudentGroup(subject.trim() || exam.meta.course || "Englisch", className);
+        const nextToken = access.mode === "generated" ? generateSecurityToken() : access.password?.trim() ?? "";
+        group.passwordVerifier = await createPasswordVerifier(group.id, nextToken);
+        nextDatabase = addStudentGroup(nextDatabase, group);
+        nextUnlockedPasswords[group.id] = nextToken;
+        passwordCache.set(group.id, nextToken);
+        groupByClassName.set(classKey, group);
+        if (access.mode === "generated") {
+          generatedSecurityTokens.push({
+            groupId: group.id,
+            subject: group.subject,
+            className: group.className,
+            token: nextToken,
           });
-
-          const updatedGroup = getStudentGroup(nextDatabase, group.id);
-          if (updatedGroup) {
-            groupByClassName.set(classKey, updatedGroup);
-            group = updatedGroup;
-          }
-
-          importedStudentsPerClass.set(group.className, (importedStudentsPerClass.get(group.className) ?? 0) + 1);
         }
-
-        const lockedGroupDuringImport = Object.keys(unlockedGroupPasswordsRef.current).some(
-          (groupId) => !(groupId in nextUnlockedPasswords),
-        );
-        if (lockedGroupDuringImport) clearSensitiveGlobalSearch();
-        unlockedGroupPasswordsRef.current = nextUnlockedPasswords;
-        setUnlockedGroupIds(Object.keys(nextUnlockedPasswords));
-        setStudentDatabase(nextDatabase);
-
-        const firstImportedClassName = importedStudentsPerClass.keys().next().value as string | undefined;
-        if (firstImportedClassName) {
-          const importedGroup = nextDatabase.groups.find((group) => group.className === firstImportedClassName);
-          if (importedGroup) {
-            setActiveGroupId(importedGroup.id);
-            const lastImportedStudent = importedGroup.students[importedGroup.students.length - 1] ?? null;
-            setActiveStudentId(lastImportedStudent?.id ?? importedGroup.students[0]?.id ?? "");
-          }
-        }
-
-        const importedCount = Array.from(importedStudentsPerClass.values()).reduce((sum, value) => sum + value, 0);
-        const importedClasses = Array.from(importedStudentsPerClass.entries())
-          .map(([groupClassName, count]) => `${groupClassName}: ${count}`)
-          .join("\n");
-        const skippedText = skippedClasses.size > 0
-          ? ` Übersprungen: ${Array.from(skippedClasses).join(", ")}.`
-          : "";
-        pushNotice(
-          skippedClasses.size > 0 ? "warning" : "success",
-          "Klassenliste importiert",
-          `Importiert: ${importedCount} Schüler. ${importedClasses.replace(/\n/g, " · ")}.${skippedText}`,
-        );
-        if (generatedSecurityTokens.length > 0) {
-          setPendingSecurityTokenCards(generatedSecurityTokens);
-        }
-      } catch (error) {
-        pushNotice("danger", "Klassenliste konnte nicht importiert werden", error instanceof Error ? error.message : undefined);
       }
-    })();
+
+      if (!group.passwordVerifier) {
+        skippedClasses.add(group.className);
+        continue;
+      }
+
+      const password = passwordCache.get(group.id) ?? nextUnlockedPasswords[group.id] ?? "";
+      if (!password) {
+        skippedClasses.add(group.className);
+        continue;
+      }
+
+      const isValidPassword = passwordCache.has(group.id) || await verifyPassword(group.passwordVerifier, group.id, password);
+      if (!isValidPassword) {
+        skippedClasses.add(group.className);
+        delete nextUnlockedPasswords[group.id];
+        continue;
+      }
+
+      passwordCache.set(group.id, password);
+
+      const alias = buildStudentAlias(
+        group.className,
+        group.students.length + 1,
+        new Set(group.students.map((student) => student.alias)),
+      );
+      const encryptedName = await encryptText(`${row.lastName}, ${row.firstName}`, password);
+      const studentId = crypto.randomUUID();
+
+      nextDatabase = addStudentToGroup(nextDatabase, group.id, {
+        id: studentId,
+        alias,
+        encryptedName,
+        createdAt: new Date().toISOString(),
+      });
+
+      const updatedGroup = getStudentGroup(nextDatabase, group.id);
+      if (updatedGroup) {
+        groupByClassName.set(classKey, updatedGroup);
+        group = updatedGroup;
+      }
+
+      importedStudentsPerClass.set(group.className, (importedStudentsPerClass.get(group.className) ?? 0) + 1);
+    }
+
+    const lockedGroupDuringImport = Object.keys(unlockedGroupPasswordsRef.current).some(
+      (groupId) => !(groupId in nextUnlockedPasswords),
+    );
+    if (lockedGroupDuringImport) clearSensitiveGlobalSearch();
+    unlockedGroupPasswordsRef.current = nextUnlockedPasswords;
+    setUnlockedGroupIds(Object.keys(nextUnlockedPasswords));
+    setStudentDatabase(nextDatabase);
+
+    const firstImportedClassName = importedStudentsPerClass.keys().next().value as string | undefined;
+    if (firstImportedClassName) {
+      const importedGroup = nextDatabase.groups.find((group) => group.className === firstImportedClassName);
+      if (importedGroup) {
+        setActiveGroupId(importedGroup.id);
+        const lastImportedStudent = importedGroup.students[importedGroup.students.length - 1] ?? null;
+        setActiveStudentId(lastImportedStudent?.id ?? importedGroup.students[0]?.id ?? "");
+      }
+    }
+
+    const importedCount = Array.from(importedStudentsPerClass.values()).reduce((sum, value) => sum + value, 0);
+    const importedClasses = Array.from(importedStudentsPerClass.entries())
+      .map(([groupClassName, count]) => `${groupClassName}: ${count}`)
+      .join("\n");
+    const skippedText = skippedClasses.size > 0
+      ? ` Übersprungen: ${Array.from(skippedClasses).join(", ")}. Diese Klassen müssen zuerst entsperrt und gegebenenfalls mit einem Passwort geschützt werden. Importiere anschließend nur die übersprungenen Klassen erneut.`
+      : "";
+    const message = importedCount > 0
+      ? `Import abgeschlossen: ${importedCount} Schüler. ${importedClasses.replace(/\n/g, " · ")}.${skippedText}`
+      : `Import fehlgeschlagen: Es wurden keine Schüler importiert.${skippedText}`;
+    if (generatedSecurityTokens.length > 0) {
+      setPendingSecurityTokenCards(generatedSecurityTokens);
+    }
+    return { importedCount, skippedClassCount: skippedClasses.size, message };
   };
 
   const printWithResolvedIdentity = async (password?: string, preparedPopup?: Window | null) => {

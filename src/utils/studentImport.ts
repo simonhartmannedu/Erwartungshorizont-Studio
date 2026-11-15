@@ -9,6 +9,12 @@ export interface ImportSortOptions {
   direction: "ascending" | "descending";
 }
 
+export interface StudentImportResult {
+  importedCount: number;
+  skippedClassCount: number;
+  message: string;
+}
+
 const normalizeHeader = (value: string) =>
   value
     .trim()
