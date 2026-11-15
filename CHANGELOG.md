@@ -4,6 +4,8 @@ Dieses Projekt verwendet [Semantic Versioning](https://semver.org/).
 
 ## Unveröffentlicht
 
+- Zugeklappte Korrekturabschnitte zeigen in der Kopfzeile ein kompaktes Kästchen mit erreichten und maximalen Punkten. Die Werte folgen der aktuellen Korrektur und Schülerauswahl; gesperrte Bewertungen bleiben auch in den Abschnittsbadges verborgen.
+
 ## 1.2.0 – 15.11.2026
 
 - Das vorhandene Favicon steht neben dem App-Titel. Kompakte, responsive Überschriftengrößen ordnen Übersicht, Vorlagenauswahl und Wizard unter dem App-Titel ein und lassen mehr Platz für die EWH-Arbeit.

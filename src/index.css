@@ -6350,6 +6350,35 @@
     color: var(--app-text-strong);
   }
 
+  .section-score-summary {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 5.25rem;
+    max-width: 100%;
+    border: 1px solid color-mix(in srgb, var(--section-accent) 30%, var(--app-secondary-border));
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background: color-mix(in srgb, var(--section-accent) 8%, var(--app-secondary-bg));
+    color: var(--app-text-strong);
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .section-score-summary > span {
+    color: var(--app-text-muted);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .section-score-summary > strong {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+  }
+
   .section-editor .card-title-toggle {
     color: inherit;
     text-decoration: none;

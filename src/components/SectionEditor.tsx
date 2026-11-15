@@ -140,6 +140,15 @@ export const SectionEditor = ({
         collapsible
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
+        headerAside={collapsed ? (
+          <div className="section-score-summary" role="group" aria-label={`Punkte für ${section.title || `Aufgabenteil ${index + 1}`}`}>
+            <span>{showScores && scoresLocked ? "Gesperrt" : "Punkte"}</span>
+            <strong>
+              {showScores ? `${scoresLocked ? "–" : formatNumber(result.achievedPoints)} / ` : ""}
+              {formatNumber(result.maxPoints)} P.
+            </strong>
+          </div>
+        ) : undefined}
         actions={
           <div className="inline-flex items-center gap-1" role="group" aria-label={`Aktionen für ${section.title || `Aufgabenteil ${index + 1}`}`}>
             <IconButton onClick={() => onMove("up")} title="Aufgabenteil nach oben" className="px-2 py-1.5 text-xs">
@@ -192,8 +201,8 @@ export const SectionEditor = ({
             </Badge>
           )}
           {linkedSectionTitle && <Badge tone="slate">Verknüpft mit {linkedSectionTitle}</Badge>}
-          <Badge tone="amber">{formatNumber(result.percentage)} %</Badge>
-          {showScores ? <Badge tone="slate">{formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge> : null}
+          <Badge tone="amber">{showScores && scoresLocked ? "Gesperrt" : `${formatNumber(result.percentage)} %`}</Badge>
+          {showScores ? <Badge tone="slate">{scoresLocked ? "Gesperrt" : formatNumber(result.achievedPoints)} / {formatNumber(result.maxPoints)} P.</Badge> : null}
           {collapsed && (
             <span className="themed-muted w-full text-xs font-medium sm:ml-auto sm:w-auto">
               {section.tasks.length} Unteraufgaben

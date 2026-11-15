@@ -14,6 +14,7 @@ export const Card = ({
   title,
   subtitle,
   actions,
+  headerAside,
   children,
   className = "",
   headerLayout = "split",
@@ -24,6 +25,7 @@ export const Card = ({
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
+  headerAside?: ReactNode;
   children: ReactNode;
   className?: string;
   headerLayout?: "split" | "stacked";
@@ -32,17 +34,19 @@ export const Card = ({
   onToggleCollapse?: () => void;
 }) => (
   <section className={`panel p-4 sm:p-6 ${className}`}>
-    {(title || actions || collapsible) && (
+    {(title || actions || headerAside || collapsible) && (
       <div
         className={`mb-5 ${
-          headerLayout === "stacked"
+          headerAside
+            ? "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2"
+            : headerLayout === "stacked"
             ? "space-y-3"
             : "flex flex-wrap items-start justify-between gap-3"
         }`}
       >
-        <div>
+        <div className={headerAside ? "contents" : undefined}>
           {title ? (
-            <h2 className="card-title text-lg font-semibold">
+            <h2 className={`card-title text-lg font-semibold ${headerAside ? "min-w-0 break-words" : ""}`}>
               {collapsible ? (
                 <button
                   type="button"
@@ -55,10 +59,11 @@ export const Card = ({
               ) : title}
             </h2>
           ) : null}
-          {subtitle && <p className="card-subtitle mt-1 text-sm">{subtitle}</p>}
+          {subtitle && <p className={`card-subtitle text-sm ${headerAside ? "col-span-2 row-start-2" : "mt-1"}`}>{subtitle}</p>}
         </div>
+        {headerAside ? <div className="col-start-2 row-start-1">{headerAside}</div> : null}
         {collapsible ? (
-          <div className="control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1 shadow-sm sm:flex-nowrap">
+          <div className={`control-cluster inline-flex flex-wrap items-center gap-1 rounded-full border p-1 shadow-sm sm:flex-nowrap ${headerAside ? "col-span-2 justify-self-start" : ""}`}>
             {actions}
             <IconButton
               onClick={() => onToggleCollapse?.()}
